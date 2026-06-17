@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.pyc
+
+# Notebook checkpoints
+.ipynb_checkpoints/
+
+# Build / working artifacts
+**/out/_shots/
+**/out/_template.html
+**/out/assemble.js
+**/out/verify_embedded.js
+**/out/assets/
+*- Copy.html
+* - Copy.html
+
+# OS / editor
+.DS_Store
+Thumbs.db
