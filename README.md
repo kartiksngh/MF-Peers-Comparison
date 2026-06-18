@@ -4,9 +4,12 @@ A self-contained, offline dashboard that ranks Indian mutual-fund schemes and fu
 into performance quartiles (Q1 best … Q4 worst) on **1-year** and **3-year** returns, and
 shows where **Aditya Birla Sun Life (ABSL)** stands versus the **Top-15** fund houses.
 
-**▶ Live dashboard:** https://kartiksngh.github.io/MF-Peers-Comparison/
+**▶ Live dashboard:** https://kartiksngh.github.io/MF-Peers-Comparison/ (always shows the latest refresh)
 
-This refresh is as of **16 June 2026**.
+This refresh is as of **16 June 2026**. The deck is **interactive** — every snapshot view has a
+time-slider with play / reverse / pause / step and an animated-**GIF export**, and the Composite
+bar has per-quartile show/hide toggles. To update the live link with a new refresh, see
+**`HOW_TO_PUBLISH.md`**.
 
 Two peer universes are shown side by side:
 
@@ -17,10 +20,12 @@ Two peer universes are shown side by side:
 ## Contents
 
 ```
-index.html              ← the published dashboard (copy of June-16's dashboard_offline.html)
-June 16, 2026/          ← this refresh — self-contained
+index.html              ← the LIVE dashboard (copy of the latest refresh's dashboard_offline.html)
+publish_refresh.py      ← stages a new refresh + resets index.html to the latest (see HOW_TO_PUBLISH.md)
+HOW_TO_PUBLISH.md       ← how to update the live link
+June 16, 2026/          ← this refresh (archived) — self-contained
 ├── peer_monitor.py     ← the engine (one file; reads Data/, writes out/)
-├── dashboard.html      ← offline dashboard template (__PEER_DATA__ + inlined Chart.js)
+├── dashboard.html      ← baked offline template (__PEER_DATA__ + inlined Chart.js, html2canvas, gif.js, slider/GIF engine)
 ├── make_notebook.py    ← regenerates the audit notebook from the engine (no drift)
 ├── embed_data.py       ← helper to inject data into the template
 ├── BUILD_SPEC.md       ← the methodology / audit contract (read first)
