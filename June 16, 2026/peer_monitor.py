@@ -726,7 +726,7 @@ def write_dashboard_json(path, res, pct, cmap, amc_all, sleeve, exclusions, peer
             "y": [None if pd.isna(v) else int(round(v)) for v in col1],
             "t": [None if pd.isna(v) else int(round(v)) for v in col3],
             "b": [None if pd.isna(v) else int(round(v)) for v in colb],
-            "a": [None if pd.isna(v) else round(float(v), 6) for v in cola],
+            "a": [None if pd.isna(v) else round(float(v), 4) for v in cola],
             "cr": [None if pd.isna(v) else round(float(v), 2) for v in colcr],
         })
 
@@ -753,7 +753,7 @@ def write_dashboard_json(path, res, pct, cmap, amc_all, sleeve, exclusions, peer
     aum_dates = [d.date().isoformat() for d in aum_dcols]
 
     def _series(row):
-        return [None if pd.isna(x) else round(float(x), 6) for x in row[aum_dcols].values]
+        return [None if pd.isna(x) else round(float(x), 4) for x in row[aum_dcols].values]
 
     # sleeve index = (Rolling Window, fund house, Breakdown, Quartile)
     sleeve_recs = [{"rw": ix[0], "fh": ix[1], "br": ix[2], "qt": ix[3], "v": _series(row)}
@@ -789,7 +789,7 @@ def write_dashboard_json(path, res, pct, cmap, amc_all, sleeve, exclusions, peer
             allpeer.append({
                 "s": s, "h": hh, "sl": sleeve_of.get(s, "Other"), "c": cat_of.get(s),
                 "aq1y": [_q(v) for v in a1], "aq3y": [_q(v) for v in a3],
-                "a": [None if pd.isna(v) else round(float(v), 6) for v in pa],
+                "a": [None if pd.isna(v) else round(float(v), 4) for v in pa],
                 "cr": [None if pd.isna(v) else round(float(v), 2) for v in ca],
             })
 
