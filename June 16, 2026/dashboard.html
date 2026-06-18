@@ -1797,7 +1797,10 @@ function renderCompositeKPIs(){
 }
 // Stacked histogram of ONLY the ticked quartiles, each kept in its own Q-colour (Q1 dark-green
 // … Q4 red — the static-snapshot scheme). Y fixed 0–100%; house order FROZEN by the latest-date
-// summed value so scrubbing the timeline moves only bar HEIGHTS (each house holds its x slot).
+// summed value so scrubbing the timeline moves only bar HEIGHTS. PERF: updates the chart IN
+// PLACE (chart.update('none')) while the SHAPE is unchanged — rebuilds only on a structural
+// change (universe / basis / weight / quartile pick / house order). Avoids destroy+recreate
+// churn, so scrub + play are smooth.
 function renderCompositeBar(){
   const i=S.composite.date;
   const sel=(S.composite.qsel&&S.composite.qsel.length)?S.composite.qsel.slice().sort():[1,2];
@@ -1808,29 +1811,39 @@ function renderCompositeBar(){
     .filter(r=> r.ref!=null || sumSel(r.byQ,i)!=null)
     .sort((a,b)=> (b.ref==null?-1:b.ref)-(a.ref==null?-1:a.ref));
   const selLabel=sel.map(q=>'Q'+q).join('+');
-  const isA=fh=>fh==='Aditya', botQ=sel[0], topQ=sel[sel.length-1];
+  const isA=fh=>fh==='Aditya', botQ=sel[0], topQ=sel[sel.length-1], labels=rows.map(r=>r.fh);
   document.getElementById('cp-bar-sub').textContent=`${selLabel} share of each house's covered AUM · stacked by quartile · fixed 0–100% axis · ordered by latest ${selLabel} · ${fmt.date(curDates()[i])}`;
+  const dataByQ=sel.map(q=> rows.map(r=>share(r.byQ,q,i)));
+  // fast path: shape unchanged → just swap the data arrays and repaint (no chart rebuild)
+  const sig=[S.universe,S.basis,S.w,S.reward,sel.join(''),labels.join('|')].join('~');
+  if(S.charts.cpBar && S.charts.cpBarSig===sig){
+    dataByQ.forEach((d,qi)=>{ S.charts.cpBar.data.datasets[qi].data=d; });
+    S.charts.cpBar.update('none');
+    return;
+  }
+  // (re)build — shape changed (universe / basis / weight / quartile pick / order)
   const lg=document.getElementById('cp-bar-legend');
   if(lg) lg.innerHTML = sel.map(q=>`<span><span class="ldot" style="background:${QCOL['% in Q'+q]}"></span>Q${q}</span>`).join('')
     + `<span><span class="ldot" style="background:transparent;box-shadow:0 0 0 2.5px ${OUTLINE}"></span>Aditya Birla</span>`;
   // one dataset per selected quartile (ascending → Q1 at the bottom), each in its quartile colour.
-  // Aditya gets a blue box: side rails on every segment + cap on the bottom/top segment only.
-  const ds=sel.map(q=>({ label:'Q'+q, stack:'q', backgroundColor:QCOL['% in Q'+q], maxBarThickness:66,
-    data:rows.map(r=>share(r.byQ,q,i)),
+  // Aditya gets a maroon box: side rails on every segment + cap on the bottom/top segment only.
+  const ds=sel.map((q,qi)=>({ label:'Q'+q, stack:'q', backgroundColor:QCOL['% in Q'+q], maxBarThickness:66,
+    data:dataByQ[qi],
     borderColor:rows.map(r=> isA(r.fh)?OUTLINE:'rgba(0,0,0,0)'),
     borderWidth:rows.map(r=> isA(r.fh)?{left:OUTLINE_W,right:OUTLINE_W,top:(q===topQ?OUTLINE_W:0),bottom:(q===botQ?OUTLINE_W:0)}:0),
     borderSkipped:false }));
   const ctx=document.getElementById('cp-bar').getContext('2d');
   S.charts.cpBar?.destroy();
-  S.charts.cpBar=new Chart(ctx,{type:'bar',data:{labels:rows.map(r=>r.fh),datasets:ds},
-    options:{ maintainAspectRatio:false, responsive:true, interaction:{mode:'index',intersect:false},
+  S.charts.cpBar=new Chart(ctx,{type:'bar',data:{labels,datasets:ds},
+    options:{ maintainAspectRatio:false, responsive:true, animation:false, interaction:{mode:'index',intersect:false},
       plugins:{legend:{display:false}, tooltip:{...baseTooltip(), callbacks:{label:c=>`${c.dataset.label}: ${c.parsed.y==null?'—':c.parsed.y.toFixed(1)+'%'}`}}},
       scales:{ x:{ stacked:true, grid:{display:false}, ticks:{ maxRotation:55, minRotation:55,
             color:c=> rows[c.index]&&isA(rows[c.index].fh)?OUTLINE:C.ink3,
             font:c=> ({size:10, weight: rows[c.index]&&isA(rows[c.index].fh)?'700':'400'}) } },
         y:{ stacked:true, min:0, max:100, ticks:{callback:v=>v+'%',color:C.ink3}, grid:{color:C.line2}, border:{display:false} } } }});
+  S.charts.cpBarSig=sig;
   document.getElementById('cp-bar-method').innerHTML=methodNote(
-    `Stacked histogram: each house's bar shows the ticked quartiles (${selLabel}) as separate <b>colour-coded segments</b> (Q1 dark-green … Q4 red), each = that quartile's share of the house's covered AUM, on <b>${fmt.date(curDates()[i])}</b> (${basisDesc()}). Y-axis fixed 0–100%; houses held in a <b>fixed order</b> (by the latest ${selLabel}) so playing the timeline shows each house's stack rise or fall in place. <b>Aditya Birla</b> outlined in the ABSL brand maroon &amp; bold on the axis. ${scoreMethodLine()}`);
+    `Stacked histogram: each house's bar shows the ticked quartiles (${selLabel}) as separate <b>colour-coded segments</b> (Q1 dark-green … Q4 red), each = that quartile's share of the house's covered AUM (${basisDesc()}). Y-axis fixed 0–100%; houses held in a <b>fixed order</b> (by the latest ${selLabel}) so playing the timeline shows each house's stack rise or fall in place. <b>Aditya Birla</b> outlined in the ABSL brand maroon &amp; bold on the axis. ${scoreMethodLine()}`);
 }
 function renderCompositeTrend(){
   const {dates,byQ}=houseSeries('Aditya',null), weight=byQ[WEIGHT_QT]||[];
@@ -2005,12 +2018,19 @@ function updateTlLabel(tl){ const d=curDates()[tl.cfg.get()]; tl.lbl.textContent
 // any fund has the required 1Y/3Y history). extentOf() already treats null/≈0 as absent —
 // the same rule that clips the trend x-axes — so the slider, the dropdowns, the play loop
 // and the GIF picker are all bounded to [lo, hi]. Recomputed live (universe + basis aware).
+// Cached per universe/basis/weight/reward — it only changes with those, NOT per date, so we
+// must not rescan all houses on every scrub/play tick (that was a per-step cost).
+let _extCache={key:null,val:null};
 function selectableExtent(){
+  const key=S.universe+'|'+S.basis+'|'+S.w+'|'+S.reward;
+  if(_extCache.key===key) return _extCache.val;
   const dts=curDates(); let lo=Infinity, hi=-1;
   (TOP15||[]).forEach(fh=>{ const {byQ}=houseSeries(fh,null);
     const e=extentOf(byQ['% in Q1'],byQ['% in Q2'],byQ['% in Q3'],byQ['% in Q4']);
     if(e){ if(e.lo<lo)lo=e.lo; if(e.hi>hi)hi=e.hi; } });
-  return hi<0 ? {lo:0, hi:dts.length-1} : {lo, hi};
+  const val = hi<0 ? {lo:0, hi:dts.length-1} : {lo, hi};
+  _extCache={key, val};
+  return val;
 }
 function dateOptionsRange(dts, lo, hi, sel){ let h='';
   for(let i=lo;i<=hi;i++) h+=`<option value="${i}" ${i===sel?'selected':''}>${fmt.date(dts[i])}</option>`; return h; }
@@ -2047,15 +2067,33 @@ function reflectTransport(tl){ if(!tl.box) return;
   tl.box.querySelector('.tl-rev').classList.toggle('active', tl.playing && tl.dir<0);
   tl.box.querySelector('.tl-fwd').classList.toggle('active', tl.playing && tl.dir>0); }
 function startPlay(tl, dir){
-  stopPlay(tl, true);                                       // clear any running timer
+  stopPlay(tl, true);                                       // clear any running loop
   const {lo,hi}=selectableExtent();
   if(dir>0 && tl.cfg.get()>=hi) gotoIdx(tl.cfg, lo);        // at the end → wrap to start
   if(dir<0 && tl.cfg.get()<=lo) gotoIdx(tl.cfg, hi);        // at the start → wrap to end
   tl.playing=true; tl.dir=dir; setAnim(false); reflectTransport(tl);
-  tl.timer=setInterval(()=>{ const ni=tl.cfg.get()+dir; if(ni<lo||ni>hi){ stopPlay(tl); return; } gotoIdx(tl.cfg, ni); }, PLAY_MS);
+  // Self-correcting requestAnimationFrame loop: advance only AFTER the prior frame has had a
+  // chance to paint, so a slow machine plays SLOWER but never skips months. A fixed setInterval
+  // fires regardless of paint, so on a busy main thread steps pile up and the view jumps.
+  let last=null;
+  const tick=(ts)=>{
+    if(!tl.playing){ tl.raf=null; return; }
+    if(last==null) last=ts;
+    if(ts-last >= PLAY_MS){
+      last=ts;
+      const ni=tl.cfg.get()+dir;
+      if(ni<lo||ni>hi){ stopPlay(tl); return; }
+      gotoIdx(tl.cfg, ni);                                  // one step = one render = one paint
+    }
+    tl.raf=requestAnimationFrame(tick);
+  };
+  tl.raf=requestAnimationFrame(tick);
 }
-function stopPlay(tl, silent){ if(tl.timer){ clearInterval(tl.timer); tl.timer=null; }
-  tl.playing=false; tl.dir=0; if(!silent) setAnim(true); reflectTransport(tl); }
+function stopPlay(tl, silent){
+  if(tl.timer){ clearInterval(tl.timer); tl.timer=null; }
+  if(tl.raf){ cancelAnimationFrame(tl.raf); tl.raf=null; }
+  tl.playing=false; tl.dir=0; if(!silent) setAnim(true); reflectTransport(tl);
+}
 function stepTl(tl, d){ stopPlay(tl); gotoIdx(tl.cfg, tl.cfg.get()+d); }
 
 //── GIF export dialog ─────────────────────────────────────────────────────────
@@ -2142,7 +2180,7 @@ async function runGif(){
       gotoIdx(cfg, idxs[k]); await raf2();
       badge.textContent=fmt.date(curDates()[idxs[k]]);
       target.appendChild(badge); target.classList.add('capturing');
-      const shot=await html2canvas(target,{backgroundColor:'#fbf8f1', scale:Math.min(2, window.devicePixelRatio||1), logging:false, useCORS:true});
+      const shot=await html2canvas(target,{backgroundColor:'#fbf8f1', scale:1, logging:false, useCORS:true});
       target.classList.remove('capturing'); if(badge.parentNode) badge.parentNode.removeChild(badge);
       if(H2==null) H2=Math.round(W2*shot.height/shot.width);
       gif.addFrame(composeFrame(shot, W2, H2), {delay:sp, copy:true});
