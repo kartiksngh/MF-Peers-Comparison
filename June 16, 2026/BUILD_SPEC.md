@@ -89,9 +89,44 @@ The composite-score method becomes a **user control in the dashboard**; the VR-p
 - **Distance/alpha table**: Birla-vs-category (top/bottom/mean/Q1) AND Birla-vs-benchmark alpha + % outperforming (peer + benchmark), `% times +ve alpha` rolling 250 (nb 440-467, 647-648).
 - **Dashboard** (`dashboard.html` + `dashboard_data.json` + `dashboard_offline.html`): reuse the embedded template; feed it the corrected composite/score/alpha + month-end sampling.
 
+### 4i. Short rolling windows 1M/3M/6M/9M + quartile residency (NEW — KV 2026-06-24)
+In ADDITION to the 1Y/3Y windows, every scheme is evaluated on **1-, 3-, 6- and 9-month** rolling
+windows so the WHOLE deck (sleeve/AMC/league/matrix/scheme) can be viewed on any window via the
+global **`Rolling window / basis`** selector (`1M·3M·6M·9M·1Y·3Y·3Y+rew·Composite`).
+- **Returns** (`calendar_returns_m(nav, months)`): exact-calendar point-to-point, `NAV_t/NAV_{t_m}−1`,
+  where `t_m` = last trading day on/before the same calendar day `months` months before `t`
+  (`pd.DateOffset(months=...)`, day-clamped, e.g. Mar-31−1M→Feb-28). **CUMULATIVE, not annualized**
+  for sub-year — a sub-year CAGR misleads, and quartile RANKS are identical either way (annualizing is
+  monotonic). The 1Y/3Y windows are unchanged (1Y cumulative, 3Y CAGR).
+- **No composite / no benchmark reward** for the sub-year windows — raw quartiles only; composite
+  (0.8·1Y+0.2·3Y, +reward) applies ONLY when combining 1Y & 3Y.
+- **Quartiles**: round-up bucketing (`quartiles_roundup`) within the **MFI all-peer** category
+  (`all_peer_quartiles_m`) AND within the **VR exact-peer** category (`vr_quartiles_m`). Both universes.
+- **Engine→JSON**: per-scheme month-end quartiles `aq1m/aq3m/aq6m/aq9m` (all-peer rows) and
+  `q1m/q3m/q6m/q9m` (VR rows). Dashboard aggregates the all-peer short windows into the house bands
+  **client-side** (a raw cube from the per-scheme quartiles — symmetric with the VR cube — so we DON'T
+  ship 4 more precomputed sleeve/AMC tables; the validated 1Y/3Y precomputed-table path is untouched).
+- **Quartile RESIDENCY** (`window_residency`): for every **Top-15-house** scheme, both universes, all
+  6 windows, the count of trading days spent in Q1/Q2/Q3/Q4 over the **trailing window ending at each
+  as-of month-end** (window length = lookback, e.g. 3M ≈ 62-65 trading days). Shipped as
+  `residency[universe][scheme][windowLabel] = {f:firstAsofIdx, v:[[q1,q2,q3,q4]|null,…]}` aligned to
+  `aum_dates` (all) / `months` (VR), leading/trailing-empty trimmed. **Definition** = days in each
+  quartile over the trailing window; **denominator `n` = days the scheme was rated** (= q1+q2+q3+q4,
+  NOT calendar days — a young scheme without the full window of history has fewer rated days);
+  shown as days, fraction `d/n`, and `%` to 2 dp. Rendered in **Scheme Detail, beside the quartile chart**;
+  **follows the as-of date selector**. Composite/3Y+reward show a "pick a single window" hint (a blend
+  of 1Y & 3Y has no single window). Only Top-15 schemes (the scheme picker only lists those).
+- **Size note**: residency + the per-scheme short-window quartiles roughly double the offline deck
+  (~9.7 → ~18.7 MB; residency ≈ 6.3 MB). Knowingly accepted for the as-of-aware interactivity; GitHub
+  Pages serves it gzipped (~3-4 MB on the wire). Trim levers if email size matters: drop 1Y/3Y residency,
+  cap residency to recent N years, or revert residency to latest-date-only.
+
 ## 5. Open / parked
 - Auto-fetch of MFI data (analogous to NSE-Indices fetch in the FFT project) — AFTER this run.
 - Web fetch for NASDAQ-100 TRI & S&P Global 1200 TRI (replace stale Bloomberg) — parked, save for later.
+- **`_app.js` is a STALE working copy** — the authoritative dashboard app code lives INLINE in
+  `_dashboard_src.html` (the bake reads only that). Edit `_dashboard_src.html`; re-sync or delete
+  `_app.js` in a future cleanup so it can't mislead.
 
 ## 7b. Benchmark staleness handling (finalized 2026-06-17)
 `align_benchmarks` now CARRIES benchmarks forward (ffill) onto the scheme calendar, so the +1 bonus is computable at every date using the latest available benchmark level (correct for periodic indices like monthly CRISIL Hybrid). A category's composite is CAPPED (set NaN after its benchmark's last real date) only when that benchmark is **>`STALE_BENCH_DAYS` (45) behind scheme-latest** — i.e. genuinely stale. As of June data this caps exactly: Pure International & Nasdaq-100-FOFs (2026-03-11), Multi-Asset Allocation (2025-11-28, broken composite benchmark). Monthly CRISIL/Silver and 1-day-lagged benchmarks stay current. Month-end outputs use `month_end_asof` (last non-NaN ≤ month-end per column) so capped cats show their last valid date and 1-day reporting lags are absorbed. Excel files default to month-end resolution. Verified Aditya VR composite as-of 06-16: Q1 41.5/Q2 15.5/Q3 27.9/Q4 5.2, coverage 90.2%.

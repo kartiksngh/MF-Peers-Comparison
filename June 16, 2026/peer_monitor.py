@@ -367,6 +367,104 @@ def calendar_returns(nav: pd.DataFrame):
             pd.DataFrame(r3, index=idx, columns=nav.columns))
 
 
+# ── Short rolling windows (1/3/6/9 months) — RAW quartiles, no composite/reward ──
+# KV (2026-06-24): in ADDITION to the 1Y/3Y windows, evaluate every scheme on 1M/3M/6M/9M
+# rolling windows so the whole deck (sleeve/AMC/league/scheme) can be viewed on any window.
+# Returns are CUMULATIVE point-to-point (NAV_t/NAV_{t_m}-1), NOT annualized — a sub-year CAGR
+# would be misleading; quartile RANKS are identical either way (annualizing is monotonic).
+MONTH_WINS = [1, 3, 6, 9]                                   # the NEW sub-year windows
+RES_WINS   = [1, 3, 6, 9, 12, 36]                           # all windows (incl. 1Y/3Y) for residency
+WIN_LABEL  = {1: "1 Month", 3: "3 Month", 6: "6 Month", 9: "9 Month", 12: "1 Year", 36: "3 Year"}
+
+
+def calendar_returns_m(nav: pd.DataFrame, months: int) -> pd.DataFrame:
+    """Cumulative point-to-point return over a trailing `months`-month CALENDAR window:
+    for each date t, t_m = last trading day on/before the SAME calendar day `months` months
+    before t (DateOffset clamps the day to the target month's length, e.g. Mar-31 - 1M ->
+    Feb-28). `R = NAV_t / NAV_{t_m} - 1` (cumulative). Mirrors calendar_returns()'s exact-
+    calendar lookback, but month-based and never annualized (sub-year)."""
+    idx = nav.index
+    targets = pd.DatetimeIndex(idx) - pd.DateOffset(months=months)
+    pos = idx.get_indexer(pd.DatetimeIndex(targets), method="ffill")
+    vals = nav.values.astype(float)
+    r = np.full(vals.shape, np.nan)
+    ok = pos >= 0
+    r[ok] = vals[ok] / vals[pos[ok]] - 1.0
+    return pd.DataFrame(r, index=idx, columns=nav.columns)
+
+
+def all_peer_quartiles_m(nav, cmap, categories, months, n_jobs=-1):
+    """Daily all-peer (MFI) quartile labels for a `months`-month window (raw, like 1Y/3Y)."""
+    r = calendar_returns_m(nav, months)
+    members = {c: list(cmap.index[cmap["Category"] == c]) for c in categories}
+    return _quartiles_for_returns(r, members, n_jobs=n_jobs)
+
+
+def vr_quartiles_m(nav, cme, months, avoid=AVOID_EXACT_CATS, min_peers=1,
+                   only_cats=None, n_jobs=-1):
+    """Daily VR exact-peer quartile labels for a `months`-month window, as a MultiIndex
+    (cat, scheme) frame (mirrors exact_peer_scoring's qy_1y/qy_3y shape, raw quartiles only)."""
+    r = calendar_returns_m(nav, months)
+    cats = sorted(c for c in cme["Category"].dropna().unique() if c not in avoid)
+    if only_cats is not None:
+        cats = [c for c in cats if c in only_cats]
+    jobs = []
+    for c in cats:
+        fs = list(dict.fromkeys(s for s in cme.index[cme["Category"] == c] if s in nav.columns))
+        if len(fs) < min_peers:
+            continue
+        jobs.append((c, r[fs]))
+    labs = Parallel(n_jobs=n_jobs)(delayed(_quartile_block)(sub) for c, sub in jobs)
+    return _assemble_mi({c: lab for (c, _), lab in zip(jobs, labs)})
+
+
+def _vr_daily_by_scheme(qy_mi: pd.DataFrame) -> pd.DataFrame:
+    """Collapse a MultiIndex(cat, scheme) daily-quartile frame to dates x scheme-NAME, keeping
+    the FIRST category for any scheme that sits in >1 VR category (matches the dashboard's
+    `vr.find(v=>v.s===name)` first-match convention)."""
+    seen, cols, names = set(), [], []
+    for (c, sch) in qy_mi.columns:
+        if sch in seen:
+            continue
+        seen.add(sch); cols.append((c, sch)); names.append(sch)
+    sub = qy_mi.loc[:, cols].copy()
+    sub.columns = names
+    return sub
+
+
+def window_residency(qy_daily: pd.DataFrame, asof_dates, months_back: int) -> dict:
+    """Quartile RESIDENCY: for each scheme, the number of trading days spent in Q1/Q2/Q3/Q4
+    over the trailing `months_back`-month CALENDAR window ending at each as-of date.
+       window = (asof - months_back months, asof]  (same calendar-month lookback as the returns).
+    `qy_daily`: daily dates x schemes labels (q1..q4 / NaN). Returns
+       {scheme: {"f": firstAsofIdx, "v": [[q1,q2,q3,q4] | None, ...]}}  aligned to asof_dates,
+    with leading/trailing all-empty as-of dates trimmed. n_days_traded = q1+q2+q3+q4."""
+    didx = pd.DatetimeIndex(qy_daily.index)
+    asof = pd.DatetimeIndex(asof_dates)
+    qnum = qy_daily.replace({"q1": 1, "q2": 2, "q3": 3, "q4": 4}).apply(pd.to_numeric, errors="coerce")
+
+    def _padcum(mask):                      # cumulative day-count, with a leading 0 row so
+        c = mask.cumsum().values            # padded[p] = count over the first p trading days,
+        return np.vstack([np.zeros((1, c.shape[1])), c])   # i.e. dates <= didx[p-1]
+    cums = {q: _padcum(qnum == q) for q in (1, 2, 3, 4)}
+    # padded[searchsorted(D,'right')] = count over all trading days on/before D
+    end_pos = didx.searchsorted(asof, side="right")
+    start_pos = didx.searchsorted(pd.DatetimeIndex(asof - pd.DateOffset(months=months_back)), side="right")
+
+    out = {}
+    for j, sch in enumerate(qy_daily.columns):
+        rows = []
+        for k in range(len(asof)):
+            cnt = [int(cums[q][end_pos[k], j] - cums[q][start_pos[k], j]) for q in (1, 2, 3, 4)]
+            rows.append(cnt if sum(cnt) > 0 else None)
+        f = next((i for i, r in enumerate(rows) if r is not None), None)
+        if f is None:
+            continue
+        last = len(rows) - next(i for i, r in enumerate(reversed(rows)) if r is not None)
+        out[sch] = {"f": f, "v": rows[f:last]}
+    return out
+
+
 def quartiles_roundup(sorted_desc_index):
     """Given an index sorted best->worst, return [q1,q2,q3,q4] lists; remainder to TOP buckets
     (nb 1286-1296)."""
@@ -686,7 +784,7 @@ def write_scoring_workbook(path, s1, s3_raw, beat, composite, qy_score, peer_map
 
 def write_dashboard_json(path, res, pct, cmap, amc_all, sleeve, exclusions, peer_map,
                          exact_bench, bench_last, aum_daily=None, w_1y=0.8,
-                         qy1=None, qy3=None):
+                         qy1=None, qy3=None, qy_all_w=None, qy_vr_w=None):
     """Emit dashboard_data.json. Per VR scheme × month-end it ships the score COMPONENTS and
     AUM so the dashboard recomputes ANY basis live (1Y / 3Y±reward / Composite with weight):
         per scheme: q1y,q3y (return quartiles 1..4), y(=1Y score 5..2), t(=3Y score 4..1),
@@ -703,6 +801,7 @@ def write_dashboard_json(path, res, pct, cmap, amc_all, sleeve, exclusions, peer
     btm = month_end_asof(res["beat"]).reindex(months)
     q1ym = month_end_asof(res["qy_1y"]).reindex(months)
     q3ym = month_end_asof(res["qy_3y"]).reindex(months)
+    qvm = {m: month_end_asof(qy_vr_w[m]).reindex(months) for m in MONTH_WINS} if qy_vr_w else {}
     pctm = month_end_asof(pct).reindex(months)
     crm = (month_end_asof(aum_daily).reindex(months) if aum_daily is not None
            else pd.DataFrame(index=months))
@@ -720,7 +819,7 @@ def write_dashboard_json(path, res, pct, cmap, amc_all, sleeve, exclusions, peer
         cq1, cq3 = q1ym[(c, sch)].values, q3ym[(c, sch)].values
         cola = (pctm[sch].reindex(months).values if sch in pctm.columns else np.full(len(months), np.nan))
         colcr = (crm[sch].reindex(months).values if sch in crm.columns else np.full(len(months), np.nan))
-        vr.append({
+        _vrec = {
             "c": c, "s": sch, "h": str(sch).split()[0], "sl": sleeve_of.get(sch, "Other"),
             "q1y": [_q(v) for v in cq1], "q3y": [_q(v) for v in cq3],
             "y": [None if pd.isna(v) else int(round(v)) for v in col1],
@@ -728,7 +827,12 @@ def write_dashboard_json(path, res, pct, cmap, amc_all, sleeve, exclusions, peer
             "b": [None if pd.isna(v) else int(round(v)) for v in colb],
             "a": [None if pd.isna(v) else round(float(v), 4) for v in cola],
             "cr": [None if pd.isna(v) else round(float(v), 2) for v in colcr],
-        })
+        }
+        for m in MONTH_WINS:        # 1M/3M/6M/9M VR exact-peer quartile (raw, 1..4)
+            cm = (qvm[m][(c, sch)].values if (m in qvm and (c, sch) in qvm[m].columns)
+                  else np.full(len(months), np.nan))
+            _vrec[f"q{m}m"] = [_q(v) for v in cm]
+        vr.append(_vrec)
 
     # AMC-total and AMC x sleeve-total AUM (Rs cr, month-end) for the top-15 houses
     amc_total, amc_sleeve_total = {}, {}
@@ -775,6 +879,7 @@ def write_dashboard_json(path, res, pct, cmap, amc_all, sleeve, exclusions, peer
         cat_of = cmap["Category"].to_dict()
         aq1 = month_end_asof(qy1).reindex(aum_dcols)
         aq3 = month_end_asof(qy3).reindex(aum_dcols)
+        aqm = {m: month_end_asof(qy_all_w[m]).reindex(aum_dcols) for m in MONTH_WINS} if qy_all_w else {}
         pct_a = month_end_asof(pct).reindex(aum_dcols)
         cr_a = (month_end_asof(aum_daily).reindex(aum_dcols) if aum_daily is not None
                 else pd.DataFrame(index=aum_dcols))
@@ -786,12 +891,35 @@ def write_dashboard_json(path, res, pct, cmap, amc_all, sleeve, exclusions, peer
             a3 = aq3[s].values if s in aq3.columns else np.full(len(aum_dcols), np.nan)
             pa = pct_a[s].values if s in pct_a.columns else np.full(len(aum_dcols), np.nan)
             ca = cr_a[s].values if s in cr_a.columns else np.full(len(aum_dcols), np.nan)
-            allpeer.append({
+            _arec = {
                 "s": s, "h": hh, "sl": sleeve_of.get(s, "Other"), "c": cat_of.get(s),
                 "aq1y": [_q(v) for v in a1], "aq3y": [_q(v) for v in a3],
                 "a": [None if pd.isna(v) else round(float(v), 4) for v in pa],
                 "cr": [None if pd.isna(v) else round(float(v), 2) for v in ca],
-            })
+            }
+            for m in MONTH_WINS:        # 1M/3M/6M/9M MFI all-peer quartile (raw, 1..4)
+                am = (aqm[m][s].values if (m in aqm and s in aqm[m].columns)
+                      else np.full(len(aum_dcols), np.nan))
+                _arec[f"aq{m}m"] = [_q(v) for v in am]
+            allpeer.append(_arec)
+
+    # ── QUARTILE RESIDENCY: for every Top-15-house scheme, the count of trading days spent in
+    # Q1/Q2/Q3/Q4 over the trailing window ENDING AT each as-of month-end (so it follows the
+    # Scheme-Detail as-of date selector). Both universes; windows 1M/3M/6M/9M/1Y/3Y. Aligned to
+    # aum_dates (all-peer) / months (VR). Only Top-15 schemes (the scheme picker only lists them).
+    top15set = set(TOP15)
+    residency = {"all": {}, "vr": {}}
+    if qy_all_w:
+        for m in RES_WINS:
+            cols = [s for s in qy_all_w[m].columns if str(s).split()[0] in top15set]
+            for sch, rec in window_residency(qy_all_w[m][cols], list(aum_dcols), m).items():
+                residency["all"].setdefault(sch, {})[WIN_LABEL[m]] = rec
+    if qy_vr_w:
+        for m in RES_WINS:
+            daily = _vr_daily_by_scheme(qy_vr_w[m])
+            cols = [s for s in daily.columns if str(s).split()[0] in top15set]
+            for sch, rec in window_residency(daily[cols], list(months), m).items():
+                residency["vr"].setdefault(sch, {})[WIN_LABEL[m]] = rec
 
     # Capped categories must be the VR (exact-peer) categories whose benchmark is stale — the
     # composite is NaN'd after the benchmark's last real date. Iterate the composite's OWN VR
@@ -815,6 +943,7 @@ def write_dashboard_json(path, res, pct, cmap, amc_all, sleeve, exclusions, peer
                  "repeated_cats": REPEATED_PEER_CATS},
         "months": mstr, "amc_dates": aum_dates, "aum_dates": aum_dates,
         "vr": vr, "amc_all": amc_recs, "sleeve": sleeve_recs, "allpeer": allpeer,
+        "residency": residency, "residency_windows": [WIN_LABEL[m] for m in RES_WINS],
         "capped_cats": capped,
         "amc_total_cr": amc_total, "amc_sleeve_total_cr": amc_sleeve_total,
         "exclusions": exclusions,
@@ -954,6 +1083,13 @@ def run(data_dir="Data", out_dir="out", w_1y=0.8, min_peers=1, repeat_frac=REPEA
     res = exact_peer_scoring(nav, bench_cal, cme, exact_bench, w_1y=w_1y,
                              min_peers=min_peers, bench_last=bench_last)
 
+    log("[5b/8] Short rolling windows 1M/3M/6M/9M (raw quartiles, both universes)")
+    qy_all_w = {12: qy1, 36: qy3}                  # 1Y/3Y daily quartiles already computed
+    qy_vr_w  = {12: res["qy_1y"], 36: res["qy_3y"]}
+    for m in MONTH_WINS:
+        qy_all_w[m] = all_peer_quartiles_m(nav, cmap, cats, m)
+        qy_vr_w[m]  = vr_quartiles_m(nav, cme, m, min_peers=min_peers)
+
     log("[6/8] Month-end sampling + VR composite %AUM")
     qy_me = month_end_asof(res["qy_score"])
     vr = vr_amc_table(qy_me, pct, cmap)
@@ -981,7 +1117,8 @@ def run(data_dir="Data", out_dir="out", w_1y=0.8, min_peers=1, repeat_frac=REPEA
                            qy_me, peer_map, resolution="daily", w_1y=w_1y)
     jp, sz = write_dashboard_json(out / "dashboard_data.json", res, pct, cmap, amc, sleeve,
                                   exclusions, peer_map, exact_bench, bench_last,
-                                  aum_daily=aum_daily, w_1y=w_1y, qy1=qy1, qy3=qy3)
+                                  aum_daily=aum_daily, w_1y=w_1y, qy1=qy1, qy3=qy3,
+                                  qy_all_w=qy_all_w, qy_vr_w=qy_vr_w)
     write_dashboards(out)  # dashboard.html (+ offline) from embedded template, if available
     log(f"\nDone. Outputs in {out.resolve()}:\n  {f1.name}\n  {f2.name}\n  dashboard_data.json ({sz:.2f} MB) + dashboard.html")
     return dict(nav=nav, cmap=cmap, cats=cats, pct=pct, bench_cal=bench_cal, bench_last=bench_last,

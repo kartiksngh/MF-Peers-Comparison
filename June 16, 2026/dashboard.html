@@ -656,8 +656,8 @@
     <div class="seg" id="gc-universe"><button data-v="all" class="active">All Peers (MFI)</button><button data-v="vr">Exact Peers (VR)</button></div></div>
   <div class="fg" id="gc-windowwrap"><label>Rolling window</label>
     <div class="seg" id="gc-window"><button data-v="1 Year" class="active">1Y</button><button data-v="3 Year">3Y</button></div></div>
-  <div class="fg" id="gc-basiswrap" style="display:none"><label>Score basis (VR)</label>
-    <div class="seg" id="gc-basis"><button data-v="1Y">1Y</button><button data-v="3Y">3Y</button><button data-v="3Y+reward">3Y+rew</button><button data-v="Composite" class="active">Composite</button></div></div>
+  <div class="fg" id="gc-basiswrap" style="display:none"><label>Rolling window / basis</label>
+    <div class="seg" id="gc-basis"><button data-v="1M">1M</button><button data-v="3M">3M</button><button data-v="6M">6M</button><button data-v="9M">9M</button><button data-v="1Y">1Y</button><button data-v="3Y">3Y</button><button data-v="3Y+reward">3Y+rew</button><button data-v="Composite" class="active">Composite</button></div></div>
   <div class="fg slider" id="gc-wwrap" style="display:none"><label>1Y weight (3Y = 100 &minus; w)</label>
     <div class="srow"><input type="range" id="gc-w" min="0" max="100" step="5" value="80"><span class="slidval" id="gc-wval">80 / 20</span></div></div>
   <div class="fg" id="gc-rewardwrap" style="display:none"><label>Benchmark reward</label>
@@ -762,6 +762,12 @@ const S = {
   vrCube:null, vrKey:null, allCube:null, allKey:null
 };
 const S1=[null,5,4,3,2], S3=[null,4,3,2,1];   // quartile(1..4) -> 1Y / 3Y score
+// Short rolling windows (raw quartiles, no composite/reward). RWOF maps a basis -> the engine's
+// residency window label; ALLFIELD/VRFIELD map a short-window basis -> the per-scheme quartile field.
+const RWOF={'1M':'1 Month','3M':'3 Month','6M':'6 Month','9M':'9 Month','1Y':'1 Year','3Y':'3 Year'};
+const ALLFIELD={'1M':'aq1m','3M':'aq3m','6M':'aq6m','9M':'aq9m'};
+const VRFIELD={'1Y':'q1y','3Y':'q3y','1M':'q1m','3M':'q3m','6M':'q6m','9M':'q9m'};
+const isShortWin=b=>b==='1M'||b==='3M'||b==='6M'||b==='9M';
 
 const fmt = {
   pct:(v,d=1)=> v==null||isNaN(v) ? '—' : (100*v).toFixed(d)+'%',
@@ -853,9 +859,9 @@ function rebucket(items, key){
 function assignQuartiles(m){
   const basis=S.basis, wf=S.w/100, reward=S.reward;
   const D=S.data.vr; for(const v of D) v.__q=null;
-  if(basis==='1Y' || basis==='3Y'){
-    const key = basis==='1Y' ? 'q1y' : 'q3y';
-    for(const v of D){ if(REPEATED.has(v.c)) continue; const q=v[key][m]; if(q!=null) v.__q=q; }
+  if(VRFIELD[basis]){                                  // raw window: 1M/3M/6M/9M/1Y/3Y
+    const key = VRFIELD[basis];
+    for(const v of D){ if(REPEATED.has(v.c)) continue; const q=v[key]?.[m]; if(q!=null) v.__q=q; }
     return;
   }
   const byCat={};
@@ -918,6 +924,28 @@ function buildAllCube(){
   S.allCube={house,hs};
 }
 function ensureAllCube(){ const key='all|'+S.w; if(S.allKey!==key){ buildAllCube(); S.allKey=key; } }
+
+// ── ALL-PEER RAW short-window cube (1M/3M/6M/9M): each scheme's quartile is the engine's
+// precomputed per-window MFI all-peer quartile (raw, NO re-bucket, no weight). Aggregated by
+// AUM into the four bands per house & house|sleeve, Top-15 only — mirrors the 1Y/3Y tables but
+// computed client-side from the per-scheme rows so we don't ship 4 more precomputed tables.
+function buildAllRawCube(basis){
+  const field=ALLFIELD[basis], M=S.data.aum_dates.length, T=new Set(TOP15), house={}, hs={};
+  for(const r of S.data.allpeer){ if(!T.has(r.h)) continue; if(!house[r.h]) house[r.h]=Array.from({length:M},blankCell);
+    const k=r.h+'|'+r.sl; if(!hs[k]) hs[k]=Array.from({length:M},blankCell); }
+  for(let i=0;i<M;i++){
+    for(const r of S.data.allpeer){ if(!T.has(r.h)) continue; const q=r[field]?.[i]; if(q==null) continue;
+      const a=r.a[i], c=r.cr[i]; if(a==null && c==null) continue;
+      const cell=house[r.h][i], cs=hs[r.h+'|'+r.sl][i];
+      if(a!=null){ cell.a[q]+=a; cell.tA+=a; cs.a[q]+=a; cs.tA+=a; }
+      if(c!=null){ cell.cr[q]+=c; cell.tCr+=c; cs.cr[q]+=c; cs.tCr+=c; }
+      cell.cnt[q]++; cell.tCnt++; cs.cnt[q]++; cs.tCnt++;
+    }
+  }
+  return {house,hs};
+}
+// raw all-peer quartiles don't depend on weight/reward, so cache once per window basis.
+function ensureAllRawCube(basis){ S.allRawCubes=S.allRawCubes||{}; if(!S.allRawCubes[basis]) S.allRawCubes[basis]=buildAllRawCube(basis); }
 function cubeSeries(cube, fh, sleeve, dates){
   const cells=(sleeve ? cube.hs[fh+'|'+sleeve] : cube.house[fh]) || [];
   const byQ={'% in Q1':[],'% in Q2':[],'% in Q3':[],'% in Q4':[],[WEIGHT_QT]:[]};
@@ -935,6 +963,7 @@ function cubeSeries(cube, fh, sleeve, dates){
 function houseSeries(fh, sleeve){
   if(S.universe==='all'){
     if(S.basis==='Composite'){ ensureAllCube(); return cubeSeries(S.allCube, fh, sleeve, S.data.aum_dates); }
+    if(ALLFIELD[S.basis]){ ensureAllRawCube(S.basis); return cubeSeries(S.allRawCubes[S.basis], fh, sleeve, S.data.aum_dates); }
     // 1Y / 3Y read the engine's precomputed (exact) all-peer tables
     const rw = S.basis==='3Y' ? '3 Year' : '1 Year', byQ={};
     const recs = sleeve
@@ -991,14 +1020,19 @@ function downloadCSV(content, filename){
 function basisDesc(){
   if(S.universe==='all'){
     if(S.basis==='Composite') return `All Peers (MFI) · Composite (1Y ${S.w} / 3Y ${100-S.w}, no reward)`;
-    return `All Peers (MFI) · ${S.basis==='3Y'?'3 Year':'1 Year'} return quartile`;
+    return `All Peers (MFI) · ${RWOF[S.basis]||S.basis} return quartile`;
   }
   if(S.basis==='Composite') return `Exact Peers (VR) · Composite (1Y ${S.w} / 3Y ${100-S.w}${S.reward?' · +reward':''})`;
   if(S.basis==='3Y+reward') return 'Exact Peers (VR) · 3Y score + benchmark reward';
+  if(isShortWin(S.basis)) return `Exact Peers (VR) · ${RWOF[S.basis]} return quartile`;
   return `Exact Peers (VR) · ${S.basis} score`;
 }
 function universeLabel(){ return S.universe==='all'?'MFI all-peer':'VR exact-peer'; }
 function scoreMethodLine(){
+  if(isShortWin(S.basis)){
+    const uni=S.universe==='all'?'MFI all-peer':'Value Research exact-peer';
+    return `Each scheme is ranked within its <b>${uni}</b> category on <b>${RWOF[S.basis]}</b> point-to-point <b>cumulative</b> calendar returns and bucketed into quartiles (Q1 = best). No composite blend or benchmark reward — those apply only when combining 1Y &amp; 3Y. Bands are each quartile's share of the house's AUM.`;
+  }
   if(S.universe==='all'){
     if(S.basis==='Composite') return `Each scheme's 1Y &amp; 3Y <b>all-peer quartiles</b> are scored (1Y Q1=5…Q4=2; 3Y Q1=4…Q4=1), blended as <b>(w·1Y + (100−w)·3Y)/100</b> and <b>re-bucketed within its full MFI category</b> (Q1 = best). No benchmark reward — MFI all-peer categories have no designated benchmark. Bands are each quartile's share of the house's AUM.`;
     return `Each scheme is ranked against its <b>MFI all-peer category</b> on <b>${S.basis==='3Y'?'3-year':'1-year'}</b> point-to-point calendar returns and bucketed into quartiles (Q1 = best). Bands are each quartile's share of the house's AUM.`;
@@ -1200,12 +1234,19 @@ function buildViews(){
     <div class="content">
       <div class="shead"><h2 id="sc-title">Scheme detail</h2><div class="ctx" id="sc-ctx"></div></div>
       <div class="kpis" id="sc-kpis"></div>
-      <div class="card">
-        <div class="card-h"><div><h3 id="sc-score-title">Quartile score history</h3><div class="sub" id="sc-score-sub"></div></div>
-          <div class="legend" id="sc-score-legend"></div>
+      <div class="grid-2 sc-split" style="grid-template-columns:1.5fr 1fr">
+        <div class="card">
+          <div class="card-h"><div><h3 id="sc-score-title">Quartile score history</h3><div class="sub" id="sc-score-sub"></div></div>
+            <div class="legend" id="sc-score-legend"></div>
+          </div>
+          <div class="chartbox tall"><canvas id="sc-score"></canvas></div>
+          <div id="sc-score-method"></div>
         </div>
-        <div class="chartbox tall"><canvas id="sc-score"></canvas></div>
-        <div id="sc-score-method"></div>
+        <div class="card">
+          <div class="card-h"><div><h3 id="sc-resid-title">Quartile residency</h3><div class="sub" id="sc-resid-sub"></div></div></div>
+          <div class="tbl-wrap" id="sc-resid"></div>
+          <div id="sc-resid-method"></div>
+        </div>
       </div>
       <div class="card">
         <div class="card-h"><div><h3 id="sc-dd-title">Schemes by quartile — AUM held</h3><div class="sub" id="sc-dd-sub"></div></div></div>
@@ -1517,15 +1558,15 @@ function schemeRowsAt(i){
       return S.data.allpeer.map(r=>{ const q1=r.aq1y[i],q3=r.aq3y[i];
         const sc=(q1==null||q3==null)?null:wf*S1[q1]+(1-wf)*S3[q3];
         return { s:r.s, h:r.h, sl:r.sl, c:r.c, q:r.__qa, a:r.a[i], cr:r.cr[i], score:sc }; }); }
-    const key=S.basis==='3Y'?'aq3y':'aq1y';
-    return S.data.allpeer.map(r=>({ s:r.s, h:r.h, sl:r.sl, c:r.c, q:r[key][i], a:r.a[i], cr:r.cr[i], score:null }));
+    const key = S.basis==='3Y'?'aq3y' : S.basis==='1Y'?'aq1y' : ALLFIELD[S.basis];
+    return S.data.allpeer.map(r=>({ s:r.s, h:r.h, sl:r.sl, c:r.c, q:r[key]?.[i], a:r.a[i], cr:r.cr[i], score:null }));
   }
   assignQuartiles(i);
   const wf=S.w/100;
   return S.data.vr.map(v=>{ let sc=null;
     if(v.__q!=null){ if(S.basis==='1Y') sc=v.y[i]; else if(S.basis==='3Y') sc=v.t[i];
       else if(S.basis==='3Y+reward'){ sc=v.t[i]==null?null:v.t[i]+(v.b[i]===1?1:0); }
-      else { sc=(v.y[i]==null||v.t[i]==null)?null:wf*v.y[i]+(1-wf)*(v.t[i]+(S.reward&&v.b[i]===1?1:0)); } }
+      else if(S.basis==='Composite'){ sc=(v.y[i]==null||v.t[i]==null)?null:wf*v.y[i]+(1-wf)*(v.t[i]+(S.reward&&v.b[i]===1?1:0)); } }
     return { s:v.s, h:v.h, sl:v.sl, c:v.c, q:v.__q, a:v.a[i], cr:v.cr[i], score:sc }; });
 }
 function renderScheme(){
@@ -1570,7 +1611,18 @@ function renderSchemeBody(){
   // ── score / quartile history (selected scheme)
   const ctx=document.getElementById('sc-score').getContext('2d');
   S.charts.scScore?.destroy();
-  if(vr){
+  if(isShortWin(S.basis)){                                  // 1M/3M/6M/9M — plot that window's quartile
+    const field = vr ? VRFIELD[S.basis] : ALLFIELD[S.basis];
+    const rec=(vr?D.vr:D.allpeer).find(r=>r.s===name); const dates=vr?D.months:D.aum_dates;
+    const qline=rec?dates.map((d,i)=>({x:d,y:(rec[field]&&rec[field][i]!=null)?rec[field][i]:null})):[];
+    const {xmin,xmax}=xBounds(dates, qline.map(p=>p.y));
+    const dq={ data:qline, borderColor:C.navy, borderWidth:2.4, tension:0, pointRadius:0, stepped:true, spanGaps:false, yAxisID:'y', fill:false }; dq.label=RWOF[S.basis]+' quartile';
+    S.charts.scScore=new Chart(ctx,{type:'line',data:{datasets:[dq]},options:lineOpts({min:0.6,max:4.4,xmin,xmax,reverse:true})});
+    document.getElementById('sc-score-title').textContent=RWOF[S.basis]+' quartile history';
+    document.getElementById('sc-score-sub').textContent=`Raw ${vr?'VR exact-peer':'MFI all-peer'} ${RWOF[S.basis]} return quartile (1 = top quartile, at the top of the axis)`;
+    document.getElementById('sc-score-legend').innerHTML=`<span><span class="lline" style="background:${C.navy}"></span>${RWOF[S.basis]} quartile</span>`;
+    document.getElementById('sc-score-method').innerHTML=methodNote(`Month-end <b>${RWOF[S.basis]} quartile</b> for <b>${name}</b> (1 = top). ${scoreMethodLine()} Axis reversed so Q1 sits on top.`);
+  } else if(vr){
     const rec=D.vr.find(v=>v.s===name); const dates=D.months, wf=S.w/100;
     const compS=rec?dates.map((d,i)=>({x:d,y:(rec.y[i]==null||rec.t[i]==null)?null:wf*rec.y[i]+(1-wf)*(rec.t[i]+(S.reward&&rec.b[i]===1?1:0))})):[];
     const oneY=rec?dates.map((d,i)=>({x:d,y:rec.y[i]})):[];
@@ -1616,7 +1668,40 @@ function renderSchemeBody(){
       <div class="kpi"><div class="k-lbl">Sleeve</div><div class="k-val" style="font-size:18px">${rowsLast?rowsLast.sl:'—'}</div><div class="k-sub">breakdown</div></div>`;
   }
 
-  renderSchemeDrill(); renderSchemePeers();
+  renderSchemeDrill(); renderSchemePeers(); renderSchemeResidency();
+}
+// ── Quartile residency: days the selected scheme spent in each quartile over the trailing
+// rolling window ending at the as-of date. Follows the Scheme-Detail as-of date + the window
+// basis. Data is precomputed per Top-15 scheme × window × month-end in the engine (residency).
+function residencyAt(universe, name, rw, i){
+  const R=S.data.residency; if(!R||!R[universe]) return null;
+  const rec=R[universe][name]; if(!rec||!rec[rw]) return null;
+  const k=i-rec[rw].f; const v=rec[rw].v;
+  return (k>=0 && k<v.length) ? v[k] : null;   // [q1,q2,q3,q4] days, or null
+}
+function renderSchemeResidency(){
+  const {name,month}=S.scheme, uni=S.universe, rw=RWOF[S.basis];
+  const box=document.getElementById('sc-resid'); if(!box) return;
+  const subEl=document.getElementById('sc-resid-sub'), methodEl=document.getElementById('sc-resid-method');
+  document.getElementById('sc-resid-title').textContent='Quartile residency';
+  if(!rw){            // Composite / 3Y+reward blend 1Y & 3Y → no single rolling window
+    subEl.textContent='Pick a single rolling window';
+    box.innerHTML='<div class="sub" style="padding:16px 14px">Residency counts the days a scheme spends in each quartile over <b>one</b> rolling window. Set the basis to <b>1M, 3M, 6M, 9M, 1Y or 3Y</b> to see it — Composite and 3Y+reward blend 1Y &amp; 3Y, so they have no single window.</div>';
+    methodEl.innerHTML=''; return;
+  }
+  const asof=fmt.date(curDates()[month]), cnt=residencyAt(uni,name,rw,month);
+  subEl.innerHTML=`Trailing ${rw} to ${asof}`;
+  if(!cnt){ box.innerHTML=`<div class="sub" style="padding:16px 14px">No rated trading days for <b>${name||'—'}</b> over the trailing <b>${rw}</b> ending ${asof} — the scheme needs the full window of history (and category peers) to be ranked here.</div>`;
+    methodEl.innerHTML=''; return; }
+  const n=cnt[0]+cnt[1]+cnt[2]+cnt[3], QC=[C.q1,C.q2,C.q3,C.q4];
+  let html=`<table class="rt"><thead><tr><th>Quartile</th><th class="num">Days</th><th class="num">Fraction</th><th class="num">%</th></tr></thead><tbody>`;
+  for(let q=0;q<4;q++){ const d=cnt[q];
+    html+=`<tr><td class="lbl"><span class="qchip" style="background:${QC[q]}">Q${q+1}</span></td><td class="num">${d}</td><td class="num">${d}/${n}</td><td class="num">${n?(100*d/n).toFixed(2):'0.00'}%</td></tr>`; }
+  const th=cnt[0]+cnt[1];
+  html+=`<tr class="qhead"><td>Top half (Q1+Q2)</td><td class="num">${th}</td><td class="num">${th}/${n}</td><td class="num">${n?(100*th/n).toFixed(2):'0.00'}%</td></tr>`;
+  html+=`</tbody></table>`;
+  box.innerHTML=html;
+  methodEl.innerHTML=methodNote(`Trading days <b>${name}</b> spent in each quartile over the <b>trailing ${rw}</b> ending <b>${asof}</b>, ranked within its <b>${universeLabel()}</b> category each day on ${RWOF[S.basis]} cumulative calendar returns. <b>Days</b> = trading days at that quartile; <b>Fraction</b> = days ÷ <b>${n}</b> days the scheme was rated in the window; <b>%</b> = the same to 2 dp. Days where the scheme lacked the full ${rw} of history are not counted, so the denominator is days <i>traded &amp; rated</i>, not calendar days.`);
 }
 function renderSchemeDrill(){
   const {fh,cat,sl,name,month}=S.scheme;
@@ -1644,29 +1729,29 @@ function renderSchemeDrill(){
     `Every ${fh} scheme in the ${universeLabel()} universe on <b>${fmt.date(curDates()[month])}</b>, grouped by its current quartile. <b>% of AMC</b> = scheme AUM ÷ ${fh}'s total AUM (all schemes in the house). <b>% of sleeve</b> = scheme AUM ÷ total ${fh} AUM in that sleeve (within this universe). <b>AUM (₹cr)</b> = the scheme's absolute month-end AUM.`);
 }
 function renderSchemePeers(){
-  const {cat,name,month}=S.scheme, vr=S.universe==='vr';
+  const {cat,name,month}=S.scheme, vr=S.universe==='vr', scored=vr && !isShortWin(S.basis);
   const rec=(vr?S.data.vr:S.data.allpeer).find(r=>r.s===name);
   const pcat = rec? rec.c : null;
   const sub=document.getElementById('sc-peers-sub');
   if(pcat==null){ document.getElementById('sc-peers').innerHTML='<div class="sub" style="padding:16px">Select a scheme to see its category peer set.</div>'; sub.textContent=''; document.getElementById('sc-peers-method').innerHTML=''; return; }
   let peers=schemeRowsAt(month).filter(r=>r.c===pcat && (r.score!=null||r.q!=null));
-  if(vr) peers=peers.filter(r=>r.score!=null).sort((a,b)=>b.score-a.score);
+  if(scored) peers=peers.filter(r=>r.score!=null).sort((a,b)=>b.score-a.score);
   else if(S.basis==='Composite') peers=peers.filter(r=>r.score!=null).sort((a,b)=>b.score-a.score || (b.cr||0)-(a.cr||0));
   else   peers=peers.filter(r=>r.q!=null).sort((a,b)=>a.q-b.q || (b.cr||0)-(a.cr||0));
   peers.forEach((p,idx)=>p.rank=idx+1); const n=peers.length;
-  const avg=vr&&n?peers.reduce((s,p)=>s+p.score,0)/n:null;
+  const avg=scored&&n?peers.reduce((s,p)=>s+p.score,0)/n:null;
   sub.textContent=`${vr?'VR exact-peer':'MFI all-peer'} category “${pcat}” ranked on ${fmt.date(curDates()[month])}`;
-  let html='<table class="rt"><thead><tr><th>#</th><th>Scheme</th><th class="num">Quartile</th>'+(vr?'<th class="num">Score</th><th class="num">vs avg</th>':'<th class="num">% of its AMC</th>')+'</tr></thead><tbody>';
+  let html='<table class="rt"><thead><tr><th>#</th><th>Scheme</th><th class="num">Quartile</th>'+(scored?'<th class="num">Score</th><th class="num">vs avg</th>':'<th class="num">% of its AMC</th>')+'</tr></thead><tbody>';
   peers.forEach(p=>{ const cls=p.s===name?'hl':''; const pc=p.rank===1?'r1':p.rank<=Math.ceil(n/4)?'up':p.rank>n-Math.ceil(n/4)?'dn':'';
     const qchip=p.q?`<span class="qchip" style="background:${[null,C.q1,C.q2,C.q3,C.q4][p.q]}">Q${p.q}</span>`:'—';
-    if(vr){ const d=p.score-avg, dc=d>=0?'delta-pos':'delta-neg';
+    if(scored){ const d=p.score-avg, dc=d>=0?'delta-pos':'delta-neg';
       html+=`<tr class="${cls}"><td><span class="pill ${pc}">${p.rank}</span></td><td class="lbl">${p.s}</td><td class="num">${qchip}</td><td class="num">${fmt.num(p.score)}</td><td class="num ${dc}">${(d>=0?'+':'')+d.toFixed(2)}</td></tr>`; }
     else html+=`<tr class="${cls}"><td><span class="pill ${pc}">${p.rank}</span></td><td class="lbl">${p.s}</td><td class="num">${qchip}</td><td class="num">${fmt.pct(p.a)}</td></tr>`; });
   html+='</tbody></table>';
   document.getElementById('sc-peers').innerHTML=html;
   document.getElementById('sc-peers-method').innerHTML=methodNote(
-    vr ? `Every scheme in the <b>${pcat}</b> VR exact-peer set ranked by ${basisDesc()} score on <b>${fmt.date(curDates()[month])}</b>. “vs avg” is the gap to the category mean that day.`
-       : `Every scheme in the <b>${pcat}</b> MFI all-peer category ranked by ${S.basis} ${S.basis==='Composite'?'score':'quartile'} on <b>${fmt.date(curDates()[month])}</b>.`);
+    scored ? `Every scheme in the <b>${pcat}</b> VR exact-peer set ranked by ${basisDesc()} score on <b>${fmt.date(curDates()[month])}</b>. “vs avg” is the gap to the category mean that day.`
+       : `Every scheme in the <b>${pcat}</b> ${vr?'VR exact-peer':'MFI all-peer'} category ranked by ${RWOF[S.basis]||S.basis} ${S.basis==='Composite'?'score':'quartile'} on <b>${fmt.date(curDates()[month])}</b>.`);
 }
 function exportScheme(){
   const {fh,month}=S.scheme; const rows=schemeRowsAt(month).filter(r=>r.h===fh);
