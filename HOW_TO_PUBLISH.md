@@ -41,7 +41,7 @@ python publish_refresh.py "C:\Users\Administrator\Documents\Projects\Peer NAV Qu
 git status
 git commit -m "August 11, 2026 deck"
 
-# 3. push  —  A HUMAN RUNS THIS (see warning below)
+# 3. push  (Claude or KV can run this — just confirm the repo first, see below)
 git push origin main
 ```
 
@@ -53,11 +53,11 @@ redeploys automatically a minute or so after the push. Confirm the push landed w
 this repo, then `copy "<that folder>\out\dashboard_offline.html" index.html`, then commit +
 push.
 
-## Two safety rules (do not skip)
+## Safety rules (do not skip)
 
-1. **A person runs `git push` — never automate it.** The deck is **public** and inlines all
-   chart data, and this repo also contains the raw vendor `Data\`. Publishing is a deliberate
-   human decision each time (proprietary data → public internet). This was chosen knowingly.
+1. **The data is PUBLIC** — MFI / Value Research mutual-fund NAV/AUM is public market data, so
+   there is no confidentiality concern in publishing. KV has authorized Claude to run `git push`
+   for this repo, so it does **not** need a human to run it — just do the repo check in rule 2.
 2. **Only ever push from THIS folder.** On this machine git is accidentally rooted at the home
    directory (`C:\Users\Administrator`), so a push from the working project folder would try to
    upload your entire profile (SSH keys, tokens, AppData). Before any git command, run

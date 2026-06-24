@@ -14,9 +14,9 @@ as history; index.html is overwritten with the newest deck each time.
 
   python publish_refresh.py "C:/Users/Administrator/Documents/Projects/Peer NAV Quartiles comparison/2026/August 11, 2026"
 
-Then (the PUSH is a human step — proprietary data -> public repo):
+Then publish (public MF data — just a deliberate publish step; Claude or KV can run the push):
   git -C "<this repo>" commit -m "August 11, 2026 deck"
-  ! git -C "<this repo>" push -u origin main          # run with the ! session prefix
+  git -C "<this repo>" push origin main
 """
 import shutil, sys, subprocess
 from pathlib import Path
@@ -63,7 +63,7 @@ def main():
     print(f"Staged '{src.name}' and refreshed index.html (= latest deck).")
     print(f'  review : git -C "{REPO}" status')
     print(f'  commit : git -C "{REPO}" commit -m "{src.name} deck"')
-    print(f'  push   : ! git -C "{REPO}" push -u origin main   (you run this)')
+    print(f'  push   : git -C "{REPO}" push origin main')
 
 
 if __name__ == "__main__":
