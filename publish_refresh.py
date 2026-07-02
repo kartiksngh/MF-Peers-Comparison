@@ -23,7 +23,9 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parent
 CRUFT_FILES = {"_template.html", "assemble.js", "verify_embedded.js"}
-CRUFT_GLOBS = ["*- Copy.html", "* - Copy.html", "sample_*animation.gif", "dashboard_animated.html"]
+CRUFT_GLOBS = ["*- Copy.html", "* - Copy.html", "sample_*animation.gif", "dashboard_animated.html",
+               "BirlaMFPR*.xls*",   # internal ABSL/VR competition workbook — never publish
+               "_engine_run.log"]
 CRUFT_DIRS  = {"_shots", "assets", "_verify", "__pycache__", ".ipynb_checkpoints"}
 
 
