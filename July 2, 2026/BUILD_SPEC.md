@@ -39,6 +39,7 @@ Cross-source scheme joins MUST key on **AMFI Code** (present in NAV's metadata r
 ### 4a. Universe & maps
 - `fund house` = first token of scheme name (`split(" ")[0]`) — nb 173, 284.
 - All-peer (MFI) categories: keep categories with ≥4 fund houses (nb 245); Value+Contra merged → "Value/Contra"; Breakdown rules + MULTI_ASSET_DROP per old code §2.
+- **The VR peerset is ABSOLUTE and a SUBSET of All-Peers (KV 2026-07-03).** The NAV universe = Map schemes ∪ VR schemes; All-Peers exclusions (MULTI_ASSET_DROP, unmapped schemes) remove a scheme from the All-Peers categorisation ONLY — never from the NAV universe, so a VR peer is always scored (e.g. WhiteOak Capital Multi Asset Allocation: excluded from All-Peers, scored in VR). A scheme common to both universes must carry the same category concept in both (label synonyms allowed, e.g. Gennext↔Consumer); Map `Category=0` is not allowed — VR members take their VR category, others their SEBI (AMFI NAVAll) category.
 - Exact-peer (VR) categories from `category_map_exact['Category']`, **excluding** `["Domestic + International","Multi Index FoF","Other Competitor Thematic/Contra Funds"]` (nb 1235); sorted (nb 1238).
 - `exact_bench`: Category → Benchmark name, from the `AMFI Code=='bench'` rows (nb 287-291). Benchmark name must match a column in `bench_nav` after name-mapping.
 

@@ -1056,7 +1056,13 @@ def run(data_dir="Data", out_dir="out", w_1y=0.8, min_peers=1, repeat_frac=REPEA
     code2name = scheme_code_map()
     raw_map = pd.read_excel(MAP_DIR / "Map MFI Scheme to Category.xlsx", engine=ENGINE)
     cmap, cats = build_category_map(raw_map, code2name)
-    nav = nav[[s for s in nav.columns if s in cmap.index]]
+    # The VR peerset is ABSOLUTE (KV 2026-07-03): align it against the FULL NAV first, so
+    # All-Peers exclusions (MULTI_ASSET_DROP, unmapped schemes) can never drop a VR peer
+    # from the universe. All-Peers categorisation itself is untouched (cmap unchanged).
+    cme, exact_bench, vr_dropped = load_vr_mapping()
+    cme, vr_unmatched = align_vr_to_nav(cme, nav.columns, code2name)
+    vr_names = set(cme.index)
+    nav = nav[[s for s in nav.columns if s in cmap.index or s in vr_names]]
     cmap = cmap.loc[[s for s in cmap.index if s in nav.columns]]
     log(f"      universe: {nav.shape[1]} schemes, {len(cats)} all-peer categories, "
         f"to {nav.index.max().date()}")
@@ -1070,8 +1076,6 @@ def run(data_dir="Data", out_dir="out", w_1y=0.8, min_peers=1, repeat_frac=REPEA
     bench_nav, bench_report = load_bench_nav()
     bench_nav = clean_nav(bench_nav, frac=repeat_frac, max_gap=max_fill_gap, verbose=False)[0]
     bench_cal, bench_last = align_benchmarks(bench_nav, nav.index)
-    cme, exact_bench, vr_dropped = load_vr_mapping()
-    cme, vr_unmatched = align_vr_to_nav(cme, nav.columns, code2name)
     log(f"      VR peers recovered by code: {cme.attrs.get('recovered_by_match', 0)}; "
         f"dropped (no MFI NAV): {len(vr_dropped)}")
 
