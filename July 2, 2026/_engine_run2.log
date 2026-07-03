@@ -1,0 +1,43 @@
+C:\Users\Administrator\Documents\Projects\Peer NAV Quartiles comparison\2026\July 2, 2026\peer_monitor.py:46: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
+  df.index = pd.to_datetime(df.index, errors="coerce")
+C:\Users\Administrator\Documents\Projects\Peer NAV Quartiles comparison\2026\July 2, 2026\peer_monitor.py:46: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
+  df.index = pd.to_datetime(df.index, errors="coerce")
+C:\Users\Administrator\Documents\Projects\Peer NAV Quartiles comparison\2026\July 2, 2026\peer_monitor.py:46: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
+  df.index = pd.to_datetime(df.index, errors="coerce")
+C:\Users\Administrator\Documents\Projects\Peer NAV Quartiles comparison\2026\July 2, 2026\peer_monitor.py:759: FutureWarning: Starting with pandas version 3.0 all arguments of to_excel except for the argument 'excel_writer' will be keyword-only.
+  _sample(sleeve, resolution, axis=1).reset_index().to_excel(w, "Sleevewise %AUM Q1-Q4 - All", index=False)
+C:\Users\Administrator\Documents\Projects\Peer NAV Quartiles comparison\2026\July 2, 2026\peer_monitor.py:760: FutureWarning: Starting with pandas version 3.0 all arguments of to_excel except for the argument 'excel_writer' will be keyword-only.
+  _sample(amc_all, resolution, axis=1).reset_index().to_excel(w, "AMCwise %AUM Q1-Q4 - All", index=False)
+C:\Users\Administrator\Documents\Projects\Peer NAV Quartiles comparison\2026\July 2, 2026\peer_monitor.py:761: FutureWarning: Starting with pandas version 3.0 all arguments of to_excel except for the argument 'excel_writer' will be keyword-only.
+  _sample(vr, resolution, axis=1).reset_index().to_excel(w, "AMCwise %AUM Q1-Q4 - VR peer", index=False)
+C:\Users\Administrator\Documents\Projects\Peer NAV Quartiles comparison\2026\July 2, 2026\peer_monitor.py:774: FutureWarning: Starting with pandas version 3.0 all arguments of to_excel except for the argument 'excel_writer' will be keyword-only.
+  smp(s1).to_excel(w, "1Y score (q1=5..q4=2)")
+C:\Users\Administrator\Documents\Projects\Peer NAV Quartiles comparison\2026\July 2, 2026\peer_monitor.py:775: FutureWarning: Starting with pandas version 3.0 all arguments of to_excel except for the argument 'excel_writer' will be keyword-only.
+  smp(s3_raw).to_excel(w, "3Y score no reward (q1=4..1)")
+C:\Users\Administrator\Documents\Projects\Peer NAV Quartiles comparison\2026\July 2, 2026\peer_monitor.py:776: FutureWarning: Starting with pandas version 3.0 all arguments of to_excel except for the argument 'excel_writer' will be keyword-only.
+  smp(s3_reward).to_excel(w, "3Y score +bench reward")
+C:\Users\Administrator\Documents\Projects\Peer NAV Quartiles comparison\2026\July 2, 2026\peer_monitor.py:777: FutureWarning: Starting with pandas version 3.0 all arguments of to_excel except for the argument 'excel_writer' will be keyword-only.
+  smp(beat).to_excel(w, "Beats benchmark 3Y (1=yes)")
+C:\Users\Administrator\Documents\Projects\Peer NAV Quartiles comparison\2026\July 2, 2026\peer_monitor.py:779: FutureWarning: Starting with pandas version 3.0 all arguments of to_excel except for the argument 'excel_writer' will be keyword-only.
+  smp(composite).to_excel(w, f"Composite {_wp}-{100 - _wp} +reward")
+C:\Users\Administrator\Documents\Projects\Peer NAV Quartiles comparison\2026\July 2, 2026\peer_monitor.py:780: FutureWarning: Starting with pandas version 3.0 all arguments of to_excel except for the argument 'excel_writer' will be keyword-only.
+  smp(qy_score).to_excel(w, "Composite quartile (default)")
+C:\Users\Administrator\Documents\Projects\Peer NAV Quartiles comparison\2026\July 2, 2026\peer_monitor.py:781: FutureWarning: Starting with pandas version 3.0 all arguments of to_excel except for the argument 'excel_writer' will be keyword-only.
+  peer_map.reset_index().to_excel(w, "Peer & Bench Mapping", index=False)
+[1/8] Load + clean scheme NAV (calendar basis); AMFI-code category join
+  [] dropped 43 non-trading dates (frac>=0.9); filled 32780 gap-cells across 947 series; 10 discontinued series (last real < 2026-07-01)
+      universe: 945 schemes, 37 all-peer categories, to 2026-07-01
+[2/8] Daily AUM share
+[3/8] Benchmarks (carry-forward align) + VR peer map (AMFI-code join)
+      VR peers recovered by code: 0; dropped (no MFI NAV): 0
+[4/8] All-peer (MFI) quartiles -> Sleeve/AMC %AUM
+[5/8] Exact-peer (VR) scoring: 5/4/3/2 & 4/3/2/1, +reward, composite, re-bucket
+[5b/8] Short rolling windows 1M/3M/6M/9M (raw quartiles, both universes)
+[6/8] Month-end sampling + VR composite %AUM
+[7/8] Exclusions log
+[8/8] Write Excel + dashboard JSON
+
+Done. Outputs in C:\Users\Administrator\Documents\Projects\Peer NAV Quartiles comparison\2026\July 2, 2026\out:
+  percent AUM in Q1 to Q4 - July 01, 2026.xlsx
+  Scheme Scoring on Exact Peer Set - Calendar 1Y 3Y - July 01, 2026.xlsx
+  dashboard_data.json (17.10 MB) + dashboard.html

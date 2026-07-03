@@ -1,0 +1,13 @@
+C:\Users\Administrator\Documents\Projects\Peer NAV Quartiles comparison\2026\July 2, 2026\peer_monitor.py:46: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
+  df.index = pd.to_datetime(df.index, errors="coerce")
+C:\Users\Administrator\Documents\Projects\Peer NAV Quartiles comparison\2026\July 2, 2026\peer_monitor.py:46: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
+  df.index = pd.to_datetime(df.index, errors="coerce")
+  [] dropped 43 non-trading dates (frac>=0.9); filled 32780 gap-cells across 947 series; 10 discontinued series (last real < 2026-07-01)
+universe: 945 schemes, 37 categories, to 2026-07-01
+[verify 1Y] Aditya Birla Sun Life Flexi Cap Fund - Dir - Growth
+   direct slice [167, 87, 0, 0]  engine residency [167, 87, 0, 0]  MATCH=True  n=254  %=['65.7', '34.3', '0.0', '0.0']
+[verify 3Y] Aditya Birla Sun Life Flexi Cap Fund - Dir - Growth
+   direct slice [0, 241, 13, 0]  engine residency [0, 241, 13, 0]  MATCH=True  n=254  %=['0.0', '94.9', '5.1', '0.0']
+note: 12 schemes in Map but in no valid all-peer category (engine excludes categories with <4 fund houses) — left out of the dump
+matrix: 4781 dates x 933 schemes  (2007-03-16 .. 2026-07-01)
+written: out\Quartile Matrix and Time-in-Quartile - July 01, 2026.xlsx  (7.9 MB)
