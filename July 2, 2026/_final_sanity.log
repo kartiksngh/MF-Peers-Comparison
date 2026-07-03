@@ -1,0 +1,24 @@
+C:\Users\Administrator\Documents\Projects\Peer NAV Quartiles comparison\_sanity_check.py:48: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
+  x.index = pd.to_datetime(x.index, errors="coerce")
+C:\Users\Administrator\Documents\Projects\Peer NAV Quartiles comparison\_sanity_check.py:48: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
+  x.index = pd.to_datetime(x.index, errors="coerce")
+C:\Program Files\Python312\Lib\site-packages\openpyxl\styles\stylesheet.py:237: UserWarning: Workbook contains no default style, apply openpyxl's default
+  warn("Workbook contains no default style, apply openpyxl's default")
+C:\Users\Administrator\Documents\Projects\Peer NAV Quartiles comparison\_sanity_check.py:48: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
+  x.index = pd.to_datetime(x.index, errors="coerce")
+C:\Program Files\Python312\Lib\site-packages\openpyxl\styles\stylesheet.py:237: UserWarning: Workbook contains no default style, apply openpyxl's default
+  warn("Workbook contains no default style, apply openpyxl's default")
+C:\Users\Administrator\Documents\Projects\Peer NAV Quartiles comparison\_sanity_check.py:48: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
+  x.index = pd.to_datetime(x.index, errors="coerce")
+[info] --prev auto-detected: C:\Users\Administrator\Documents\Projects\Peer NAV Quartiles comparison\2026\June 16, 2026
+[OK  ] as-of 2026-07-01 (2d old)
+[OK  ] all-peer universe 924 vs previous 888
+[OK  ] VR composite range [1.80, 5.00] within [1.8, 5.0]
+[OK  ] quartile bands: sum<=100% and >=0 for 30 house-windows
+[info] capped categories: {'Pure International Plan': '2026-03-11', 'Nasdaq 100 FOFs': '2026-03-11', 'Multi Asset Allocation': '2025-11-28'}
+       Pure International Plan: benchmark last real 2026-03-11 — must be explainable (NASDAQ/S&P fallback or a known stale composite)
+       Nasdaq 100 FOFs: benchmark last real 2026-03-11 — must be explainable (NASDAQ/S&P fallback or a known stale composite)
+       Multi Asset Allocation: benchmark last real 2025-11-28 — must be explainable (NASDAQ/S&P fallback or a known stale composite)
+[OK  ] NAV data-path cross-check vs previous: 971 overlapping cells, 0 mismatches
+
+SANITY: PASS (0 warning(s))

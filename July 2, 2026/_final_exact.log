@@ -1,0 +1,44 @@
+file: BirlaMFPR-30062026-A_C.xls
+[note] 'Equity Investment Solutions' (30 schemes, single-AMC) = record-keeping block — not a peer category
+[note] 'FoFs' (11 schemes, single-AMC) = record-keeping block — not a peer category
+[note] 'Domestic + International' (2 schemes, single-AMC) = record-keeping block — not a peer category
+[OK ] Aggressive Hybrid Fund                     file= 19 mapping= 19 deck= 19
+[OK ] Arbitrage Funds                            file= 15 mapping= 15 deck= 15
+[OK ] Asset Allocator Funds                      file= 12 mapping= 12 deck= 12
+[OK ] Bal Bhavishya                              file= 22 mapping= 22 deck= 22
+[OK ] Balanced Advantage                         file= 25 mapping= 25 deck= 25
+[OK ] Banking & Financial Services               file= 15 mapping= 15 deck= 15
+[OK ] Business Cycle                             file= 16 mapping= 16 deck= 16
+[OK ] Conglomerate Fund                          file=  3 mapping=  3 deck=  3
+[OK ] Digital Funds                              file=  9 mapping=  9 deck=  9
+[OK ] Dividend Yield Fund                        file= 10 mapping= 10 deck= 10
+[OK ] ELSS Schemes                               file= 19 mapping= 19 deck= 19
+[OK ] ESG Funds                                  file=  6 mapping=  6 deck=  6
+[OK ] Equity Savings                             file=  8 mapping=  8 deck=  8
+[OK ] Flexi Cap Funds                            file= 22 mapping= 22 deck= 22
+[OK ] Focused Funds                              file= 21 mapping= 21 deck= 21
+[OK ] Gennext                                    file= 14 mapping= 14 deck= 14
+[OK ] Infrastructure Funds                       file= 18 mapping= 18 deck= 18
+[OK ] Large & Mid Cap Funds                      file= 25 mapping= 25 deck= 25
+[OK ] Large Cap Funds                            file= 14 mapping= 14 deck= 14
+[OK ] Make in India                              file= 11 mapping= 11 deck= 11
+[OK ] Midcap Funds                               file= 24 mapping= 24 deck= 24
+[OK ] Multi Asset Allocation                     file= 20 mapping= 20 deck= 20
+[OK ] Multi Cap                                  file= 25 mapping= 25 deck= 25
+[OK ] Multi Index FoF                            file=  4 mapping=  4  (AVOID_EXACT_CATS: not scored, by design)
+[OK ] Nasdaq 100 FOFs                            file=  5 mapping=  5 deck=  5
+[OK ] Other Competitor Thematic/Contra Funds     file= 37 mapping= 37  (AVOID_EXACT_CATS: not scored, by design)
+[OK ] PSU Funds                                  file=  4 mapping=  4 deck=  4
+[OK ] Pharma & Healthcare Fund                   file= 14 mapping= 14 deck= 14
+[OK ] Pure International Plan                    file=  4 mapping=  4 deck=  4
+[OK ] Qaunt Funds                                file= 11 mapping= 11 deck= 11
+[OK ] Retirement Fund 30                         file=  9 mapping=  9 deck=  9
+[OK ] Retirement Fund 40                         file= 25 mapping= 25 deck= 25
+[OK ] Sector-MNC Schemes                         file=  6 mapping=  6 deck=  6
+[OK ] Silver FoF                                 file=  7 mapping=  7 deck=  7
+[OK ] Small Cap Funds                            file= 26 mapping= 26 deck= 26
+[OK ] Special Opportunities                      file=  7 mapping=  7 deck=  7
+[OK ] Transportation & Logistics                 file=  6 mapping=  6 deck=  6
+[OK ] Value Funds                                file= 14 mapping= 14 deck= 14
+
+VR EXACTNESS: PASS — deck == mapping == BirlaMFPR file, member-for-member
