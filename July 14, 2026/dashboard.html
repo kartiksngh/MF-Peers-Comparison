@@ -657,7 +657,7 @@
   <div class="fg" id="gc-windowwrap"><label>Rolling window</label>
     <div class="seg" id="gc-window"><button data-v="1 Year" class="active">1Y</button><button data-v="3 Year">3Y</button></div></div>
   <div class="fg" id="gc-basiswrap" style="display:none"><label>Rolling window / basis</label>
-    <div class="seg" id="gc-basis"><button data-v="1M">1M</button><button data-v="3M">3M</button><button data-v="6M">6M</button><button data-v="9M">9M</button><button data-v="1Y">1Y</button><button data-v="3Y">3Y</button><button data-v="3Y+reward">3Y+rew</button><button data-v="Composite" class="active">Composite</button></div></div>
+    <div class="seg" id="gc-basis"><button data-v="1M">1M</button><button data-v="3M">3M</button><button data-v="6M">6M</button><button data-v="9M">9M</button><button data-v="1Y">1Y</button><button data-v="2Y">2Y</button><button data-v="3Y">3Y</button><button data-v="5Y">5Y</button><button data-v="3Y+reward">3Y+rew</button><button data-v="Composite" class="active">Composite</button></div></div>
   <div class="fg slider" id="gc-wwrap" style="display:none"><label>1Y weight (3Y = 100 &minus; w)</label>
     <div class="srow"><input type="range" id="gc-w" min="0" max="100" step="5" value="80"><span class="slidval" id="gc-wval">80 / 20</span></div></div>
   <div class="fg" id="gc-rewardwrap" style="display:none"><label>Benchmark reward</label>
@@ -762,12 +762,13 @@ const S = {
   vrCube:null, vrKey:null, allCube:null, allKey:null
 };
 const S1=[null,5,4,3,2], S3=[null,4,3,2,1];   // quartile(1..4) -> 1Y / 3Y score
-// Short rolling windows (raw quartiles, no composite/reward). RWOF maps a basis -> the engine's
-// residency window label; ALLFIELD/VRFIELD map a short-window basis -> the per-scheme quartile field.
-const RWOF={'1M':'1 Month','3M':'3 Month','6M':'6 Month','9M':'9 Month','1Y':'1 Year','3Y':'3 Year'};
-const ALLFIELD={'1M':'aq1m','3M':'aq3m','6M':'aq6m','9M':'aq9m'};
-const VRFIELD={'1Y':'q1y','3Y':'q3y','1M':'q1m','3M':'q3m','6M':'q6m','9M':'q9m'};
-const isShortWin=b=>b==='1M'||b==='3M'||b==='6M'||b==='9M';
+// Raw rolling windows (raw quartiles, no composite/reward): 1M/3M/6M/9M + 2Y/5Y (KV 2026-07-14).
+// RWOF maps a basis -> the engine's residency window label; ALLFIELD/VRFIELD map a raw-window
+// basis -> the per-scheme quartile field (engine keys are month-counts: 24m=2Y, 60m=5Y).
+const RWOF={'1M':'1 Month','3M':'3 Month','6M':'6 Month','9M':'9 Month','1Y':'1 Year','2Y':'2 Year','3Y':'3 Year','5Y':'5 Year'};
+const ALLFIELD={'1M':'aq1m','3M':'aq3m','6M':'aq6m','9M':'aq9m','2Y':'aq24m','5Y':'aq60m'};
+const VRFIELD={'1Y':'q1y','3Y':'q3y','1M':'q1m','3M':'q3m','6M':'q6m','9M':'q9m','2Y':'q24m','5Y':'q60m'};
+const isShortWin=b=>!!ALLFIELD[b];   // the raw-quartile windows (everything but 1Y/3Y/score bases)
 
 const fmt = {
   pct:(v,d=1)=> v==null||isNaN(v) ? '—' : (100*v).toFixed(d)+'%',
@@ -823,7 +824,7 @@ function boot(data){
   // optional deep-link state (e.g. #tab=amc&u=vr&b=Composite) — harmless if absent
   const h=location.hash||'';
   const mu=h.match(/[?&#]u=(all|vr)/); if(mu) S.universe=mu[1];
-  const mb=h.match(/[?&#]b=([A-Za-z0-9]+)/); if(mb){ const map={'1Y':'1Y','3Y':'3Y','3Yr':'3Y+reward','Composite':'Composite'}; if(map[mb[1]]) S.basis=map[mb[1]]; }
+  const mb=h.match(/[?&#]b=([A-Za-z0-9]+)/); if(mb){ const map={'1Y':'1Y','2Y':'2Y','3Y':'3Y','5Y':'5Y','3Yr':'3Y+reward','Composite':'Composite'}; if(map[mb[1]]) S.basis=map[mb[1]]; }
 
   document.getElementById('mb-asof').textContent  = 'As of ' + fmt.date(data.meta.latest_aum_date || data.meta.latest);
   document.getElementById('mb-univ').textContent  = `${data.meta.n_vr_schemes} VR · ${data.meta.n_allpeer_schemes} all-peer · ${TOP15.length} houses`;
@@ -1611,7 +1612,7 @@ function renderSchemeBody(){
   // ── score / quartile history (selected scheme)
   const ctx=document.getElementById('sc-score').getContext('2d');
   S.charts.scScore?.destroy();
-  if(isShortWin(S.basis)){                                  // 1M/3M/6M/9M — plot that window's quartile
+  if(isShortWin(S.basis)){                                  // raw windows (1M..9M, 2Y, 5Y) — plot that window's quartile
     const field = vr ? VRFIELD[S.basis] : ALLFIELD[S.basis];
     const rec=(vr?D.vr:D.allpeer).find(r=>r.s===name); const dates=vr?D.months:D.aum_dates;
     const qline=rec?dates.map((d,i)=>({x:d,y:(rec[field]&&rec[field][i]!=null)?rec[field][i]:null})):[];

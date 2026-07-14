@@ -367,14 +367,18 @@ def calendar_returns(nav: pd.DataFrame):
             pd.DataFrame(r3, index=idx, columns=nav.columns))
 
 
-# ── Short rolling windows (1/3/6/9 months) — RAW quartiles, no composite/reward ──
+# ── Extra rolling windows (1/3/6/9 months + 2Y/5Y) — RAW quartiles, no composite/reward ──
 # KV (2026-06-24): in ADDITION to the 1Y/3Y windows, evaluate every scheme on 1M/3M/6M/9M
 # rolling windows so the whole deck (sleeve/AMC/league/scheme) can be viewed on any window.
-# Returns are CUMULATIVE point-to-point (NAV_t/NAV_{t_m}-1), NOT annualized — a sub-year CAGR
-# would be misleading; quartile RANKS are identical either way (annualizing is monotonic).
-MONTH_WINS = [1, 3, 6, 9]                                   # the NEW sub-year windows
-RES_WINS   = [1, 3, 6, 9, 12, 36]                           # all windows (incl. 1Y/3Y) for residency
-WIN_LABEL  = {1: "1 Month", 3: "3 Month", 6: "6 Month", 9: "9 Month", 12: "1 Year", 36: "3 Year"}
+# KV (2026-07-14): also 2Y and 5Y. Returns here are CUMULATIVE point-to-point
+# (NAV_t/NAV_{t_m}-1), NOT annualized — a sub-year CAGR would be misleading, and for the
+# multi-year windows the DISPLAYED object is the quartile RANK, which is identical either
+# way (annualizing by ^(12/m) is monotonic). Conceptually 2Y/5Y are annualized (CAGR) like
+# 3Y; only ranks are stored/shown, so the cumulative computation is exact for them.
+MONTH_WINS = [1, 3, 6, 9, 24, 60]                           # the extra raw windows (months)
+RES_WINS   = [1, 3, 6, 9, 12, 24, 36, 60]                   # all windows (incl. 1Y/3Y) for residency
+WIN_LABEL  = {1: "1 Month", 3: "3 Month", 6: "6 Month", 9: "9 Month",
+              12: "1 Year", 24: "2 Year", 36: "3 Year", 60: "5 Year"}
 
 
 def calendar_returns_m(nav: pd.DataFrame, months: int) -> pd.DataFrame:
@@ -1087,7 +1091,7 @@ def run(data_dir="Data", out_dir="out", w_1y=0.8, min_peers=1, repeat_frac=REPEA
     res = exact_peer_scoring(nav, bench_cal, cme, exact_bench, w_1y=w_1y,
                              min_peers=min_peers, bench_last=bench_last)
 
-    log("[5b/8] Short rolling windows 1M/3M/6M/9M (raw quartiles, both universes)")
+    log("[5b/8] Extra rolling windows 1M/3M/6M/9M/2Y/5Y (raw quartiles, both universes)")
     qy_all_w = {12: qy1, 36: qy3}                  # 1Y/3Y daily quartiles already computed
     qy_vr_w  = {12: res["qy_1y"], 36: res["qy_3y"]}
     for m in MONTH_WINS:

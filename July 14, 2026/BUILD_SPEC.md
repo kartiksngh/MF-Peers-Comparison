@@ -90,25 +90,28 @@ The composite-score method becomes a **user control in the dashboard**; the VR-p
 - **Distance/alpha table**: Birla-vs-category (top/bottom/mean/Q1) AND Birla-vs-benchmark alpha + % outperforming (peer + benchmark), `% times +ve alpha` rolling 250 (nb 440-467, 647-648).
 - **Dashboard** (`dashboard.html` + `dashboard_data.json` + `dashboard_offline.html`): reuse the embedded template; feed it the corrected composite/score/alpha + month-end sampling.
 
-### 4i. Short rolling windows 1M/3M/6M/9M + quartile residency (NEW — KV 2026-06-24)
-In ADDITION to the 1Y/3Y windows, every scheme is evaluated on **1-, 3-, 6- and 9-month** rolling
-windows so the WHOLE deck (sleeve/AMC/league/matrix/scheme) can be viewed on any window via the
-global **`Rolling window / basis`** selector (`1M·3M·6M·9M·1Y·3Y·3Y+rew·Composite`).
+### 4i. Extra rolling windows 1M/3M/6M/9M/2Y/5Y + quartile residency (KV 2026-06-24; 2Y/5Y added KV 2026-07-14)
+In ADDITION to the 1Y/3Y windows, every scheme is evaluated on **1-, 3-, 6-, 9-month, 2-year and
+5-year** rolling windows so the WHOLE deck (sleeve/AMC/league/matrix/scheme) can be viewed on any
+window via the global **`Rolling window / basis`** selector (`1M·3M·6M·9M·1Y·2Y·3Y·5Y·3Y+rew·Composite`).
 - **Returns** (`calendar_returns_m(nav, months)`): exact-calendar point-to-point, `NAV_t/NAV_{t_m}−1`,
   where `t_m` = last trading day on/before the same calendar day `months` months before `t`
-  (`pd.DateOffset(months=...)`, day-clamped, e.g. Mar-31−1M→Feb-28). **CUMULATIVE, not annualized**
-  for sub-year — a sub-year CAGR misleads, and quartile RANKS are identical either way (annualizing is
-  monotonic). The 1Y/3Y windows are unchanged (1Y cumulative, 3Y CAGR).
-- **No composite / no benchmark reward** for the sub-year windows — raw quartiles only; composite
+  (`pd.DateOffset(months=...)`, day-clamped, e.g. Mar-31−1M→Feb-28). **Computed CUMULATIVE, not
+  annualized** — a sub-year CAGR misleads, and quartile RANKS are identical either way (annualizing
+  by `^(12/m)` is monotonic). Conceptually the multi-year windows (2Y/5Y) are annualized (CAGR) like
+  3Y; since only the RANK is stored and shown, the cumulative computation is exact for them. A scheme
+  without the full window of history (e.g. <5y for 5Y) is NaN → unrated in that window, so the rated
+  universe shrinks as the window lengthens. The 1Y/3Y windows are unchanged (1Y cumulative, 3Y CAGR).
+- **No composite / no benchmark reward** for these extra windows — raw quartiles only; composite
   (0.8·1Y+0.2·3Y, +reward) applies ONLY when combining 1Y & 3Y.
 - **Quartiles**: round-up bucketing (`quartiles_roundup`) within the **MFI all-peer** category
   (`all_peer_quartiles_m`) AND within the **VR exact-peer** category (`vr_quartiles_m`). Both universes.
-- **Engine→JSON**: per-scheme month-end quartiles `aq1m/aq3m/aq6m/aq9m` (all-peer rows) and
-  `q1m/q3m/q6m/q9m` (VR rows). Dashboard aggregates the all-peer short windows into the house bands
+- **Engine→JSON**: per-scheme month-end quartiles `aq1m/aq3m/aq6m/aq9m/aq24m/aq60m` (all-peer rows) and
+  `q1m/q3m/q6m/q9m/q24m/q60m` (VR rows). Dashboard aggregates the all-peer extra windows into the house bands
   **client-side** (a raw cube from the per-scheme quartiles — symmetric with the VR cube — so we DON'T
   ship 4 more precomputed sleeve/AMC tables; the validated 1Y/3Y precomputed-table path is untouched).
 - **Quartile RESIDENCY** (`window_residency`): for every **Top-15-house** scheme, both universes, all
-  6 windows, the count of trading days spent in Q1/Q2/Q3/Q4 over the **trailing window ending at each
+  8 windows (1M/3M/6M/9M/1Y/2Y/3Y/5Y), the count of trading days spent in Q1/Q2/Q3/Q4 over the **trailing window ending at each
   as-of month-end** (window length = lookback, e.g. 3M ≈ 62-65 trading days). Shipped as
   `residency[universe][scheme][windowLabel] = {f:firstAsofIdx, v:[[q1,q2,q3,q4]|null,…]}` aligned to
   `aum_dates` (all) / `months` (VR), leading/trailing-empty trimmed. **Definition** = days in each
