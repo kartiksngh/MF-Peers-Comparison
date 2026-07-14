@@ -25,6 +25,7 @@ REPO = Path(__file__).resolve().parent
 CRUFT_FILES = {"_template.html", "assemble.js", "verify_embedded.js"}
 CRUFT_GLOBS = ["*- Copy.html", "* - Copy.html", "sample_*animation.gif", "dashboard_animated.html",
                "BirlaMFPR*.xls*",   # internal ABSL/VR competition workbook — never publish
+               "MF Data*.xls*",     # vendor portfolio-holdings dump (NAVIndia) — never publish
                "_engine_run.log"]
 CRUFT_DIRS  = {"_shots", "assets", "_verify", "__pycache__", ".ipynb_checkpoints"}
 
