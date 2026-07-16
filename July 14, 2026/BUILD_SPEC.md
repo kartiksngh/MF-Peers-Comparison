@@ -85,7 +85,7 @@ The composite-score method becomes a **user control in the dashboard**; the VR-p
 - The old `.py` `percent_aum_daily()` is equivalent — reuse/verify.
 
 ### 4h. Outputs (mirror current shapes)
-- **`percent AUM in Q1 to Q4 - <date>.xlsx`**: Sleevewise + AMCwise (**All Peers** = raw 1Y & 3Y quartiles) + AMCwise (**VR Peers** = composite `qy_df_score`, after dropping `reperated_peer_category` = Bal Bhavishya & Retirement Fund 40, "repeated peersets" — nb 1686-1689). Restricted to TOP15 houses.
+- **`percent AUM in Q1 to Q4 - <date>.xlsx`**: Sleevewise + AMCwise (**All Peers** = raw 1Y & 3Y quartiles) + AMCwise (**VR Peers** = composite `qy_df_score`, after dropping the **BORROWED memberships** of the repeated/widened peer-sets = Bal Bhavishya & Retirement Fund 40 — a scheme whose home is another category counts there, once; a NATIVE fund whose only membership is the widened set (Bal Bhavishya Yojna, Retirement 40s Plans) reports FROM that set. Until 2026-07-16 the whole repeated category was dropped, which made the native funds count zero times — corrected per KV's each-scheme-counts-once ruling; the deck's client-side cube mirrors this exactly). Restricted to TOP15 houses.
 - **`Scheme Scoring on Exact Peer Set - Calendar 1Y 3Y - <date>.xlsx`**: 1Y score, 3Y score, composite daily score, peer+bench mapping (exact-peer, composite-based).
 - **Distance/alpha table**: Birla-vs-category (top/bottom/mean/Q1) AND Birla-vs-benchmark alpha + % outperforming (peer + benchmark), `% times +ve alpha` rolling 250 (nb 440-467, 647-648).
 - **Dashboard** (`dashboard.html` + `dashboard_data.json` + `dashboard_offline.html`): reuse the embedded template; feed it the corrected composite/score/alpha + month-end sampling.

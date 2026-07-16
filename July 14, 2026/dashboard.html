@@ -795,21 +795,50 @@ function gradient(ctx, area, hex, topA=0.42, botA=0.02){
 }
 
 //──────────────────────────── DATA LOADING ─────────────────────────────────
-let REPEATED, CAPPED, TOP15;
+let REPEATED, CAPPED, TOP15, NONREP_NAMES;
+// A VR record is BORROWED when it sits in a widened/repeated set (Bal Bhavishya,
+// Retirement Fund 40) but the scheme's HOME is another category (KV 2026-07-03/16:
+// a scheme's reported quartile always comes from its home set; widened tables grade
+// their own NATIVE funds against the borrowed pool). Natives (only membership = the
+// widened set itself) ARE reported from that set — each scheme counts exactly once.
+const isBorrowed = v => REPEATED.has(v.c) && NONREP_NAMES.has(v.s);
+function showLoadError(e){
+  document.getElementById('views').innerHTML =
+    `<div class="loading"><div class="lt">Could not load peer data</div>
+     <div style="font-size:13px;max-width:520px;text-align:center"><small style="color:var(--ink-4)">${e}</small></div></div>`;
+  console.error(e);
+}
 function loadData(){
-  try { boot(JSON.parse(document.getElementById('peer-data').textContent)); }
-  catch(e){
-    document.getElementById('views').innerHTML =
-      `<div class="loading"><div class="lt">Could not parse embedded peer-data</div>
-       <div style="font-size:13px;max-width:520px;text-align:center"><small style="color:var(--ink-4)">${e}</small></div></div>`;
-    console.error(e);
+  const txt = (document.getElementById('peer-data').textContent || '').trim();
+  if (txt && txt !== 'null' && !txt.startsWith('__PEER')){   // inline data present (offline deck)
+    try { boot(JSON.parse(txt)); } catch(e){ showLoadError(e); }
+    return;
   }
+  // HOSTED mode: the published page ships the data as separate JSON files so the shell
+  // paints instantly and the payload rides gzipped; residency (the largest block, used
+  // only in Scheme Detail) loads lazily in the background.
+  document.getElementById('views').innerHTML =
+    '<div class="loading"><div class="lt">Loading peer data…</div></div>';
+  fetch('peer_data.json')
+    .then(r => { if(!r.ok) throw new Error('HTTP ' + r.status + ' fetching peer_data.json'); return r.json(); })
+    .then(d => { boot(d); if(!d.residency) setTimeout(fetchResidency, 2000); })
+    .catch(showLoadError);
+}
+let RES_PROMISE = null;
+function fetchResidency(){
+  if (RES_PROMISE || (S.data && S.data.residency)) return RES_PROMISE;
+  RES_PROMISE = fetch('residency.json')
+    .then(r => { if(!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+    .then(res => { S.data.residency = res; try{ if(S.data) renderSchemeBody(); }catch(e){} })
+    .catch(() => { RES_PROMISE = null; });
+  return RES_PROMISE;
 }
 function boot(data){
   S.data = data;
   REPEATED = new Set(data.meta.repeated_cats || []);
   CAPPED   = data.capped_cats || {};
   TOP15    = data.meta.top15 || [];
+  NONREP_NAMES = new Set(data.vr.filter(v => !REPEATED.has(v.c)).map(v => v.s));
   S.w      = data.meta.w_default || 80;
 
   // default as-of indices
@@ -859,22 +888,26 @@ function rebucket(items, key){
 // Assign quartile 1..4 to every eligible VR scheme at month m, under the global basis.
 function assignQuartiles(m){
   const basis=S.basis, wf=S.w/100, reward=S.reward;
-  const D=S.data.vr; for(const v of D) v.__q=null;
-  if(VRFIELD[basis]){                                  // raw window: 1M/3M/6M/9M/1Y/3Y
+  const D=S.data.vr; for(const v of D){ v.__q=null; v.__qb=null; }
+  // __q  = the REPORTED quartile (null on borrowed memberships — a scheme counts once,
+  //        through its home set; natives of a widened set report from that set).
+  // __qb = the IN-TABLE quartile (set for every membership, incl. borrowed) so a widened
+  //        category's peer table can still display its full borrowed pool.
+  if(VRFIELD[basis]){                                  // raw window: 1M/3M/6M/9M/1Y/2Y/3Y/5Y
     const key = VRFIELD[basis];
-    for(const v of D){ if(REPEATED.has(v.c)) continue; const q=v[key]?.[m]; if(q!=null) v.__q=q; }
+    for(const v of D){ const q=v[key]?.[m]; if(q!=null){ v.__qb=q; if(!isBorrowed(v)) v.__q=q; } }
     return;
   }
   const byCat={};
   for(const v of D){
-    if(REPEATED.has(v.c)) continue;
     if(CAPPED[v.c] && S.data.months[m] > CAPPED[v.c]) continue;   // capped category past its cap date
     let score;
     if(basis==='3Y+reward'){ const t=v.t[m]; if(t==null) continue; score=t+(v.b[m]===1?1:0); }
     else { const y=v.y[m], t=v.t[m]; if(y==null||t==null) continue; score=wf*y+(1-wf)*(t+(reward&&v.b[m]===1?1:0)); }
-    (byCat[v.c]=byCat[v.c]||[]).push({ref:v,score});
+    (byCat[v.c]=byCat[v.c]||[]).push({ref:v,score});   // widened tables re-bucket over the FULL pool (natives + borrowed)
   }
   for(const k in byCat) rebucket(byCat[k]);
+  for(const v of D){ v.__qb=v.__q; if(isBorrowed(v)) v.__q=null; }
 }
 // VR cube: per house & per house|sleeve, an array over months of {a:{1..4},cr:{1..4},cnt:{1..4},tA,tCr,tCnt}
 function blankCell(){ return {a:{1:0,2:0,3:0,4:0},cr:{1:0,2:0,3:0,4:0},cnt:{1:0,2:0,3:0,4:0},tA:0,tCr:0,tCnt:0}; }
@@ -885,7 +918,7 @@ function buildVRCube(){
   for(let m=0;m<M;m++){
     assignQuartiles(m);
     for(const v of S.data.vr){
-      const q=v.__q; if(!q) continue;                 // VR coverage = SCORED exposure only (matches engine vr_amc_table)
+      const q=v.__q; if(!q) continue;                 // VR coverage = REPORTED exposure only (borrowed memberships excluded, natives in — matches engine vr_amc_table)
       const a=v.a[m], c=v.cr[m]; if(a==null && c==null) continue;
       const cell=house[v.h][m], cs=hs[v.h+'|'+v.sl][m];
       if(a!=null){ cell.a[q]+=a; cell.tA+=a; cs.a[q]+=a; cs.tA+=a; }
@@ -1565,10 +1598,10 @@ function schemeRowsAt(i){
   assignQuartiles(i);
   const wf=S.w/100;
   return S.data.vr.map(v=>{ let sc=null;
-    if(v.__q!=null){ if(S.basis==='1Y') sc=v.y[i]; else if(S.basis==='3Y') sc=v.t[i];
+    if(v.__qb!=null){ if(S.basis==='1Y') sc=v.y[i]; else if(S.basis==='3Y') sc=v.t[i];
       else if(S.basis==='3Y+reward'){ sc=v.t[i]==null?null:v.t[i]+(v.b[i]===1?1:0); }
       else if(S.basis==='Composite'){ sc=(v.y[i]==null||v.t[i]==null)?null:wf*v.y[i]+(1-wf)*(v.t[i]+(S.reward&&v.b[i]===1?1:0)); } }
-    return { s:v.s, h:v.h, sl:v.sl, c:v.c, q:v.__q, a:v.a[i], cr:v.cr[i], score:sc }; });
+    return { s:v.s, h:v.h, sl:v.sl, c:v.c, q:v.__q, qb:v.__qb, borrowed:isBorrowed(v), a:v.a[i], cr:v.cr[i], score:sc }; });
 }
 function renderScheme(){
   const fhSel=document.getElementById('sc-fh');
@@ -1685,6 +1718,11 @@ function renderSchemeResidency(){
   const box=document.getElementById('sc-resid'); if(!box) return;
   const subEl=document.getElementById('sc-resid-sub'), methodEl=document.getElementById('sc-resid-method');
   document.getElementById('sc-resid-title').textContent='Quartile residency';
+  if(!S.data.residency){   // hosted mode: residency arrives as a lazy second fetch
+    subEl.textContent='';
+    box.innerHTML='<div class="sub" style="padding:16px 14px">Loading residency data…</div>';
+    methodEl.innerHTML=''; fetchResidency(); return;
+  }
   if(!rw){            // Composite / 3Y+reward blend 1Y & 3Y → no single rolling window
     subEl.textContent='Pick a single rolling window';
     box.innerHTML='<div class="sub" style="padding:16px 14px">Residency counts the days a scheme spends in each quartile over <b>one</b> rolling window. Set the basis to <b>1M, 3M, 6M, 9M, 1Y or 3Y</b> to see it — Composite and 3Y+reward blend 1Y &amp; 3Y, so they have no single window.</div>';
@@ -1706,11 +1744,13 @@ function renderSchemeResidency(){
 }
 function renderSchemeDrill(){
   const {fh,cat,sl,name,month}=S.scheme;
-  let rows=schemeRowsAt(month).filter(r=>r.h===fh && (cat==='(all)'||r.c===cat) && (sl==='(all)'||r.sl===sl) && (r.a!=null||r.cr!=null));
+  // borrowed memberships are hidden here — the scheme already appears once, under its
+  // HOME category (and they'd double-count the AUM denominators below).
+  let rows=schemeRowsAt(month).filter(r=>!r.borrowed && r.h===fh && (cat==='(all)'||r.c===cat) && (sl==='(all)'||r.sl===sl) && (r.a!=null||r.cr!=null));
   // sleeve totals (this house, this universe) for % of sleeve
-  const sleeveCr={}; schemeRowsAt(month).forEach(r=>{ if(r.h===fh && r.cr!=null){ sleeveCr[r.sl]=(sleeveCr[r.sl]||0)+r.cr; } });
-  // % of AMC denominator = sum of cr across this house in the universe
-  let amcCr=0; schemeRowsAt(month).forEach(r=>{ if(r.h===fh && r.cr!=null) amcCr+=r.cr; });
+  const sleeveCr={}; schemeRowsAt(month).forEach(r=>{ if(!r.borrowed && r.h===fh && r.cr!=null){ sleeveCr[r.sl]=(sleeveCr[r.sl]||0)+r.cr; } });
+  // % of AMC denominator = sum of cr across this house in the universe (each scheme once)
+  let amcCr=0; schemeRowsAt(month).forEach(r=>{ if(!r.borrowed && r.h===fh && r.cr!=null) amcCr+=r.cr; });
   document.getElementById('sc-dd-title').textContent=`${fh} schemes by quartile — AUM held`;
   document.getElementById('sc-dd-sub').textContent=`${basisDesc()} · ${fmt.date(curDates()[month])} · ${cat==='(all)'?'all categories':cat} · ${sl==='(all)'?'all sleeves':sl}`;
   const byQ={1:[],2:[],3:[],4:[],0:[]};
@@ -1735,19 +1775,24 @@ function renderSchemePeers(){
   const pcat = rec? rec.c : null;
   const sub=document.getElementById('sc-peers-sub');
   if(pcat==null){ document.getElementById('sc-peers').innerHTML='<div class="sub" style="padding:16px">Select a scheme to see its category peer set.</div>'; sub.textContent=''; document.getElementById('sc-peers-method').innerHTML=''; return; }
-  let peers=schemeRowsAt(month).filter(r=>r.c===pcat && (r.score!=null||r.q!=null));
+  // the category table shows its FULL pool — incl. schemes BORROWED into a widened set
+  // (their in-table quartile qb is display-only context; their reported quartile lives
+  // in their home category).
+  let peers=schemeRowsAt(month).filter(r=>r.c===pcat && (r.score!=null||(r.qb??r.q)!=null));
   if(scored) peers=peers.filter(r=>r.score!=null).sort((a,b)=>b.score-a.score);
   else if(S.basis==='Composite') peers=peers.filter(r=>r.score!=null).sort((a,b)=>b.score-a.score || (b.cr||0)-(a.cr||0));
-  else   peers=peers.filter(r=>r.q!=null).sort((a,b)=>a.q-b.q || (b.cr||0)-(a.cr||0));
+  else   peers=peers.filter(r=>(r.qb??r.q)!=null).sort((a,b)=>(a.qb??a.q)-(b.qb??b.q) || (b.cr||0)-(a.cr||0));
   peers.forEach((p,idx)=>p.rank=idx+1); const n=peers.length;
   const avg=scored&&n?peers.reduce((s,p)=>s+p.score,0)/n:null;
   sub.textContent=`${vr?'VR exact-peer':'MFI all-peer'} category “${pcat}” ranked on ${fmt.date(curDates()[month])}`;
   let html='<table class="rt"><thead><tr><th>#</th><th>Scheme</th><th class="num">Quartile</th>'+(scored?'<th class="num">Score</th><th class="num">vs avg</th>':'<th class="num">% of its AMC</th>')+'</tr></thead><tbody>';
   peers.forEach(p=>{ const cls=p.s===name?'hl':''; const pc=p.rank===1?'r1':p.rank<=Math.ceil(n/4)?'up':p.rank>n-Math.ceil(n/4)?'dn':'';
-    const qchip=p.q?`<span class="qchip" style="background:${[null,C.q1,C.q2,C.q3,C.q4][p.q]}">Q${p.q}</span>`:'—';
+    const pq=p.qb??p.q;
+    const qchip=pq?`<span class="qchip" style="background:${[null,C.q1,C.q2,C.q3,C.q4][pq]}">Q${pq}</span>`:'—';
+    const nm=p.s+(p.borrowed?' <small style="color:var(--ink-4)">(borrowed — reported in its home set)</small>':'');
     if(scored){ const d=p.score-avg, dc=d>=0?'delta-pos':'delta-neg';
-      html+=`<tr class="${cls}"><td><span class="pill ${pc}">${p.rank}</span></td><td class="lbl">${p.s}</td><td class="num">${qchip}</td><td class="num">${fmt.num(p.score)}</td><td class="num ${dc}">${(d>=0?'+':'')+d.toFixed(2)}</td></tr>`; }
-    else html+=`<tr class="${cls}"><td><span class="pill ${pc}">${p.rank}</span></td><td class="lbl">${p.s}</td><td class="num">${qchip}</td><td class="num">${fmt.pct(p.a)}</td></tr>`; });
+      html+=`<tr class="${cls}"><td><span class="pill ${pc}">${p.rank}</span></td><td class="lbl">${nm}</td><td class="num">${qchip}</td><td class="num">${fmt.num(p.score)}</td><td class="num ${dc}">${(d>=0?'+':'')+d.toFixed(2)}</td></tr>`; }
+    else html+=`<tr class="${cls}"><td><span class="pill ${pc}">${p.rank}</span></td><td class="lbl">${nm}</td><td class="num">${qchip}</td><td class="num">${fmt.pct(p.a)}</td></tr>`; });
   html+='</tbody></table>';
   document.getElementById('sc-peers').innerHTML=html;
   document.getElementById('sc-peers-method').innerHTML=methodNote(

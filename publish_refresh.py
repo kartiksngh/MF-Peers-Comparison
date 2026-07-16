@@ -53,8 +53,28 @@ def main():
             try: p.unlink()
             except OSError: pass
 
-    # the fixed landing page = the newest deck  -> link always shows the latest refresh
-    shutil.copy2(dest / "out" / "dashboard_offline.html", REPO / "index.html")
+    # the fixed landing page = the newest deck -> link always shows the latest refresh.
+    # HOSTED SPLIT (2026-07-16, page-speed): instead of the 20+ MB self-contained file,
+    # index.html = the template SHELL (data placeholder -> null) and the data ships as
+    # two separate JSON files the page fetches (gzipped by GitHub Pages; residency — the
+    # biggest block, Scheme-Detail-only — loads lazily). The emailed offline deck in the
+    # dated folder stays fully self-contained and untouched.
+    import json
+    tpl = dest / "dashboard.html"                       # template copy WITH __PEER_DATA__
+    if tpl.exists() and "__PEER_DATA__" in tpl.read_text(encoding="utf-8", errors="ignore")[:5_000_000]:
+        data = json.loads((dest / "out" / "dashboard_data.json").read_text(encoding="utf-8"))
+        residency = data.pop("residency", None)
+        data["residency"] = None                        # page lazy-fetches residency.json
+        (REPO / "peer_data.json").write_text(json.dumps(data, separators=(",", ":")),
+                                             encoding="utf-8")
+        (REPO / "residency.json").write_text(json.dumps(residency, separators=(",", ":")),
+                                             encoding="utf-8")
+        (REPO / "index.html").write_text(
+            tpl.read_text(encoding="utf-8").replace("__PEER_DATA__", "null", 1),
+            encoding="utf-8")
+        print("index.html = fast shell; data split into peer_data.json + residency.json")
+    else:                                               # old refreshes: self-contained fallback
+        shutil.copy2(dest / "out" / "dashboard_offline.html", REPO / "index.html")
 
     # GitHub hard limit is 100 MB/file; the offline deck is ~10 MB
     big = [p for p in REPO.rglob("*")

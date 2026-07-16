@@ -693,9 +693,17 @@ def exact_peer_scoring(nav, bench_cal, cme, exact_bench, w_1y=0.8, use_bonus=Tru
 # %% VR-peer %AUM in Q1..Q4 (composite-quartile based)  (BUILD_SPEC §4h; nb 1689-1712)
 def vr_amc_table(qy_score, pct_aum, cmap, top15=TOP15, repeated=REPEATED_PEER_CATS):
     """%AUM in Q1..Q4 by fund house, from the COMPOSITE-score quartiles (qy_score, a
-    MultiIndex(cat,scheme) frame). Drops 'repeated peer-set' categories. dates in COLUMNS.
+    MultiIndex(cat,scheme) frame). Drops BORROWED memberships of 'repeated peer-set'
+    (widened) categories — a scheme whose home is another category is counted there,
+    once; a NATIVE fund whose ONLY membership is the widened set (e.g. Bal Bhavishya
+    Yojna, Retirement 40s Plans) reports from that set (KV ruling 2026-07-03/16: each
+    scheme counts exactly once, nobody counts zero times). dates in COLUMNS.
     Also returns aum-weighted score-percentile by fund house."""
-    qs = qy_score.loc[:, ~qy_score.columns.get_level_values(0).isin(repeated)]
+    cats = qy_score.columns.get_level_values(0)
+    schs = qy_score.columns.get_level_values(1)
+    nonrep_schemes = set(schs[~cats.isin(repeated)])
+    borrowed = cats.isin(repeated) & schs.isin(nonrep_schemes)
+    qs = qy_score.loc[:, ~borrowed]
     schemes = list(qs.columns.get_level_values(1))
     pa = pct_aum.loc[qs.index, schemes].copy()
     pa.columns = qs.columns
