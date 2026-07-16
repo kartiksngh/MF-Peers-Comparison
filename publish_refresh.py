@@ -62,17 +62,20 @@ def main():
     import json
     tpl = dest / "dashboard.html"                       # template copy WITH __PEER_DATA__
     if tpl.exists() and "__PEER_DATA__" in tpl.read_text(encoding="utf-8", errors="ignore")[:5_000_000]:
+        import sys as _sys
+        _sys.path.insert(0, str(REPO))
+        from _page_speed import extract_fonts, pack_data, pack_residency
         data = json.loads((dest / "out" / "dashboard_data.json").read_text(encoding="utf-8"))
         residency = data.pop("residency", None)
         data["residency"] = None                        # page lazy-fetches residency.json
-        (REPO / "peer_data.json").write_text(json.dumps(data, separators=(",", ":")),
+        (REPO / "peer_data.json").write_text(json.dumps(pack_data(data), separators=(",", ":")),
                                              encoding="utf-8")
-        (REPO / "residency.json").write_text(json.dumps(residency, separators=(",", ":")),
+        (REPO / "residency.json").write_text(json.dumps(pack_residency(residency), separators=(",", ":")),
                                              encoding="utf-8")
-        (REPO / "index.html").write_text(
-            tpl.read_text(encoding="utf-8").replace("__PEER_DATA__", "null", 1),
-            encoding="utf-8")
-        print("index.html = fast shell; data split into peer_data.json + residency.json")
+        html = tpl.read_text(encoding="utf-8").replace("__PEER_DATA__", "null", 1)
+        html = extract_fonts(html, REPO)
+        (REPO / "index.html").write_text(html, encoding="utf-8")
+        print("index.html = fast shell (fonts split); data packed into peer_data.json + residency.json")
     else:                                               # old refreshes: self-contained fallback
         shutil.copy2(dest / "out" / "dashboard_offline.html", REPO / "index.html")
 
