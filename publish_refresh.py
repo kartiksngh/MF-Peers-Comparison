@@ -56,26 +56,48 @@ def main():
     # the fixed landing page = the newest deck -> link always shows the latest refresh.
     # HOSTED SPLIT (2026-07-16, page-speed): instead of the 20+ MB self-contained file,
     # index.html = the template SHELL (data placeholder -> null) and the data ships as
-    # two separate JSON files the page fetches (gzipped by GitHub Pages; residency — the
-    # biggest block, Scheme-Detail-only — loads lazily). The emailed offline deck in the
-    # dated folder stays fully self-contained and untouched.
+    # separate JSON files the page fetches (gzipped by GitHub Pages; residency — the
+    # biggest block, Scheme-Detail-only — loads lazily; standing + the two sip convention
+    # blocks, added 2026-08-11, load the same lazy way and are written only when the
+    # engine output actually carries them, so OLD refresh folders still publish clean).
+    # The emailed offline deck in the dated folder stays fully self-contained and untouched.
     import json
     tpl = dest / "dashboard.html"                       # template copy WITH __PEER_DATA__
     if tpl.exists() and "__PEER_DATA__" in tpl.read_text(encoding="utf-8", errors="ignore")[:5_000_000]:
         import sys as _sys
         _sys.path.insert(0, str(REPO))
-        from _page_speed import extract_fonts, pack_data, pack_residency
+        from _page_speed import extract_fonts, pack_data, pack_residency, pack_sip, pack_standing
         data = json.loads((dest / "out" / "dashboard_data.json").read_text(encoding="utf-8"))
         residency = data.pop("residency", None)
         data["residency"] = None                        # page lazy-fetches residency.json
+        # Standing + SIP: same pop-and-lazy-file treatment as residency (mirrors
+        # publish_daily.py exactly). Absent on old outputs -> nothing written, keys stay
+        # absent; the null markers go in ONLY when a block was actually popped.
+        standing = data.pop("standing", None)
+        sip = data.pop("sip", None)
+        if standing is not None:
+            data["standing"] = None                     # page lazy-fetches standing.json
+        if sip is not None:
+            data["sip"] = None                          # page lazy-fetches sip_first/sip_last.json
         (REPO / "peer_data.json").write_text(json.dumps(pack_data(data), separators=(",", ":")),
                                              encoding="utf-8")
         (REPO / "residency.json").write_text(json.dumps(pack_residency(residency), separators=(",", ":")),
                                              encoding="utf-8")
+        written = ["peer_data.json", "residency.json"]
+        if standing is not None:
+            (REPO / "standing.json").write_text(json.dumps(pack_standing(standing), separators=(",", ":")),
+                                                encoding="utf-8")
+            written.append("standing.json")
+        if sip is not None:                             # one file per convention, each its own lazy fetch
+            (REPO / "sip_first.json").write_text(json.dumps(pack_sip(sip.get("first")), separators=(",", ":")),
+                                                 encoding="utf-8")
+            (REPO / "sip_last.json").write_text(json.dumps(pack_sip(sip.get("last")), separators=(",", ":")),
+                                                encoding="utf-8")
+            written += ["sip_first.json", "sip_last.json"]
         html = tpl.read_text(encoding="utf-8").replace("__PEER_DATA__", "null", 1)
         html = extract_fonts(html, REPO)
         (REPO / "index.html").write_text(html, encoding="utf-8")
-        print("index.html = fast shell (fonts split); data packed into peer_data.json + residency.json")
+        print("index.html = fast shell (fonts split); data packed into " + " + ".join(written))
     else:                                               # old refreshes: self-contained fallback
         shutil.copy2(dest / "out" / "dashboard_offline.html", REPO / "index.html")
 

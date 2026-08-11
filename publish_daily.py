@@ -1,9 +1,13 @@
 r"""DAILY publish — refresh ONLY the live page files, no dated-folder copy.
 
-Writes, from a refresh folder's outputs, the three files the hosted page serves:
+Writes, from a refresh folder's outputs, the files the hosted page serves:
   index.html      = the dashboard template SHELL (data placeholder -> null)
-  peer_data.json  = dashboard_data.json minus residency (page fetches it, gzipped by Pages)
+  peer_data.json  = dashboard_data.json minus the lazy blocks (page fetches it, gzipped by Pages)
   residency.json  = the residency block (page lazy-fetches on demand)
+  standing.json   = the category-standing rank block (lazy; written only when the engine
+                    shipped a `standing` key — old engine outputs publish fine without it)
+  sip_first.json / sip_last.json = the two SIP-convention blocks (lazy; same tolerance —
+                    written only when the engine shipped a `sip` key)
 
 The dated ARCHIVE copy (whole folder) is publish_refresh.py's job (weekly). This script
 exists so the DAILY cron can update the live deck without growing the repo by a folder
@@ -31,19 +35,40 @@ def main():
         sys.exit(f"no {dj} — run the engine first")
 
     sys.path.insert(0, str(REPO))
-    from _page_speed import extract_fonts, pack_data, pack_residency
+    from _page_speed import extract_fonts, pack_data, pack_residency, pack_sip, pack_standing
 
     data = json.loads(dj.read_text(encoding="utf-8"))
     residency = data.pop("residency", None)
     data["residency"] = None
+    # Standing + SIP (2026-08-11 features) get the same lazy-file treatment as residency:
+    # popped out of peer_data.json, served as their own fetch-on-demand files. Old engine
+    # outputs have NEITHER key — then nothing new is written and the keys stay absent
+    # (only when a block was actually popped does peer_data.json carry the null marker).
+    standing = data.pop("standing", None)
+    sip = data.pop("sip", None)
+    if standing is not None:
+        data["standing"] = None               # page lazy-fetches standing.json
+    if sip is not None:
+        data["sip"] = None                    # page lazy-fetches sip_first.json / sip_last.json
     data = pack_data(data)                    # ~4x smaller month-series, page unpacks at boot
     (REPO / "peer_data.json").write_text(json.dumps(data, separators=(",", ":")), encoding="utf-8")
     (REPO / "residency.json").write_text(json.dumps(pack_residency(residency), separators=(",", ":")),
                                          encoding="utf-8")
+    written = ["peer_data.json", "residency.json"]
+    if standing is not None:
+        (REPO / "standing.json").write_text(json.dumps(pack_standing(standing), separators=(",", ":")),
+                                            encoding="utf-8")
+        written.append("standing.json")
+    if sip is not None:                       # one file per convention, each its own lazy fetch
+        (REPO / "sip_first.json").write_text(json.dumps(pack_sip(sip.get("first")), separators=(",", ":")),
+                                             encoding="utf-8")
+        (REPO / "sip_last.json").write_text(json.dumps(pack_sip(sip.get("last")), separators=(",", ":")),
+                                            encoding="utf-8")
+        written += ["sip_first.json", "sip_last.json"]
     html = tpl.read_text(encoding="utf-8").replace("__PEER_DATA__", "null", 1)
     html = extract_fonts(html, REPO)          # ~2 MB of base64 fonts -> cached fonts/*.woff2
     (REPO / "index.html").write_text(html, encoding="utf-8")
-    print(f"live page refreshed from {src.name}: index.html (fonts split) + peer_data.json + residency.json (packed)")
+    print(f"live page refreshed from {src.name}: index.html (fonts split) + " + " + ".join(written) + " (packed)")
 
 
 if __name__ == "__main__":
