@@ -57,28 +57,34 @@ def main():
     # HOSTED SPLIT (2026-07-16, page-speed): instead of the 20+ MB self-contained file,
     # index.html = the template SHELL (data placeholder -> null) and the data ships as
     # separate JSON files the page fetches (gzipped by GitHub Pages; residency — the
-    # biggest block, Scheme-Detail-only — loads lazily; standing + the two sip convention
-    # blocks, added 2026-08-11, load the same lazy way and are written only when the
-    # engine output actually carries them, so OLD refresh folders still publish clean).
+    # biggest block, Scheme-Detail-only — loads lazily; standing, the two sip convention
+    # blocks and the return profile, added 2026-08-11, load the same lazy way and are
+    # written only when the engine output actually carries them, so OLD refresh folders
+    # still publish clean).
     # The emailed offline deck in the dated folder stays fully self-contained and untouched.
     import json
     tpl = dest / "dashboard.html"                       # template copy WITH __PEER_DATA__
     if tpl.exists() and "__PEER_DATA__" in tpl.read_text(encoding="utf-8", errors="ignore")[:5_000_000]:
         import sys as _sys
         _sys.path.insert(0, str(REPO))
-        from _page_speed import extract_fonts, pack_data, pack_residency, pack_sip, pack_standing
+        from _page_speed import (extract_fonts, pack_data, pack_residency, pack_returns,
+                                 pack_sip, pack_standing)
         data = json.loads((dest / "out" / "dashboard_data.json").read_text(encoding="utf-8"))
         residency = data.pop("residency", None)
         data["residency"] = None                        # page lazy-fetches residency.json
-        # Standing + SIP: same pop-and-lazy-file treatment as residency (mirrors
+        # Standing + SIP + returns: same pop-and-lazy-file treatment as residency (mirrors
         # publish_daily.py exactly). Absent on old outputs -> nothing written, keys stay
-        # absent; the null markers go in ONLY when a block was actually popped.
+        # absent; the null markers go in ONLY when a block was actually popped, and always
+        # before the json.dumps below.
         standing = data.pop("standing", None)
         sip = data.pop("sip", None)
+        returns = data.pop("returns", None)
         if standing is not None:
             data["standing"] = None                     # page lazy-fetches standing.json
         if sip is not None:
             data["sip"] = None                          # page lazy-fetches sip_first/sip_last.json
+        if returns is not None:
+            data["returns"] = None                      # page lazy-fetches returns.json
         (REPO / "peer_data.json").write_text(json.dumps(pack_data(data), separators=(",", ":")),
                                              encoding="utf-8")
         (REPO / "residency.json").write_text(json.dumps(pack_residency(residency), separators=(",", ":")),
@@ -94,6 +100,10 @@ def main():
             (REPO / "sip_last.json").write_text(json.dumps(pack_sip(sip.get("last")), separators=(",", ":")),
                                                 encoding="utf-8")
             written += ["sip_first.json", "sip_last.json"]
+        if returns is not None:                         # return profile: one lazy file
+            (REPO / "returns.json").write_text(json.dumps(pack_returns(returns), separators=(",", ":")),
+                                               encoding="utf-8")
+            written.append("returns.json")
         html = tpl.read_text(encoding="utf-8").replace("__PEER_DATA__", "null", 1)
         html = extract_fonts(html, REPO)
         (REPO / "index.html").write_text(html, encoding="utf-8")
@@ -101,7 +111,37 @@ def main():
     else:                                               # old refreshes: self-contained fallback
         shutil.copy2(dest / "out" / "dashboard_offline.html", REPO / "index.html")
 
-    # GitHub hard limit is 100 MB/file; the offline deck is ~10 MB
+    # ── the self-contained decks are no longer archivable (2026-08-11) ─────────────────
+    # GitHub's hard limit is 100 MB/file and this script refuses anything over 95 MB. The
+    # dated folder's two self-contained decks (dashboard.html and dashboard_offline.html —
+    # identical files) used to be ~10 MB; once the category-standing, SIP and return-profile
+    # blocks landed they inline ~97 MB of JSON and reach ~100 MB, which would abort the whole
+    # weekly archive. They are also the ONE archived artefact that is fully regenerable: the
+    # folder keeps Data/, the engine, the template and out/dashboard_data.json, so
+    # `python peer_monitor.py --data Data --out out` reproduces both decks exactly.
+    # So drop them from the ARCHIVE COPY only (this happens AFTER the fallback branch above
+    # has already used dashboard_offline.html, and the live page is built from the template +
+    # packed JSON, never from these files) and leave a note saying how to rebuild.
+    # Any OTHER oversized file still aborts — that is what the guard is for.
+    pruned = []
+    for name in ("dashboard.html", "dashboard_offline.html"):
+        p = dest / "out" / name
+        if p.is_file() and p.stat().st_size > 95 * 1024 * 1024:
+            pruned.append(f"{name} ({p.stat().st_size / 1e6:.0f} MB)")
+            p.unlink()
+    if pruned:
+        (dest / "out" / "DECK_NOT_ARCHIVED.txt").write_text(
+            "The self-contained offline deck(s) were NOT archived here:\n  "
+            + "\n  ".join(pruned)
+            + "\n\nThey exceed the 95 MB per-file publish limit since the standing/SIP/return\n"
+              "blocks were added. Everything needed to rebuild them byte-for-byte is in this\n"
+              "folder — from inside it run:\n\n    python peer_monitor.py --data Data --out out\n\n"
+              "The live site is unaffected: it is served from index.html + the packed JSON\n"
+              "files in the repo root, which are built from this folder's dashboard.html\n"
+              "template and out/dashboard_data.json.\n", encoding="utf-8")
+        print("archive: skipped oversized self-contained deck(s): " + ", ".join(pruned)
+              + " (see out/DECK_NOT_ARCHIVED.txt — they are regenerable)")
+
     big = [p for p in REPO.rglob("*")
            if p.is_file() and ".git" not in p.parts and p.stat().st_size > 95 * 1024 * 1024]
     if big:
