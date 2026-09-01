@@ -1959,15 +1959,43 @@ function renderAll(){
 }
 
 //──────────────────────────── CHART OPTION FACTORIES ───────────────────────
+// ── Chart polish (Kyser 2026-09-02: "visually good and interactive... smooth") ──
+// A shared vertical CROSSHAIR at the hovered date (line charts only — a bar chart's hover
+// highlight is the bar itself), registered once globally; every tooltip filters out null
+// series and sorts items best-first so the 14-line peer charts read as a ranked list at
+// that date; hover raises a visible point on each line (radius 0 -> 4) with a fast 120ms
+// response, while full redraws keep a slightly longer, softer ease. setAnim()'s
+// scrubber/GIF animation kill-switch is untouched — it overrides Chart.defaults.animation,
+// which still outranks these per-chart durations.
+Chart.register({ id:'vcross',
+  afterDraw(chart){
+    if(chart.config.type!=='line') return;
+    const act=chart.tooltip && chart.tooltip.getActiveElements ? chart.tooltip.getActiveElements() : null;
+    if(!act || !act.length) return;
+    const x=act[0].element.x, a=chart.chartArea, ctx=chart.ctx;
+    ctx.save(); ctx.beginPath(); ctx.moveTo(x, a.top); ctx.lineTo(x, a.bottom);
+    ctx.lineWidth=1; ctx.strokeStyle='rgba(22,19,15,0.28)'; ctx.setLineDash([3,3]); ctx.stroke(); ctx.restore();
+  }});
+function chartMotion(){
+  return { animation:{duration:600, easing:'easeOutCubic'},
+    transitions:{ active:{animation:{duration:120}} },
+    elements:{ point:{radius:0, hoverRadius:4, hitRadius:10, hoverBorderWidth:2, hoverBackgroundColor:'#fff'},
+               line:{borderCapStyle:'round', borderJoinStyle:'round'} } };
+}
 function baseTooltip(){
   return { mode:'index', intersect:false, backgroundColor:'#16130f', titleColor:'#f3ead8', bodyColor:'#e7dcc6',
-    borderColor:'rgba(243,234,216,0.15)', borderWidth:1, padding:11, cornerRadius:6, titleFont:{family:"'JetBrains Mono',monospace",size:11},
-    bodyFont:{family:"'Inter',sans-serif",size:12}, displayColors:true, boxWidth:9, boxHeight:9, usePointStyle:true };
+    borderColor:'rgba(243,234,216,0.15)', borderWidth:1, padding:11, cornerRadius:6, caretSize:6,
+    titleFont:{family:"'JetBrains Mono',monospace",size:11},
+    bodyFont:{family:"'Inter',sans-serif",size:12}, displayColors:true, boxWidth:9, boxHeight:9, usePointStyle:true,
+    filter:i=> i.parsed.y!=null,
+    itemSort:(a,b)=> ((b.parsed.y==null?-1e9:b.parsed.y)-(a.parsed.y==null?-1e9:a.parsed.y)) };
 }
 function timeX(xmin,xmax){ return { type:'time', time:{unit:'year'}, min:xmin, max:xmax, grid:{display:false}, ticks:{color:C.ink3, font:{size:10}}, border:{color:C.line} }; }
 function stackOpts({leftMax, rightLabel, xmin, xmax}){
-  return { maintainAspectRatio:false, responsive:true, interaction:{mode:'index',intersect:false}, animation:{duration:500},
-    plugins:{ legend:{display:false}, tooltip:{...baseTooltip(),
+  // stacked bands keep DATASET order in the tooltip (Q1..Q4 top-down) — value-sorting them
+  // would scramble the band story, so the ranked itemSort from baseTooltip is switched off here
+  return { maintainAspectRatio:false, responsive:true, interaction:{mode:'index',intersect:false}, ...chartMotion(),
+    plugins:{ legend:{display:false}, tooltip:{...baseTooltip(), itemSort:undefined,
       callbacks:{ label:c=> `${c.dataset.label}: ${c.parsed.y==null?'—':c.parsed.y.toFixed(1)+'%'}` } } },
     scales:{ x:timeX(xmin,xmax),
       y:{ stacked:true, min:0, max:leftMax, grace:leftMax?undefined:'5%', ticks:{callback:v=>v+'%',color:C.ink3,font:{size:10}}, grid:{color:C.line2}, border:{display:false} },
@@ -1975,7 +2003,7 @@ function stackOpts({leftMax, rightLabel, xmin, xmax}){
            title:{display:!!rightLabel,text:rightLabel,color:C.absl,font:{size:10}} } } };
 }
 function dualOpts({leftSuffix, rightLabel, rightMin, rightMax, xmin, xmax}){
-  return { maintainAspectRatio:false, responsive:true, interaction:{mode:'index',intersect:false}, animation:{duration:500},
+  return { maintainAspectRatio:false, responsive:true, interaction:{mode:'index',intersect:false}, ...chartMotion(),
     plugins:{ legend:{display:false}, tooltip:{...baseTooltip(),
       callbacks:{ label:c=>{ const v=c.parsed.y; if(v==null) return `${c.dataset.label}: —`;
         return c.dataset.yAxisID==='y1' ? `${c.dataset.label}: ${v.toFixed(2)}` : `${c.dataset.label}: ${v.toFixed(1)}${leftSuffix||''}`; } } } },
@@ -1985,7 +2013,7 @@ function dualOpts({leftSuffix, rightLabel, rightMin, rightMax, xmin, xmax}){
            title:{display:!!rightLabel,text:rightLabel,color:C.navy,font:{size:10}} } } };
 }
 function lineOpts({suffix, min, max, xmin, xmax, reverse}){
-  return { maintainAspectRatio:false, responsive:true, interaction:{mode:'nearest',intersect:false}, animation:{duration:500},
+  return { maintainAspectRatio:false, responsive:true, interaction:{mode:'nearest',intersect:false}, ...chartMotion(),
     plugins:{ legend:{display:false}, tooltip:{...baseTooltip(),
       callbacks:{ label:c=> `${c.dataset.label}: ${c.parsed.y==null?'—':c.parsed.y.toFixed(1)+(suffix||'')}` } } },
     scales:{ x:timeX(xmin,xmax), y:{ min, max, reverse:!!reverse, grace:(min==null&&max==null)?'6%':undefined,
