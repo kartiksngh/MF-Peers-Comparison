@@ -637,6 +637,33 @@
   table.rt.pgrid tr:hover td.pg-frz { background: var(--paper-2); }
   table.rt.pgrid tr.hl td.pg-frz { background: var(--absl-bg); }
   table.rt.pgrid td { padding: 8px 10px; }
+  /* The pinned BENCHMARK row. It is a reference line, not a competitor in the ranking, so it is
+     styled as one: a tinted band with a rule under it, italic scheme name, and never the hover
+     highlight the fund rows get (hovering it invites the reader to compare it as a peer, which is
+     exactly the wrong reading). It stays first regardless of the sort. */
+  table.rt.pgrid tr.pg-bench td { background: var(--paper-2); border-bottom: 1.5px solid var(--line-2); font-weight: 600; }
+  table.rt.pgrid tr.pg-bench td.lbl { font-style: italic; color: var(--ink-2); font-weight: 600; }
+  table.rt.pgrid tr.pg-bench:hover td, table.rt.pgrid tr.pg-bench:hover td.pg-frz { background: var(--paper-2); }
+  /* ── AMC SUMMARY (2026-09-01). Colour lives in inline styles on the cells (the ramps are
+     data-driven), so the stylesheet carries only structure: a compact monospace numeric grid, a
+     muted category column, the roll-up footer, and the bar that encodes the last column. */
+  table.rt.amcsum { font-size: 12px; }
+  table.rt.amcsum td, table.rt.amcsum th { padding: 7px 9px; }
+  table.rt.amcsum td.lbl { max-width: 320px; }
+  table.rt.amcsum td.am-cat, table.rt.amcsum th.am-cat { color: var(--ink-3); font-size: 11px; white-space: nowrap; }
+  .am-unit { font-weight: 400; color: var(--ink-4); font-size: 10px; letter-spacing: 0; }
+  /* the roll-up sits under a rule and never takes the row hover - it is a total, not a peer */
+  table.rt.amcsum tfoot tr.am-roll td { border-top: 2px solid var(--ink-2); background: var(--paper-2);
+    font-weight: 700; color: var(--ink); }
+  table.rt.amcsum tfoot tr.am-roll:hover td { background: var(--paper-2); }
+  .am-q12 { font-family:'JetBrains Mono',monospace; font-size: 11px; }
+  /* The last column is a BAR, not a tint - a bounded 0-100 share reads better as length, and the
+     different channel is what keeps it from colliding with the tinted alpha column beside it
+     (measured: those two hues sat at dE 2.3 at mid intensity, which is indistinguishable). */
+  .am-barwrap { display: inline-block; width: 46px; height: 6px; background: var(--line-2);
+    border-radius: 3px; overflow: hidden; vertical-align: middle; margin-right: 7px; }
+  .am-bar { display: block; height: 100%; background: #8c7a4e; border-radius: 3px; }
+  .am-barnum { font-family:'JetBrains Mono',monospace; font-size: 11px; }
   .pg-sub { display: block; font-family:'JetBrains Mono',monospace; font-size: 9.5px; color: var(--ink-4); letter-spacing: .01em; margin-top: 2px; }
   .pg-pend { color: var(--ink-4); letter-spacing: .14em; font-family:'JetBrains Mono',monospace; }
   .pg-tools { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
@@ -950,11 +977,23 @@ const WINMONTHS={'1 Month':1,'3 Month':3,'6 Month':6,'9 Month':9,'1 Year':12,'2 
 const modeConv  = () => S.mode==='s3' ? 'sip3y' : S.mode==='s5' ? 'sip5y' : null;   // mode -> file/book key
 const modeBookMonths = () => S.mode==='s3' ? 36 : S.mode==='s5' ? 60 : null;
 const modeLabel = () => S.mode==='s3' ? '3Y SIP book' : S.mode==='s5' ? '5Y SIP book' : 'Lumpsum';
+// The instalment day, in words. ONE grid serves BOTH books (peer_monitor sip_month_grids →
+// grids["mid"]), so this is a constant, not a per-convention lookup. It WAS a lookup, back when
+// the deck shipped 1st-of-month AND month-end conventions; the key it tested became the BOOK key
+// ('sip3y'/'sip5y') in the 2026-08-13 rework, so `conv==='first'` could never be true again and
+// four panels silently printed "month-end" about a book that buys near the 15th. One named
+// constant now, so a future convention change edits one line instead of five string literals.
+const SIPCONVLBL = 'trading day nearest the 15th';
 // The one methodology sentence every affected method note gains under a SIP mode (empty for lumpsum,
 // so every lumpsum note stays byte-identical to the pre-SIP deck).
 function modeSentence(){
   if(S.mode==='ls') return '';
-  const bm=modeBookMonths(), yrs=bm/12, w=WINMONTHS[S.basis]||null;
+  // ★ WINMONTHS IS KEYED BY THE WINDOW *LABEL* ("3 Year"), S.basis CARRIES THE *CODE* ("3Y").
+  // This read used to be WINMONTHS[S.basis], which is always undefined — so `same` was never
+  // true and the "this window IS a fresh N-year SIP" branch below could not fire in any state,
+  // including the one it exists for (3Y window on the 3Y book). RWOF maps code → label; every
+  // other WINMONTHS read on this page already goes through it. (Found + fixed 2026-09-01.)
+  const bm=modeBookMonths(), yrs=bm/12, w=WINMONTHS[RWOF[S.basis]]||null;
   const same=(w!=null && w===bm);
   return ` ₹100 invested on the trading day nearest the <b>15th of every month for ${yrs} years</b>`
     + (same
@@ -2003,6 +2042,17 @@ function buildViews(){
            was lost. Panel ids are otherwise untouched. -->
       <div class="shead"><h2>AMC roll-up <em>— one house in full, then the industry cross-section</em></h2><div class="ctx" id="am-ctx"></div></div>
       <div class="kpis" id="am-kpis"></div>
+      <!-- ★ AMC SUMMARY (Kyser 2026-09-01). The scheme-by-scheme table the CIO reads, on the tab
+           where the house is already in view, and adaptive to every toggle above it: peer
+           universe, investment mode and rolling window all re-derive it. It sits FIRST, above the
+           charts, because it is the answer and the charts are the context. -->
+      <div class="card">
+        <div class="card-h"><div><h3 id="am-sum-title">AMC summary</h3><div class="sub" id="am-sum-sub"></div></div>
+          <button class="btn btn-dark" id="am-sum-exp">${icoDown()} Export summary CSV</button>
+        </div>
+        <div class="tbl-wrap" id="am-sum"></div>
+        <div id="am-sum-method"></div>
+      </div>
       <div class="card">
         <div class="card-h"><div><h3>AMC-level quartile distribution</h3><div class="sub" id="am-stack-sub"></div></div>
           <div class="legend">
@@ -2314,6 +2364,7 @@ function renderAMC(){
     // one date -> every DATED element on the tab, and both controls that can express it
     document.getElementById('am-rankdate').onchange=e=>{ amcGotoDate(+e.target.value); };
     document.getElementById('am-exp').onclick=exportAMC;
+    document.getElementById('am-sum-exp').onclick=exportAMCSummary;
     document.getElementById('cp-exp').onclick=exportComposite;
     // quartile multi-select for the mix bar (sum of ticked) — never allow an empty selection
     document.querySelectorAll('#cp-qsel button').forEach(b=>{ b.onclick=()=>{
@@ -2367,6 +2418,7 @@ function renderAMC(){
   document.getElementById('am-rank-method').innerHTML=methodNote(
     `House-wide <b>Q1+Q2 share</b> (green, bold = <b>${houseLabel(fh)}</b>; muted = every other house in scope) and <b>${houseLabel(fh)}'s Q4 share</b> (red) over time, each as a share of the house's whole covered AUM — the same denominator the stacked chart above uses, so the two panels read on one scale. Dashed navy (right axis) = the AUM-weighted <b>quality score</b>, Q1=4 … Q4=1. ${universeLabel()} basis, recomputed live.`);
 
+  renderAMCSummary();                     // the scheme-by-scheme table (adaptive to every toggle)
   renderComposite();                      // the industry cross-section (KPI row + mix bar)
   renderAMCTable();
 }
@@ -2395,7 +2447,7 @@ function renderAMCHouseKPIs(){
 // time-series charts (am-stack, am-rank) alone — they plot the whole history and
 // carry no as-of dependence, so redrawing them per frame would only cost chart rebuilds.
 // (F4: the per-house header/KPI row joined this list — it is a snapshot, not a series.)
-function renderAMCSnapshot(){ renderAMCHouseKPIs(); renderCompositeKPIs(); renderCompositeBar(); renderAMCTable(); }
+function renderAMCSnapshot(){ renderAMCHouseKPIs(); renderAMCSummary(); renderCompositeKPIs(); renderCompositeBar(); renderAMCTable(); }
 // ── THE ONE AS-OF ENTRY POINT for this tab (F4, 2026-08-11).
 // Two controls express the same as-of date — the native <select> (am-rankdate) and the timeline
 // scrubber the slider engine injects beside it — and they must MIRROR EACH OTHER IN BOTH
@@ -2418,6 +2470,297 @@ function amcGotoDate(i){
   try{ const tl=(typeof TL!=='undefined') ? TL.amc : null;
        if(tl && tl.range){ tl.range.value=i; updateTlLabel(tl); } }catch(e){}
   renderAMCSnapshot();
+}
+// ─────────────────────── ★ AMC SUMMARY (Kyser 2026-09-01) ───────────────────────────────────
+// Every scheme of the selected house, one row each, carrying the SAME measures the Scheme-Detail
+// "Category standing" card shows for one fund — because they ARE that card's functions, called
+// per scheme (computeStanding + computeStandingAlpha). Nothing here re-implements a metric, so a
+// row in this table and that card cannot print different numbers for the same fund.
+// ADAPTIVE: peer universe × investment mode × rolling window all flow straight through.
+//
+// ── WHY THE COLOURS LOOK LIKE THIS ──────────────────────────────────────────────────────────
+// Kyser's brief: the same green→red ramp on every column is disorienting; adjacent columns need
+// different shades and ranges. The design answers that by colouring each column BY WHAT IT MEANS,
+// which makes separation a by-product rather than something to fiddle with:
+//   %AUM outperformed  sequential FOREST, fixed 0–100      (a bounded share — the scale is absolute)
+//   Return / XIRR      sequential BRASS, data-driven range (unbounded — only relative rank is readable)
+//   α vs benchmark     DIVERGING navy↔terracotta, symmetric about 0 (a signed quantity needs a zero)
+//   α vs category avg  the SAME poles at 0.6 chroma        (same sign vocabulary at a lighter
+//                      weight — deliberately NOT a third hue: a colour must mean one thing across
+//                      a row, so a second signed column must not invent a new sign language)
+//   % cat AUM beat     a BAR, not a fill                   (see the verification note below)
+// Fills are light TINTS with the number in ink, never white-on-dark — solid heatmap blocks are
+// what make an Excel-style table strobe.
+// ★ VERIFIED, NOT EYEBALLED (2026-09-01). Every ramp was checked for lightness monotonicity and
+// for ink legibility on its darkest tint (worst 7.9:1 against a 4.5:1 floor), and every ADJACENT
+// pair was checked at matched intensity under normal, protanopic and deuteranopic vision. The
+// check caught a real defect: the α-vs-category column's pale navy beside a sand wash for the last
+// column came out at ΔE 2.3 — two neighbouring columns nobody could separate. The fix was to
+// change that column's ENCODING CHANNEL rather than hunt for a fifth hue: "% of category AUM
+// beating benchmark" is a bounded 0–100 share, which a BAR encodes better than a tint anyway, and
+// it is CONTEXT about the category rather than this fund's skill — so a different channel states
+// that difference too. A bar beside four tinted cells cannot be confused with them at any
+// intensity, which retires the adjacency question for that pair entirely.
+const AMCSUM_C = { outperf:'#1f5c3d', ret:'#b3852f', pos:'#20436b', neg:'#c0523e' };
+const AMCSUM_MAX = 0.42;          // the darkest tint is 42% of the anchor over the card — a wash
+function _amcMix(hexTo, t){
+  const c=[0xfb,0xf7,0xee], d=[1,3,5].map(k=>parseInt(hexTo.slice(k,k+2),16));
+  const m=c.map((v,k)=>Math.round(v+(d[k]-v)*AMCSUM_MAX*Math.max(0,Math.min(1,t))));
+  return 'rgb('+m[0]+','+m[1]+','+m[2]+')';
+}
+const amcSeqBg = (anchor, v, lo, hi) =>
+  (v==null || !(hi>lo)) ? '' : 'background:'+_amcMix(anchor, (v-lo)/(hi-lo));
+// Diverging: 0 is the bare card, and the two directions never share a hue. `scale` shrinks the
+// chroma so a second signed column reads as the same vocabulary at a lighter weight.
+const amcDivBg = (v, mag, scale) =>
+  (v==null || !(mag>0)) ? '' : 'background:'+_amcMix(v>=0?AMCSUM_C.pos:AMCSUM_C.neg, (Math.abs(v)/mag)*(scale||1));
+
+// Collect the house's schemes, one row per FUND. Home membership only: a borrowed VR membership is
+// the same fund a second time, and it would double-count in the roll-up below.
+function computeAMCSummary(fh, i){
+  const vr=S.universe==='vr';
+  const src=(vr?S.data.vr:S.data.allpeer)||[];
+  const seen=new Set(), rows=[];
+  src.forEach(rec=>{
+    if(rec.h!==fh || BADCAT(rec.c)) return;
+    if(vr && isBorrowed(rec)) return;
+    if(seen.has(rec.s)) return; seen.add(rec.s);
+    const st=computeStanding(rec.s, i), al=computeStandingAlpha(rec.s, i);
+    const cr = rec.cr ? rec.cr[i] : null;
+    rows.push({ nm:rec.s, cat:rec.c, sl:rec.sl, cr, st, al,
+      rank: st.state==='ok' ? st.r : null, of: st.state==='ok' ? st.n : null,
+      qdigit: st.state==='ok' ? st.qdigit : null,
+      aumPct: (st.state==='ok' && st.crRated>0) ? 100*st.crAtOrBelow/st.crRated : null });
+  });
+  rows.sort((a,b)=> (b.cr||0)-(a.cr||0));        // biggest money first: how a CIO reads a house
+  // ── THE ROLL-UP. Rule 2 again, and the reason `xform` is exported from computeStandingAlpha:
+  // the house return weights the RAW inputs (and, under a book, the opening weights) and
+  // transforms ONCE. An AUM-weighted average of the schemes' XIRRs is a different, unearned number.
+  let wSum=0, rawAcc=0, wOpAcc=0, opAcc=0, opW=0, abAcc=0, abW=0, acAcc=0, acW=0, qW=0;
+  const nQ={1:0,2:0,3:0,4:0};
+  let xf=null, anyW=false;
+  rows.forEach(r=>{
+    const cr=r.cr; if(cr==null || !(cr>0)) return;
+    if(!xf && r.al && r.al.xform) xf=r.al.xform;               // one shared transform (see above)
+    if(r.al && r.al.state==='ok' && r.al.ownRaw!=null){
+      wSum+=cr; rawAcc+=cr*r.al.ownRaw;
+      if(r.al.ownW!=null){ wOpAcc+=cr*r.al.ownW; anyW=true; }
+    }
+    if(r.aumPct!=null){ opAcc+=cr*r.aumPct; opW+=cr; }
+    if(r.al && r.al.alphaBench!=null){ abAcc+=cr*r.al.alphaBench; abW+=cr; }
+    if(r.al && r.al.alphaCat  !=null){ acAcc+=cr*r.al.alphaCat;  acW+=cr; }
+    if(r.qdigit>=1 && r.qdigit<=4){ nQ[r.qdigit]+=cr; qW+=cr; }
+  });
+  const houseRaw = wSum>0 ? rawAcc/wSum : null;
+  const houseRet = (houseRaw!=null && xf) ? xf(houseRaw, (anyW && wSum>0) ? wOpAcc/wSum : null) : null;
+  let totCr=0; rows.forEach(r=>{ if(r.cr!=null && r.cr>0) totCr+=r.cr; });
+  const roll = { totCr, nSchemes:rows.length,
+    ret:houseRet, retCovCr:wSum,
+    aumPct: opW>0 ? opAcc/opW : null, aumPctCovCr:opW,
+    alphaBench: abW>0 ? abAcc/abW : null, abCovCr:abW,
+    alphaCat:   acW>0 ? acAcc/acW : null, acCovCr:acW,
+    q1: qW>0 ? 100*nQ[1]/qW : null, q12: qW>0 ? 100*(nQ[1]+nQ[2])/qW : null,
+    q4: qW>0 ? 100*nQ[4]/qW : null, qCovCr:qW };
+  const unitRow = rows.find(r=>r.al && r.al.unit);
+  return { rows, roll, unit: unitRow ? unitRow.al.unit : null };
+}
+
+let _AMCSUM=null;
+function renderAMCSummary(){
+  const host=document.getElementById('am-sum'); if(!host) return;
+  const fh=S.amc.fh, dates=curDates();
+  const i=Math.max(0, Math.min(dates.length-1, S.amc.rankDate==null?dates.length-1:S.amc.rankDate));
+  // this table reads returns.json, so it must ask for it and repaint when it lands (hosted decks
+  // fetch it lazily; the offline deck ships it inline and this is a no-op there)
+  amcWantReturns();
+  const M=computeAMCSummary(fh, i);
+  _AMCSUM={M, fh, i, asof:dates[i]};
+  const rw=RWOF[S.basis];
+  const sub=document.getElementById('am-sum-sub');
+  if(sub) sub.innerHTML=M.rows.length+' scheme'+(M.rows.length===1?'':'s')+' of '+houseLabel(fh)+' · '+universeLabel()+' · '+modeLabel()+' · '+(rw||basisDesc())+' · '+fmt.date(dates[i]);
+  if(!M.rows.length){
+    host.innerHTML='<div class="sub" style="padding:16px">This house has no mapped scheme in the selected peer universe.</div>';
+    document.getElementById('am-sum-method').innerHTML=''; return;
+  }
+  // COLUMN SCALES. Two are ABSOLUTE (a share of AUM is 0–100 whatever the cohort) and two are
+  // RELATIVE to what is on screen, because a return and an alpha have no natural bounds. The
+  // method note says which is which, so a dark cell in a relative column is never read as a verdict.
+  const pick=f=>{ const o=[]; M.rows.forEach(r=>{ const v=f(r); if(v!=null) o.push(v); }); return o; };
+  const rets=pick(r=> (r.al && r.al.state==='ok') ? r.al.own : null);
+  const rLo=rets.length?Math.min.apply(null,rets):0, rHi=rets.length?Math.max.apply(null,rets):0;
+  const abList=pick(r=> r.al?r.al.alphaBench:null), acList=pick(r=> r.al?r.al.alphaCat:null);
+  const abMag=abList.length?Math.max.apply(null,abList.map(Math.abs)):0;
+  const acMag=acList.length?Math.max.apply(null,acList.map(Math.abs)):0;
+  const pp=v=> v==null?'—':((v>=0?'+':'')+v.toFixed(2)+' pp');
+  const pc=v=> v==null?'—':(v.toFixed(1)+'%');
+  const rt=v=> v==null?'—':((v>=0?'+':'')+v.toFixed(2)+'%');
+  const esc=t=> String(t==null?'':t).replace(/"/g,'&quot;');
+  // ONE REASON PER BLANK, never a bare dash — the same contract the standing card holds itself to.
+  const why=al=>{
+    if(!al) return '';
+    if(al.state==='nowindow')    return 'Composite / 3Y+reward blend 1Y and 3Y — there is no single window to measure a return over';
+    if(al.state==='loading')     return 'return data is still downloading';
+    if(al.state==='absent')      return 'this deck was built without the return block';
+    if(al.state==='winoverbook') return al.rw+' is longer than the '+((al.book||0)/12)+'-year SIP book, so the engine ships nothing for it';
+    if(al.state==='nosip')       return 'this deck ships no SIP block for the '+modeLabel();
+    if(al.state==='noblock')     return 'no return series for this universe';
+    if(al.state==='nocat')       return 'no mapped category in this universe';
+    // ★ state 'ok' AND STILL BLANK. The cohort resolved, but THIS fund has nothing on this
+    // window — which is the commonest blank in the table and had no arm here until the headless
+    // probe named it: 35 reasonless cells, all of this shape (ABSL Quant, Conglomerate and Multi
+    // Asset Allocation on a 5-year book, none of which existed five years ago). Two distinct
+    // causes, and the reader needs to know which: no shipped figure at all, versus a figure that
+    // exists but whose ANNUAL RATE cannot be solved because the book's opening weight is missing.
+    if(al.state==='ok' && al.ownRaw==null)
+      return 'this fund has no '+(al.rw||'')+' figure under the '+modeLabel()+' — it has too little history for this window'+(modeConv()?' on this book':'');
+    if(al.state==='ok' && al.own==null)
+      return 'the fund’s opening weight for this book is missing, so its annual rate is not solvable on this window';
+    return '';
+  };
+  const bWhy=al=>{
+    if(!al || al.state!=='ok') return why(al);
+    // an alpha needs BOTH legs. If the FUND's leg is missing, blaming the benchmark would send the
+    // reader to investigate an index that is perfectly fine — so the fund's reason wins here.
+    if(al.own==null) return why(al);
+    if(al.benchWithheld) return 'the benchmark’s own opening weight is not shipped, so its rate is withheld on a part-window book rather than guessed';
+    return al.benchWhy==='novr' ? 'no Value Research peer set — no designated benchmark exists for this fund'
+         : al.benchWhy==='capped' ? 'benchmark went stale after '+fmt.date(al.capDate)+' and is blanked past that date'
+         : al.benchWhy==='benchabsent' ? al.benchName+' — the vendor ships no NAV for that index'
+         : al.benchWhy==='nobenchbook' ? (al.benchName||'this benchmark')+' is priced, but carries no '+modeLabel()+' series — it lacks the history to run this instalment grid'
+         : al.benchWhy==='nobench' ? 'no benchmark mapped for this category'
+         : al.benchWhy==='benchwin' ? 'the benchmark has no history on this window'
+         : al.benchWhy==='noaxis' ? 'as-of is not on the benchmark calendar' : '';
+  };
+  const u = M.unit ? ' <span class="am-unit">('+M.unit+')</span>' : '';
+  let html='<table class="rt amcsum"><thead><tr>'
+    +'<th>Scheme</th><th>Category</th><th class="num">AUM</th><th class="num">Qtl</th><th class="num">Rank</th>'
+    +'<th class="num">%AUM outperformed</th>'
+    +'<th class="num">Return'+u+'</th>'
+    +'<th class="num">&alpha; vs benchmark</th>'
+    +'<th class="num">&alpha; vs cat avg <small>(ex-self)</small></th>'
+    +'<th class="num">% of rated cat AUM beating bmk</th></tr></thead><tbody>';
+  M.rows.forEach(r=>{
+    const al=r.al, ok=!!(al && al.state==='ok');
+    const ret=ok?al.own:null, ab=ok?al.alphaBench:null, ac=ok?al.alphaCat:null, cb=ok?al.aumBeat:null;
+    const q=r.qdigit;
+    const opT = r.aumPct==null ? 'not rated on this basis at this date'
+              : fmt.cr(r.st.crAtOrBelow)+' of '+fmt.cr(r.st.crRated)+' rated category AUM is at or below this fund';
+    const abT = ab==null ? bWhy(al) : rt(al.own)+' vs '+rt(al.bench)+(al.benchName?' · '+al.benchName:'');
+    const acT = ac==null ? (ok ? (al.own==null ? why(al)
+                                : al.nMembers<=1 ? 'the only member of this category — there are no peers to average'
+                                : 'no rated peers besides this fund on this window')
+                               : why(al))
+              : rt(al.own)+' vs '+rt(al.catAvg)+' · '+al.nUsed+' peers, ex-self';
+    const cbT = cb!=null ? (fmt.cr(al.crBeat)+' of '+fmt.cr(al.crBeatUsed)+' rated'+(al.crCover==null?'':' · '+al.crCover.toFixed(0)+'% of the category'))
+              : (ok ? (al.cWhy==='allpeer' ? 'a cohort-level figure needs one shared index — switch the universe to Exact Peers (VR)' : bWhy(al)) : why(al));
+    html+='<tr>'
+      +'<td class="lbl">'+r.nm+'</td>'
+      +'<td class="am-cat">'+r.cat+'</td>'
+      +'<td class="num">'+fmt.cr(r.cr)+'</td>'
+      +'<td class="num">'+(q?'<span class="qchip" style="background:'+[null,C.q1,C.q2,C.q3,C.q4][q]+'">Q'+q+'</span>':'—')+'</td>'
+      +'<td class="num">'+(r.rank==null?'—':(r.rank+' / '+r.of))+'</td>'
+      +'<td class="num" style="'+amcSeqBg(AMCSUM_C.outperf, r.aumPct, 0, 100)+'" title="'+esc(opT)+'">'+pc(r.aumPct)+'</td>'
+      +'<td class="num" style="'+amcSeqBg(AMCSUM_C.ret, ret, rLo, rHi)+'" title="'+esc(ret==null?why(al):(al.unit||''))+'">'+rt(ret)+'</td>'
+      +'<td class="num '+(ab==null?'':(ab>=0?'delta-pos':'delta-neg'))+'" style="'+amcDivBg(ab, abMag, 1)+'" title="'+esc(abT)+'">'+pp(ab)+'</td>'
+      +'<td class="num '+(ac==null?'':(ac>=0?'delta-pos':'delta-neg'))+'" style="'+amcDivBg(ac, acMag, 0.6)+'" title="'+esc(acT)+'">'+pp(ac)+'</td>'
+      +'<td class="num" title="'+esc(cbT)+'">'
+        +(cb==null ? '—'
+                   : '<span class="am-barwrap"><span class="am-bar" style="width:'+Math.max(0,Math.min(100,cb)).toFixed(1)+'%"></span></span><span class="am-barnum">'+cb.toFixed(1)+'%</span>')
+      +'</td></tr>';
+  });
+  const R=M.roll;
+  const qT = R.q1==null ? '' : ('Q1 '+R.q1.toFixed(1)+'% · Q1+Q2 '+R.q12.toFixed(1)+'% · Q4 '+R.q4.toFixed(1)+'% of '+fmt.cr(R.qCovCr)+' carrying a quartile');
+  html+='</tbody><tfoot><tr class="am-roll">'
+    +'<td class="lbl">'+houseLabel(fh)+' — AUM-weighted</td>'
+    +'<td class="am-cat">'+R.nSchemes+' schemes</td>'
+    +'<td class="num">'+fmt.cr(R.totCr)+'</td>'
+    +'<td class="num" title="'+esc(qT)+'">'+(R.q12==null?'—':'<span class="am-q12">Q1+Q2 '+R.q12.toFixed(1)+'%</span>')+'</td>'
+    +'<td class="num">—</td>'
+    +'<td class="num" title="'+esc('AUM-weighted across the '+fmt.cr(R.aumPctCovCr)+' held in rated schemes')+'">'+pc(R.aumPct)+'</td>'
+    +'<td class="num" title="'+esc('the AUM-weighted RAW return, transformed once — NOT an average of the schemes’ rates; covers '+fmt.cr(R.retCovCr))+'">'+rt(R.ret)+'</td>'
+    +'<td class="num '+(R.alphaBench==null?'':(R.alphaBench>=0?'delta-pos':'delta-neg'))+'" title="'+esc('AUM-weighted across the '+fmt.cr(R.abCovCr)+' that has a usable benchmark on this window')+'">'+pp(R.alphaBench)+'</td>'
+    +'<td class="num '+(R.alphaCat==null?'':(R.alphaCat>=0?'delta-pos':'delta-neg'))+'" title="'+esc('AUM-weighted across '+fmt.cr(R.acCovCr))+'">'+pp(R.alphaCat)+'</td>'
+    +'<td class="num" title="not aggregatable: each fund’s figure describes a DIFFERENT category, so averaging them would answer no question">—</td>'
+    +'</tr></tfoot></table>';
+  host.innerHTML=html;
+  document.getElementById('am-sum-method').innerHTML=amcSummaryNote(M, fh, dates[i], rLo, rHi, abMag, acMag);
+}
+// Same lazy-fetch hook the standing card and the peer grid use, for the same reason: on a HOSTED
+// deck returns.json arrives after the first paint, and without this the whole Return/alpha half of
+// this table would sit on "—" until the reader touched a control. No view guard — see
+// stdWantReturns() for why one would make the stale render PERMANENT.
+let _AMC_RET_ASKED=0;
+function amcWantReturns(){
+  if(returnsSrc() || _AMC_RET_ASKED) return;
+  if(!(S.data.meta && S.data.meta.has_returns)) return;
+  const p=fetchReturns(); if(!p || !p.then) return;
+  _AMC_RET_ASKED=1;
+  p.then(()=>{
+    if(!returnsSrc()) _AMC_RET_ASKED=0;
+    else { try{ renderAMCSummary(); }catch(e){} }
+  });
+}
+function amcSummaryNote(M, fh, asof, rLo, rHi, abMag, acMag){
+  const rw=RWOF[S.basis], R=M.roll, wm=rw?(WINMONTHS[rw]||null):null;
+  const cov = R.totCr>0 ? 100*R.retCovCr/R.totCr : null;
+  const rt=v=> v==null?'—':((v>=0?'+':'')+v.toFixed(2)+'%');
+  const retDef = S.mode==='ls'
+    ? (wm && wm>=12 ? 'the window return ANNUALIZED to a CAGR'
+                    : 'the window return AS IT HAPPENED, cumulative — under a year nothing is annualized, because scaling a few weeks up to a "per annum" number prints a rate nobody earns')
+    : (wm && wm>=12 ? 'the book’s XIRR p.a., solved in the browser from the shipped gain, the opening weight and each instalment’s age in days — the same solver, bracket and stopping rule as the engine’s <code>sip_xirr</code>'
+                    : 'the book’s TOTAL GAIN — profit as a share of the money actually invested; under a year no rate is solved at all');
+  return methodNote(
+    'Every scheme of <b>'+houseLabel(fh)+'</b> mapped in the <b>'+universeLabel()+'</b> universe, on <b>'+(rw||basisDesc())+'</b>, under <b>'+modeLabel()+'</b>, as of <b>'+fmt.date(asof)+'</b>.'
+    +' <b>Nothing here is computed twice.</b> Each row calls the SAME two functions the Scheme-Detail “Category standing” card calls for a single fund (<code>computeStanding</code> and <code>computeStandingAlpha</code>), so a row in this table and that card must agree digit for digit — if they ever differ, one of them is broken, rather than the two holding different conventions.'
+    +'<br><br><b>Adaptive to all three toggles.</b> Change the peer universe, the investment mode or the rolling window at the top of this page and every number below re-derives; none is pinned to a window or to a book.'
+    +'<br><br><b>The columns.</b> <b>%AUM outperformed</b> = the share of the category’s RATED AUM sitting at or below this fund on this window. The convention is <b>inclusive</b> (a fund counts itself, so the top fund reads 100%), and the denominator is rated members only — a fund without the full window of history cannot be classified either side.'
+    +' <b>Return</b> = '+retDef+'.'
+    +' <b>&alpha; vs benchmark</b> = that return minus the Value Research benchmark’s, on the IDENTICAL transform — an annualized figure is never subtracted from a cumulative one.'
+    +' <b>&alpha; vs cat avg (ex-self)</b> = it minus the AUM-weighted average return of its peers, <b>excluding itself</b>. That exclusion is deliberate: a fund that is a large share of its own category would otherwise be measured largely against itself, which shrinks the alpha toward zero by (1 − its own AUM share) and is worst for exactly the biggest funds anyone looks at.'
+    +' <b>% of rated cat AUM beating bmk</b> is a property of the CATEGORY, identical for every fund in it, so it does NOT exclude self; its denominator is the rated AUM, and the tooltip says what share of the full category that covers.'
+    +'<br><br><b>The roll-up row.</b> AUM weights throughout, and every cell states in its tooltip how much AUM it actually covers'+(cov!=null?' (the return covers <b>'+cov.toFixed(0)+'%</b> of the house’s <b>'+fmt.cr(R.totCr)+'</b>)':'')+'.'
+    +' The house <b>Return</b> is NOT an average of the schemes’ rates. Annualizing and XIRR are non-linear, so an average of rates is a number no investor earned; this weights the RAW inputs — the cumulative returns, or the SIP gains AND their opening weights — and applies the transform ONCE, through the very same function the rows use (it is handed out by <code>computeStandingAlpha</code> rather than copied, so a second annualization rule cannot drift into existence here).'
+    +' The two <b>alpha</b> cells ARE weighted averages of the per-scheme alphas, which is legitimate because a difference in percentage points is already linear.'
+    +' The last column is deliberately blank at house level: each fund’s figure describes a DIFFERENT category, so averaging them would answer no question anyone asked.'
+    +' <b>Qtl</b> in the roll-up carries the house’s Q1+Q2 share of quartile-bearing AUM — the same figure the KPI row above reports.'
+    +'<br><br><b>Reading the colour.</b> Each column is coloured by what it MEANS, not on one shared green-to-red ramp: a single ramp across every column makes a table strobe and hides which quantity you are looking at.'
+    +' <b>%AUM outperformed</b> is a forest tint on a FIXED 0–100 scale, so its darkness is absolute and comparable across dates and across houses.'
+    +' <b>Return</b> is a brass tint on a scale set by THIS table ('+rt(rLo)+' → '+rt(rHi)+'), because a return has no natural bounds — read it as rank within the house, never as a verdict.'
+    +' Both <b>alpha</b> columns diverge from a colourless zero, navy for positive and terracotta for negative, each scaled to the largest absolute alpha on screen ('+abMag.toFixed(2)+' pp and '+acMag.toFixed(2)+' pp respectively); the second uses the same two hues at lighter chroma on purpose — a colour must mean one thing across a row, so a second signed column gets the same vocabulary at a lower weight rather than a third hue.'
+    +' The last column is a BAR rather than a fill: it is a bounded 0–100 share, which a bar encodes better than a tint, and it is context about the category rather than this fund’s skill, so it reads in a different channel entirely.'
+    +' Every fill is a light tint with the number in ink, never white on a dark block.'
+    +' The palette was verified rather than eyeballed (2026-09-01): every ramp is lightness-monotone, the ink clears 4.5:1 on the darkest tint of every column (worst 7.9:1), and each adjacent pair was checked at matched intensity under normal, protanopic and deuteranopic vision — a check that caught, and forced the redesign of, one pair sitting at ΔE 2.3.'
+    +'<br><br><b>Blank cells always say why</b> — hover any “—” for its reason. The commonest: Composite / 3Y+reward blends 1Y and 3Y so there is no single window to measure; a window longer than the SIP book (the engine ships nothing there — not zeros, nothing); a benchmark that went stale and is blanked past its cap date rather than computed against a frozen index; and, under All Peers, the last column, which needs one shared index that an MFI cohort does not have.'
+    +' <b>Every ₹ figure</b> is each scheme’s latest disclosed monthly AUM carried forward, and AMCs disclose on different dates — so members of one category can be reporting different months.'
+    + modeSentence());
+}
+function exportAMCSummary(){
+  if(!_AMCSUM) return;
+  const M=_AMCSUM.M, fh=_AMCSUM.fh, asof=_AMCSUM.asof, rw=RWOF[S.basis];
+  const n=v=> (v==null||v!==v) ? '' : (Math.round(v*10000)/10000);
+  const head=['Scheme','Category','Sleeve','AUM cr','Quartile','Rank','Of','%AUM outperformed',
+              'Return%','Return unit','Alpha vs benchmark pp','Benchmark','Alpha vs category avg ex-self pp',
+              'Peers ex-self','% of rated category AUM beating benchmark','Rated category AUM cr','Category AUM cr',
+              'Fund house','Universe','Window','Basis','As-of','Investment mode'];
+  const tail='"'+houseLabel(fh)+'",'+(S.universe==='vr'?'VR exact-peer':'MFI all-peer')+','+(rw||'(scored basis)')+',"'+basisDesc()+'",'+asof+',"'+modeLabel()+'"';
+  const lines=[head.join(',')];
+  M.rows.forEach(r=>{
+    const al=r.al, ok=!!(al && al.state==='ok');
+    lines.push(['"'+r.nm+'"','"'+r.cat+'"','"'+(r.sl||'')+'"', n(r.cr),
+      r.qdigit?('Q'+r.qdigit):'', r.rank==null?'':r.rank, r.of==null?'':r.of, n(r.aumPct),
+      ok?n(al.own):'', (ok&&al.unit)?('"'+al.unit+'"'):'', ok?n(al.alphaBench):'',
+      (ok&&al.benchName)?('"'+al.benchName+'"'):'', ok?n(al.alphaCat):'', ok?al.nUsed:'',
+      ok?n(al.aumBeat):'', ok?n(al.crBeatUsed):'', ok?n(al.crCat):'', tail].join(','));
+  });
+  const R=M.roll;
+  lines.push(['"'+houseLabel(fh)+' - AUM-weighted roll-up"','"'+R.nSchemes+' schemes"','', n(R.totCr),
+    R.q12==null?'':('"Q1+Q2 '+R.q12.toFixed(1)+'%"'), '', '', n(R.aumPct), n(R.ret), '',
+    n(R.alphaBench), '', n(R.alphaCat), '', '', '', '', tail].join(','));
+  lines.push('');
+  lines.push('# Roll-up convention: the house Return weights the RAW inputs (cumulative returns, or SIP gains and their opening weights) and annualizes ONCE - it is NOT an average of the schemes\' rates, which would be a number no investor earned. The two alpha columns ARE AUM-weighted averages of the per-scheme alphas, which is valid because a difference in percentage points is linear. "% of rated category AUM beating benchmark" is deliberately not rolled up: each fund\'s figure describes a different category.');
+  lines.push('# Coverage: return over '+Math.round(R.retCovCr)+' cr of '+Math.round(R.totCr)+' cr; alpha-vs-benchmark over '+Math.round(R.abCovCr)+' cr; alpha-vs-category over '+Math.round(R.acCovCr)+' cr.');
+  lines.push('# A blank cell is a value that does not exist on this window / universe / mode - it is not a zero. Hover the same cell in the deck for the specific reason.');
+  downloadCSV(lines.join('\n')+'\n', 'AMC_summary_'+fh+'_'+asof+'_'+String(rw||S.basis).replace(/ /g,'')+'_'+S.mode+'_'+S.universe+'.csv');
 }
 function renderAMCTable(){
   const i=S.amc.rankDate;
@@ -2725,13 +3068,402 @@ function computeStanding(name, i){
     if(rk>=r){ cntAtOrBelow++; if(c!=null) crAtOrBelow+=c; } });
   return {state:'ok', cat, rw, r, n, nAll, crSelf, crCat, crRated, crAtOrBelow, cntAtOrBelow, qdigit};
 }
+// ── ★ CATEGORY-STANDING ALPHA (Kyser 2026-09-01) ──────────────────────────────────────────
+// Three metrics added to the standing card. ADAPTIVE is the whole point — nothing below is
+// hard-coded to a window or to a book; every number follows the three live toggles:
+//   S.universe  'all' MFI all-peer | 'vr' Value Research exact-peer
+//   S.mode      'ls' lumpsum | 's3' 3-year SIP book | 's5' 5-year SIP book
+//   S.basis     1M/3M/6M/9M/1Y/2Y/3Y/5Y, or Composite / 3Y+reward (= no single window)
+//   A  alphaBench  scheme return − its VR category BENCHMARK's return          (pp)
+//   B  alphaCat    scheme return − the AUM-WEIGHTED average PEER return, EX-SELF (pp)
+//   C  aumBeat     share of the category's RATED AUM whose return beats the benchmark (%)
+// It reads the SAME returns block the Return-profile card below reads, through the SAME
+// accessors (_retAt / annualizePct / solveSipXirr / monthsIndexOf / benchNameFor / CAPPED), so
+// the two cards on this tab cannot print different numbers for the same comparison.
+//
+// ── THE FIVE RULES THAT KEEP THESE HONEST ─────────────────────────────────────────────────
+// 1. LIKE FOR LIKE. Both sides of every difference get the IDENTICAL transform, and it is the
+//    deck's existing convention (annualizePct + Ratification R3), not a new one: under 12
+//    months the number is the window return AS IT HAPPENED (cumulative for lumpsum, total gain
+//    for SIP); from 12 months up it is annualized (a CAGR for lumpsum, an XIRR for SIP). An
+//    annualized figure is NEVER subtracted from a cumulative one.
+// 2. WEIGHT THE RAW INPUT, THEN TRANSFORM ONCE. Annualizing and XIRR are non-linear, so
+//    Σaᵢ·f(xᵢ) ≠ f(Σaᵢ·xᵢ) — averaging CAGRs or XIRRs would print a number no investor earned.
+//    The category average therefore weights the CUMULATIVE (lumpsum), or the GAIN *and* the
+//    OPENING WEIGHT (SIP), and transforms the weighted input a single time. For SIP that is not
+//    an approximation but an identity: every peer's book is normalised to ₹1 of cost on the SAME
+//    instalment grid, so the AUM-weighted (gain, wopen) pair IS the aggregate book of an investor
+//    who owns the whole category in AUM proportion, and its XIRR is that book's true
+//    money-weighted rate. (Verified 2026-09-01 on the live payload against a direct solve of the
+//    summed cash flows: agreement to 1.5e-11 pp. The mean-of-XIRRs alternative is a DIFFERENT
+//    number — 5.187945 vs 5.187077 %p.a. on Flexi Cap / 1Y / 3Y-book — and is not what is shown.)
+// 3. A BENCHMARK IS A VALUE-RESEARCH CONCEPT, AND IT BELONGS TO A CATEGORY, NOT TO A UNIVERSE.
+//    MFI all-peer categories name no benchmark of their own, but the SCHEME still has a VR home
+//    membership, and that membership names one — so metric A resolves the benchmark from the VR
+//    home in BOTH universes, exactly as the Return-profile card below does, and reads "—" only
+//    when the scheme has no VR membership at all (~half the MFI cohort). Metric C is the honest
+//    exception: it describes a COHORT, and an MFI cohort's members have different VR homes or
+//    none, so there is no common index and its denominator cannot exist. C is VR-only.
+// 3b. B EXCLUDES THIS FUND FROM ITS OWN CATEGORY AVERAGE; C DOES NOT. B answers "how do I compare
+//    with my peers", so including self shrinks the answer by (1 − own AUM share) and is worst for
+//    the biggest funds (measured: 87.4% self-weight turned a −6.61 pp alpha into −0.83 pp). C
+//    answers "is this category beating its index", a property OF the category, so every member
+//    counts, this one included.
+// 4. TWO STALENESS GATES, BOTH REQUIRED. The engine trims a stale benchmark's trailing months
+//    away (so _retAt returns null), AND ships capped_cats. They do NOT coincide: at 2026-09-01,
+//    Conglomerate Fund / Multi Asset Allocation / Nasdaq 100 FOFs / Silver FoF / Pure
+//    International Plan all still carry a value at a date past their cap, so trimming alone
+//    would hand back a plausible-looking number computed off a frozen index. The explicit
+//    `asof > capDate` test below is what stops that.
+// 5. A PEER WITH NO RETURN IS EXCLUDED FROM BOTH SIDES. Exactly as computeStanding() does for
+//    its rated denominators: a member missing a return (or an AUM) on this window leaves BOTH
+//    the numerator and the denominator of B and C. Treating a missing return as zero would drag
+//    the category average toward zero and understate every fund's alpha.
+//
+// Non-ok states mirror computeStanding()'s vocabulary: 'nowindow' (Composite / 3Y+reward),
+// 'noscheme', 'nocat', 'absent' (deck built with no returns block), 'loading' (returns.json in
+// flight), 'winoverbook' (the window is longer than the SIP book, so the engine ships nothing),
+// 'nosip' / 'noblock'. On 'ok' any individual metric may still be null — `benchWhy` says why.
+function computeStandingAlpha(name, i){
+  const out={state:'ok', rw:null, cat:null, months:null, ann:null, xform:null,
+             own:null, ownRaw:null, ownW:null, bench:null, benchRaw:null, catAvg:null, catAvgRaw:null,
+             alphaBench:null, alphaCat:null, aumBeat:null,
+             benchName:null, benchCat:null, benchWhy:null, cWhy:null, capDate:null, benchWithheld:false,
+             nMembers:0, nUsed:0, crUsed:0, crBeat:0, crBeatUsed:0, nBeatUsed:0,
+             crCat:0, crCover:null, noAum:false, anyRet:false, book:null, unit:null};
+  const rw=RWOF[S.basis]; out.rw=rw;
+  if(!rw){ out.state='nowindow'; return out; }
+  if(!name){ out.state='noscheme'; return out; }
+  if(!(S.data.meta && S.data.meta.has_returns)){ out.state='absent'; return out; }
+  const R=returnsSrc();
+  if(!R){ out.state='loading'; return out; }
+  const vr=S.universe==='vr', uni=vr?'vr':'all';
+  // vrHomeRec, NOT a first match: a scheme can sit in a widened category as a BORROWED
+  // membership, and reading that row would key the wrong "<cat>|<scheme>" series and compare it
+  // against the wrong benchmark. Same resolution computeStanding / computeReturnProfile use.
+  const home = vr ? vrHomeRec(name) : (S.data.allpeer||[]).find(r=>r.s===name);
+  if(!home || BADCAT(home.c)){ out.state='nocat'; return out; }
+  const cat=home.c, asof=curDates()[i], m=WINMONTHS[rw]||null, ann=!!(m && m>=12);
+  out.cat=cat; out.months=m; out.ann=ann;
+  // what the two sides of the difference ARE, so the row label carries its own unit and the
+  // reader never has to work out whether a "+1.53 pp" is a rate gap or a cumulative gap
+  out.unit = S.mode==='ls' ? (ann?'CAGR p.a.':'cumulative')
+                           : (ann?'XIRR p.a.':'total gain');
+  // ── the value block for the ACTIVE mode ──────────────────────────────────────────────────
+  // ★ A WINDOW LONGER THAN THE BOOK SHIPS NOTHING (peer_monitor build_sip: `if m > book:
+  // continue`). Under the 3-year book the 5Y window has no gain, no instalment ages and no
+  // opening ages anywhere in the payload — not nulls, ABSENT. Detect it structurally so the card
+  // can say why, instead of printing three unexplained dashes that look like a loading state.
+  const conv=modeConv(), book=modeBookMonths();
+  if(conv && book && m && m>book){ out.state='winoverbook'; out.book=book; return out; }
+  const SG = conv ? ((R.sipgain||{})[conv]||null) : null;
+  if(conv && !SG){ out.state='nosip'; return out; }
+  const blk  = conv ? (SG[uni]||null) : ((R.lump||{})[uni]||null);
+  if(!blk){ out.state='noblock'; return out; }
+  const wblk = conv ? ((SG.wopen||{})[uni]||null) : null;
+  // ★ THE BENCHMARK AND THE INSTALMENT CALENDARS RIDE THE VR `months` AXIS IN BOTH UNIVERSES —
+  // a benchmark belongs to a category, not to a peer universe. Under All Peers `i` indexes
+  // `aum_dates` (153 dates) while these ride `months` (210), so the as-of is mapped across by
+  // DATE STRING. Using `i` directly would silently read a value from the wrong date.
+  const mi = vr ? i : monthsIndexOf(asof);
+  const off     = (conv && mi>=0) ? _retAt(((((R.sipdays||{})[conv])||{})[rw])||null, mi) : null;
+  const offOpen = (conv && mi>=0) ? _retAt(((((R.sipopen||{})[conv])||{})[rw])||null, mi) : null;
+  const rawOf = key => _retAt(((blk[key]||{})[rw])||null, i);
+  const wOf   = key => wblk ? _retAt(((wblk[key]||{})[rw])||null, i) : null;
+  // THE ONE TRANSFORM (rule 1), applied to every side of every difference.
+  const xform = (raw, w) => {
+    if(raw==null) return null;
+    if(!conv) return ann ? annualizePct(raw, m) : raw;      // lumpsum: cumulative → CAGR from 1Y
+    if(!ann)  return raw;                                    // SIP under a year: the total gain
+    if(!off || !off.length) return null;                     // no instalment ages ⇒ no rate
+    const r=solveSipXirr(off, raw/100, w, offOpen);
+    return r==null ? null : r*100;
+  };
+  const needW = !!(conv && ann && wblk);   // a rate needs the opening weight; w=0 on a legacy payload
+  // ★ THE TRANSFORM IS EXPORTED, NOT RE-IMPLEMENTED. The AMC-summary panel has to roll these
+  // schemes up to a house-level return, and rule 2 says it must weight the RAW inputs and
+  // transform ONCE — which means it needs THIS closure, with THIS window's instalment ages. Every
+  // caller at one (universe, mode, window, as-of) gets an identical `off`/`offOpen` (they ride the
+  // window and the date, not the fund), so the panel can hold one scheme's xform and apply it to
+  // the house aggregate. Handing out the function is what stops a second copy of the annualization
+  // rule existing somewhere else and drifting away from this one.
+  out.xform=xform;
+  // ── metric A: this scheme vs its category benchmark ──────────────────────────────────────
+  const ownKey = vr ? (cat+'|'+home.s) : home.s;
+  const ownRaw = rawOf(ownKey), ownW = wOf(ownKey);
+  out.ownRaw=ownRaw; out.ownW=ownW;
+  out.own = (needW && ownW==null) ? null : xform(ownRaw, ownW);
+  let bRaw=null;
+  // ★ A BENCHMARK BELONGS TO A VALUE-RESEARCH CATEGORY, NOT TO A PEER UNIVERSE.
+  // REVISED 2026-09-01 after review. The first cut dashed this row out entirely under All Peers,
+  // on the true premise that an MFI category names no benchmark. But that made THIS card
+  // contradict the Return-profile card a few inches below it, which resolves the benchmark from
+  // the scheme's VR HOME MEMBERSHIP and shows the excess under either universe — and the
+  // contradiction was total, because the scheme's own return is universe-INVARIANT (measured on
+  // the live payload: 81,637 values compared across lump.all vs lump.vr at matched dates, ZERO
+  // differences). Two cards on one tab were about to print a number and a dash for the identical
+  // comparison. So metric A now resolves the benchmark exactly the way computeReturnProfile does,
+  // in both universes, and the two agree by construction.
+  //  ── the honest exception is METRIC C, further down: it is a statement about a COHORT, and an
+  // MFI cohort's members have different VR homes (or none), so there is no single index to
+  // measure them against and its denominator would be meaningless. C stays VR-only.
+  const vrHome=vrHomeRec(name), hasVR=!!(vrHome && !BADCAT(vrHome.c));
+  const bcat = hasVR ? vrHome.c : null;
+  out.benchCat=bcat;
+  if(!bcat){
+    out.benchWhy='novr';                  // no VR membership at all ⇒ no designated benchmark exists
+  } else {
+    out.benchName=benchNameFor(bcat);
+    // ★ THE TWO BENCHMARK MAPS DO NOT CARRY THE SAME CATEGORIES, so "is there a benchmark?" has
+    // to be asked of the map the ACTIVE MODE reads (found 2026-09-01). Counted on the live
+    // payload: returns.bench has 35 categories, sipgain.sip3y.bench has 34 (no Conglomerate Fund)
+    // and sipgain.sip5y.bench has 32 (no Conglomerate Fund, Multi Asset Allocation or Silver FoF)
+    // — a benchmark index simply may not have enough history to run the longer instalment grid.
+    // Testing returns.bench under a SIP book therefore passes, the lookup then returns null, and
+    // the card blames "the benchmark has no history on this window" — which is a WRONG REASON for
+    // a reader trying to work out whether to trust the blank. `nobenchbook` says the true one.
+    const bmap = conv ? (SG.bench||{}) : (R.bench||{});
+    const capDate=CAPPED[bcat];           // ISO-string compare, valid because both sides are YYYY-MM-DD
+    if(capDate && asof>capDate){ out.benchWhy='capped'; out.capDate=capDate; }
+    else if(!((R.bench||{})[bcat])) out.benchWhy = out.benchName ? 'benchabsent' : 'nobench';
+    else if(!bmap[bcat]) out.benchWhy='nobenchbook';
+    else if(mi<0) out.benchWhy='noaxis';
+    else {
+      bRaw=_retAt(((bmap[bcat]||{})[rw])||null, mi);
+      if(bRaw==null) out.benchWhy='benchwin';   // the series exists, just not this far back
+    }
+  }
+  out.benchRaw=bRaw;
+  // ★ THE BENCHMARK'S OWN OPENING WEIGHT IS NOT SHIPPED (returns.sipgain[conv].wopen carries only
+  // `all` and `vr`), so under a SIP mode its RATE is only solvable when there is no opening
+  // position at all — i.e. when the window equals the book. Everywhere else it is WITHHELD rather
+  // than guessed, which is the identical rule the Return-profile card applies (`!(wOpen>0)`), so
+  // the two cards blank the same cells. Concretely: A reads "—" at 3Y-book × 1Y/2Y and at
+  // 5Y-book × 1Y/2Y/3Y, and is available on the diagonal (book == window) and under a year
+  // (where the headline is a gain, and no rate is needed).
+  out.benchWithheld = !!(bRaw!=null && conv && ann && ownW>0);
+  out.bench = (bRaw!=null && !out.benchWithheld) ? xform(bRaw, 0) : null;
+  if(out.own!=null && out.bench!=null) out.alphaBench = out.own - out.bench;
+  // ── metrics B and C: ONE pass over the cohort computeStanding walks ──────────────────────
+  const members=(vr?S.data.vr:S.data.allpeer).filter(r=>r.c===cat);
+  out.nMembers=members.length;
+  let tot=0, gAcc=0, wAcc=0, beat=0, used=0, totCat=0, beatTot=0, beatUsed=0, anyRet=false;
+  members.forEach(mem=>{
+    const key = vr ? (cat+'|'+mem.s) : mem.s;               // membership on the VR axis, scheme on the all-peer one
+    const raw=rawOf(key);
+    const cr=mem.cr?mem.cr[i]:null;
+    if(cr!=null && cr>0) totCat+=cr;                        // metric C's CATEGORY denominator: every member with AUM
+    if(raw==null) return;                                   // rule 5: no return ⇒ out of BOTH sides
+    anyRet=true;                                            // …but remember a return existed, so "no AUM" ≠ "no peers"
+    if(cr==null || !(cr>0)) return;                         // no reported AUM ⇒ no weight
+    const w=wOf(key);
+    if(needW && w==null) return;                            // a rate needs its opening weight
+    // ── metric C accumulates over the WHOLE cohort (this fund included): it is a statement about
+    // the CATEGORY, identical for every fund in it. Metric B excludes self — see below.
+    beatUsed++; beatTot+=cr;
+    if(bRaw!=null && raw>bRaw) beat+=cr;
+    // ★ THE CATEGORY AVERAGE EXCLUDES THIS FUND (added 2026-09-01 after review). Including it
+    // makes the printed alpha (1 − own AUM share) × the true vs-peers alpha — systematically
+    // shrunk toward zero, and worst for exactly the biggest funds anyone looks at. Measured on
+    // the live payload: Tata Ethical is 87.4% of its own category's rated AUM, so the row printed
+    // −0.83 pp where the alpha against its two actual peers is −6.61 pp (8×); 485 cells across
+    // the toggle matrix sat above 50% self-weight, and 63 were single-member categories where the
+    // metric was a structurally guaranteed "+0.00 pp" presented as a finding. The row two lines
+    // above this one already excludes self ("beats N−1 of N−1 peers"), so this also makes the
+    // card internally consistent. The label and the note say "ex-self" so nothing is implied.
+    if(mem===home || mem.s===home.s) return;
+    used++; tot+=cr; gAcc+=cr*raw; if(w!=null) wAcc+=cr*w;
+  });
+  // (The beat test above is in RAW space, deliberately. For lumpsum, annualizing is monotone so
+  // it cannot re-order a fund against its benchmark; for SIP, a raw GAIN difference is EXACTLY
+  // how the engine defines its own beat-benchmark flag — build_sip: bframe = (scheme gain −
+  // benchmark gain) > 0 — so this metric agrees with the shipped flag by construction.)
+  out.nUsed=used; out.crUsed=tot; out.crBeat=beat; out.crBeatUsed=beatTot;
+  out.nBeatUsed=beatUsed; out.crCat=totCat; out.anyRet=anyRet;
+  // "no rated peers" and "no reported AUM" are DIFFERENT failures and must not share a message:
+  // on the VR axis, AUM coverage starts 2013-12-31 while the as-of axis starts 2009-03-31, so 57
+  // of 210 dates have returns for every member and AUM for none. Saying "no rated peers" there
+  // blames the wrong thing and sends the reader looking for a data gap that is not there.
+  out.noAum = (totCat<=0 && anyRet);
+  if(tot>0){
+    out.catAvgRaw=gAcc/tot;                                  // rule 2: weight the RAW input…
+    out.catAvg=xform(out.catAvgRaw, needW ? wAcc/tot : null);// …then transform ONCE
+    if(out.own!=null && out.catAvg!=null) out.alphaCat = out.own - out.catAvg;
+  }
+  // METRIC C IS VR-ONLY (see the benchmark note above): an MFI cohort's members have different VR
+  // homes, or none, so there is no common index for them and this denominator cannot exist.
+  if(!vr) out.cWhy='allpeer';
+  else if(beatTot>0 && bRaw!=null) out.aumBeat = 100*beat/beatTot;
+  // How much of the category the percentage actually speaks for. The denominator is the RATED AUM
+  // (members carrying a return on this window), while the "Category AUM share" row two lines above
+  // divides by the FULL category — two different rupee totals in one table. Measured on the live
+  // payload, 44 category-cells cover under half their category's money, and one printed "100.0%"
+  // off a single rated fund holding 32% of the category. So the coverage now travels with the
+  // number, in the absolute cell, and the row is named "% of RATED category AUM".
+  out.crCover = (totCat>0 && beatTot>0) ? 100*beatTot/totCat : null;
+  return out;
+}
+// ★ THE STANDING CARD NOW READS returns.json, SO IT MUST ASK FOR IT. fetchReturns()'s own .then
+// repaints ONLY the Return-profile card (by design — a lazily-arriving block must not churn the
+// whole tab), and renderSchemeBody paints Standing BEFORE Returns, so on a HOSTED deck these
+// three rows would sit on "—" until the reader's next interaction. dataLanded()'s epoch bump does
+// not rescue it either: the Scheme-Detail onchange handlers call renderSchemeBody() directly and
+// bypass renderIfDirty entirely. So hook the same single-flight promise and repaint just this
+// card when it settles — one ask per session, flag cleared on failure so a later render retries.
+// (The OFFLINE deck ships data.returns inline, so this never fires there, which is exactly why
+// the bug would not reproduce in local testing. Same defect class pgWantReturns() already fixed
+// for the peer grid; both attach to the SAME promise, so nothing is downloaded twice.)
+let _STD_RET_ASKED=0;
+function stdWantReturns(){
+  if(returnsSrc() || _STD_RET_ASKED) return;
+  const p=fetchReturns(); if(!p || !p.then) return;
+  _STD_RET_ASKED=1;
+  // ★ NO `S.view==='scheme'` GUARD — and that is the whole point (fixed 2026-09-01 after review).
+  // With the guard, a reader who opens Scheme Detail and switches tabs while returns.json is in
+  // flight gets a card that NEVER fills in: the guard skips the repaint, and coming back does not
+  // help because renderIfDirty() only paints a view the _DIRTY set still holds, and the first
+  // visit already cleared it. The three alpha rows would then sit on "loading return data…"
+  // forever, directly above a fully-populated Return-profile card showing the same benchmark.
+  // Writing innerHTML into a hidden card is harmless — fetchReturns()'s own .then repaints
+  // renderSchemeReturns() with no view guard for exactly this reason.
+  p.then(()=>{
+    if(!returnsSrc()) _STD_RET_ASKED=0;
+    else { try{ renderSchemeStanding(); }catch(e){} }
+  });
+}
+// The three rows, in the card's existing markup (label / .num value / .num absolute) and with its
+// existing "—" convention — a bare em-dash literal in the value cell, no helper, no dash class.
+// Shared by the rated and the UNRATED branch: NONE of these three needs a rank, so a scheme the
+// engine cannot place in the ordering at this date still gets whatever of them is computable.
+// Alpha rows carry ' pp' with delta-pos/delta-neg, matching the Return-profile card's excess
+// rows; the %-of-AUM row carries '%' at 1 dp, matching the two outperformance rows above it.
+function standingAlphaRows(al){
+  const pct = v=> v==null?'—':((v>=0?'+':'')+v.toFixed(2)+'%');
+  const pp  = v=> v==null?'—':((v>=0?'+':'')+v.toFixed(2)+' pp');
+  const dc  = v=> v==null?'':(v>=0?'delta-pos':'delta-neg');
+  // ONE reason per dash. The card must never print a bare "—": every blank cell says which of
+  // the states it is in, and the method note expands each one.
+  const why = al.state==='nowindow'   ? `no single window — ${S.basis==='Composite'?'Composite':'3Y+reward'} blends 1Y &amp; 3Y`
+            : al.state==='absent'     ? 'deck built without the return block'
+            : al.state==='loading'    ? 'loading return data…'
+            : al.state==='winoverbook'? `${al.rw} is longer than the ${al.book/12}-year book`
+            : al.state==='nosip'      ? 'no SIP block for this book'
+            : al.state==='noblock'    ? 'no return series for this universe'
+            : (al.state==='ok' ? null : '—');
+  const bWhy = why!=null ? why
+            : al.benchWithheld  ? 'benchmark rate not solvable on a part-window book'
+            : al.benchWhy==='novr'        ? 'no Value Research peer set — no designated benchmark exists'
+            : al.benchWhy==='capped'      ? `benchmark stale after ${fmt.date(al.capDate)}`
+            : al.benchWhy==='benchabsent' ? `${al.benchName} — no vendor NAV series`
+            : al.benchWhy==='nobenchbook' ? `${al.benchName||'the benchmark'} has no ${modeLabel()} series — too little history for this instalment grid`
+            : al.benchWhy==='nobench'     ? 'no benchmark mapped for this category'
+            : al.benchWhy==='benchwin'    ? 'benchmark has no history on this window'
+            : al.benchWhy==='noaxis'      ? 'as-of not on the benchmark calendar'
+            : null;
+  // Metric C's dashes have their OWN ladder: it is VR-only, and it fails on an empty AUM
+  // cross-section even when the benchmark resolved perfectly — a state metric A never sees.
+  const cWhy = why!=null ? why
+            : al.cWhy==='allpeer' ? 'a cohort-level figure needs one shared index — switch to Exact Peers (VR)'
+            : al.noAum            ? 'no reported peer AUM at this date'
+            : bWhy;
+  const aAbs = al.alphaBench!=null ? `${pct(al.own)} vs ${pct(al.bench)}${al.benchName?' · '+al.benchName:''}`
+             : (bWhy || (al.own==null ? 'no scheme return on this window' : '—'));
+  const bAbs = al.alphaCat!=null ? `${pct(al.own)} vs ${pct(al.catAvg)} · ${al.nUsed} rated peers ex-self, ${fmt.cr(al.crUsed)}`
+             : (why
+                || (al.noAum ? 'no reported peer AUM at this date'
+                : al.state==='ok' && al.nMembers<=1 ? 'the only member of this category — no peers to average'
+                : al.catAvg==null ? 'no rated peers on this window besides this fund'
+                : 'no scheme return on this window'));
+  const cAbs = al.aumBeat!=null
+             ? `${fmt.cr(al.crBeat)} of ${fmt.cr(al.crBeatUsed)} rated`
+               + (al.crCover!=null ? ` · ${al.crCover.toFixed(0)}% of the ${fmt.cr(al.crCat)} category` : '')
+             : (cWhy || '—');
+  const u = al.unit ? ` <small style="color:var(--ink-4)">(${al.unit})</small>` : '';
+  return `<tr><td class="lbl">Alpha vs benchmark${u}</td><td class="num ${dc(al.alphaBench)}">${pp(al.alphaBench)}</td><td class="num">${aAbs}</td></tr>`
+       + `<tr><td class="lbl">Alpha vs category average <small style="color:var(--ink-4)">(ex-self${al.unit?', '+al.unit:''})</small></td><td class="num ${dc(al.alphaCat)}">${pp(al.alphaCat)}</td><td class="num">${bAbs}</td></tr>`
+       + `<tr><td class="lbl">% of <i>rated</i> category AUM beating benchmark</td><td class="num">${al.aumBeat==null?'—':al.aumBeat.toFixed(1)+'%'}</td><td class="num">${cAbs}</td></tr>`;
+}
+// The reproducibility contract for the three rows above: definition, data source, weighting,
+// annualization and exclusions, so a reader can rebuild every number without asking anyone.
+function standingAlphaNote(al, name){
+  const uni = S.universe==='vr' ? 'vr' : 'all';
+  // ★ SHORT-CIRCUIT ON A NON-OK STATE. Nothing below this point is meaningful when there is no
+  // window (Composite / 3Y+reward), no return block, or no data for this book — and worse, the
+  // paragraphs below interpolate al.cat / al.months / al.rw, which are NULL in those states and
+  // would print the word "null" into the reader's methodology. Say what the state is instead.
+  if(al.state!=='ok'){
+    const lead = ` <b>The three alpha rows read “—”</b> here because `;
+    return lead + (
+        al.state==='nowindow'    ? `they need ONE rolling window and <b>${S.basis==='Composite'?'Composite':'3Y+reward'}</b> blends 1Y &amp; 3Y — there is no single period to measure a return, a benchmark or a peer average over. Set the basis to <b>1M, 3M, 6M, 9M, 1Y, 2Y, 3Y or 5Y</b> and all three appear. (The rank and outperformance figures above are unaffected: they come from a SCORE, which the blend does define.)`
+      : al.state==='loading'     ? `the return block is still downloading. It arrives on its own and this card repaints itself — no action needed.`
+      : al.state==='absent'      ? `this deck was built without the return block, so scheme, benchmark and peer RETURNS are not available in it at all. Quartiles, ranks, residency and both outperformance percentages are unaffected — they ride separate blocks.`
+      : al.state==='winoverbook' ? `the <b>${al.rw}</b> window is LONGER than the <b>${modeLabel()}</b>'s ${(al.book||0)/12}-year book. An investor ${(al.book||0)/12} years into a SIP has no ${al.rw} history to be measured over, so the engine ships nothing for that combination — not zeros, nothing. Shorten the window, or switch to the ${(al.book||0)/12===3?'5Y SIP book':'lumpsum'} mode.`
+      : al.state==='nosip'       ? `this deck ships no SIP block for the <b>${modeLabel()}</b>.`
+      : `the return series for the <b>${universeLabel()}</b> universe is not in this deck.`)
+      + ` Everything else on this card is computed as described above.`;
+  }
+  const src = S.mode==='ls'
+    ? `<code>returns.lump.${uni}["${uni==='vr'?'&lt;category&gt;|&lt;scheme&gt;':'&lt;scheme&gt;'}"]["${al.rw||'&lt;window&gt;'}"]</code> — the engine's CUMULATIVE point-to-point window return, in percent to 2 dp`
+    : `<code>returns.sipgain.${modeConv()}.${uni}["${uni==='vr'?'&lt;category&gt;|&lt;scheme&gt;':'&lt;scheme&gt;'}"]["${al.rw||'&lt;window&gt;'}"]</code> — the SIP book's value-to-cost GAIN in percent to 4 dp, with its opening weight in the parallel <code>.wopen</code> map and the instalment ages in <code>returns.sipdays.${modeConv()}</code> / <code>returns.sipopen.${modeConv()}</code>`;
+  const xf = S.mode==='ls'
+    ? (al.ann
+        ? `Both sides are ANNUALIZED before subtracting — <code>(1+cumulative/100)^(12/${al.months}) − 1</code> — because the window is ${al.months} months. Annualizing is monotone, so it can never re-order a fund against its benchmark.`
+        : `Under a year NOTHING is annualized: the figures are the window returns as they happened, so the alpha is a difference of cumulative returns. Scaling a few weeks up to a "per annum" number would print a rate nobody earns.`)
+    : (al.ann
+        ? `Both sides are converted to an XIRR before subtracting — the annual rate that grows every instalment (plus whatever the book was already worth when the window opened) into the final pot, solved in the browser by bisection from the shipped gain, the opening weight and the age in days of each instalment. Same solver, same bracket and same stopping rule as the engine's <code>sip_xirr</code>.`
+        : `Under a year the figures are TOTAL GAINS — profit as a share of the money actually invested — not rates, so the alpha is a difference of gains. Scheme and peers run the identical instalment grid, so those gains are on the same rupees and subtract cleanly.`);
+  // ── WHERE THE BENCHMARK COMES FROM, and which of its two failure modes is in play.
+  // The universe branch here is about METRIC C only: metric A resolves the benchmark from the
+  // scheme's VR home membership in either universe (see rule 3), so it is live under All Peers
+  // whenever the scheme HAS a VR membership — and says so, rather than sending the reader to a
+  // card that would show the identical number.
+  const bench = al.benchWhy==='novr'
+    ? ` <b>${name}</b> has no <b>Value Research</b> peer set — either it is an MFI-only scheme or its VR row carries an unusable category — so no designated benchmark exists for it at all, and both benchmark rows read “—”. This is not a data gap that a different toggle fixes: switching universes will not produce a benchmark, because there is none to produce. About half of the MFI cohort (458 of 924 schemes at 2026-09-01) is in this state. <b>Alpha vs category average</b> is unaffected — it needs peers, not an index.`
+    : S.universe!=='vr'
+    ? ` <b>Alpha vs benchmark</b> is live here even though the <b>MFI all-peer</b> universe is selected: a benchmark belongs to a Value Research CATEGORY, not to a peer universe, so it is resolved from <b>${name}</b>'s VR home membership${al.benchCat?` (“${al.benchCat}”)`:''} — exactly what the <b>Return profile</b> card below does, so the two cards agree by construction. (The scheme's own return is identical in both universes; verified on the live payload over 81,637 values with zero differences.) <b>% of rated category AUM beating benchmark</b> is the one that genuinely cannot exist here: it describes a COHORT, and the members of an MFI category have different VR homes or none, so there is no common index to measure them against. Switch to <b>Exact Peers (VR)</b> for that row.`
+    : (al.benchWhy==='capped'
+        ? ` The <b>${al.benchCat||al.cat}</b> benchmark went stale after <b>${fmt.date(al.capDate)}</b> (more than 45 days behind the latest scheme NAV), so both benchmark rows are blanked past that date rather than computed against a frozen index. Two gates enforce this — the engine trims the stale months away AND ships <code>capped_cats</code>, which this card re-checks explicitly, because for five categories the trimming alone still returns a number past the cap date.`
+        : (al.benchWhy==='nobenchbook'
+            ? ` <b>${al.benchName||'This benchmark'}</b> exists and is priced, but it carries <b>no ${modeLabel()} series</b>: the index does not have enough history to run the ${(modeBookMonths()||0)/12}-year instalment grid, so the engine ships no SIP gain for it. Counted on this payload, <code>returns.bench</code> holds 35 categories while <code>sipgain.sip3y.bench</code> holds 34 and <code>sipgain.sip5y.bench</code> holds 32. Switch to <b>Lumpsum</b>, or to the shorter book, and the benchmark comparison returns. This is NOT the stale/capped case and NOT the unpriced case — the index is fine, the BOOK is what it cannot fill.`
+            : (al.benchWhy==='benchabsent'
+            ? ` Value Research names <b>${al.benchName}</b> for <b>${al.benchCat||al.cat}</b>, but the vendor ships no NAV for that index at all — so there is nothing to compute a benchmark return from. This is NOT the stale/capped case: a capped benchmark has a series that stopped, this one has no series at any date.`
+            // ★ THE BENCHMARK'S PATH FOLLOWS THE MODE, exactly as `src` above does. Naming
+            // returns.bench[...] under a SIP mode would point the reader at a DIFFERENT MEASURE —
+            // a cumulative point-to-point percent instead of the book's value-to-cost gain — and
+            // the two can disagree in SIGN: on HDFC Flexi Cap / VR / 3Y book / 3Y window the card
+            // shows +4.55 pp from the SIP gain, while the lumpsum path yields −1.61 pp. A reader
+            // following the note would conclude the deck is wrong. (Fixed 2026-09-01.)
+            : ` The benchmark is <b>${al.benchName||'—'}</b>, the Value Research benchmark for <b>${al.benchCat||al.cat}</b>, read from <code>${S.mode==='ls'?`returns.bench["${al.benchCat||al.cat}"]`:`returns.sipgain.${modeConv()}.bench["${al.benchCat||al.cat}"]`}</code> on the VR month-end axis${S.mode==='ls'?'':' — the benchmark index run through the IDENTICAL instalment grid, so it is a SIP-book value-to-cost gain, not a point-to-point return'}.`)));
+  const withheld = al.benchWithheld
+    ? ` <b>Alpha vs benchmark reads “—” here on purpose.</b> Under the <b>${modeLabel()}</b> the ${al.rw} window is SHORTER than the book, so most of the money was already invested when the window opened. The scheme's opening weight is shipped, but the benchmark's is not — so the benchmark's annual rate is not solvable, and it is withheld rather than guessed. It becomes available when the window equals the book (${(modeBookMonths()||0)/12}Y), and under a year, where the headline is a gain and no rate is needed. The <b>Return profile</b> card below blanks its SIP benchmark row on the identical test, so the two cards agree. <b>Alpha vs category average and % of AUM beating the benchmark stay live</b> — the peers' own opening weights ARE shipped, and the “beating” test is a raw comparison that needs no rate.`
+    : '';
+  const cmp = ` <b>% of rated category AUM beating benchmark</b> is a different question from the <b>Outperformance (AUM)</b> row above it, and the two are not comparable: outperformance asks how much of the category's money <i>this fund</i> beats, while this row asks how much of it beats <i>the benchmark</i> — a property of the CATEGORY, identical for every fund in it. Read together they separate "am I good" from "is my category beating its index at all".`;
+  return ` <b>The three rows below the outperformance block</b> — added 2026-09-01 — all follow the live toggles`
+    + ` (<b>${universeLabel()}</b> universe · <b>${modeLabel()}</b> · <b>${al.rw||S.basis}</b> window), so changing any toggle re-derives every one of them; none is fixed to a window or a book.`
+    + ` <b>Alpha vs benchmark</b> = this scheme's return minus its category benchmark's return, in percentage points.`
+    + ` <b>Alpha vs category average (ex-self)</b> = this scheme's return minus the <b>AUM-WEIGHTED</b> average return of its peers <b>excluding itself</b>.`
+    + ` <b>% of rated category AUM beating benchmark</b> = the share of the category's rated AUM held in funds whose return exceeds the benchmark's — this one <b>does</b> include this fund.`
+    + ` <b>Source:</b> ${src}; per-peer AUM is the same <code>cr</code> series the rows above use.`
+    + ` <b>Annualization:</b> ${xf}`
+    + ` <b>Weighting:</b> the category average weights each peer by its AUM at this as-of, and — this is the part that is easy to get wrong — it weights the RAW input and transforms ONCE, never averaging rates. Averaging CAGRs or XIRRs is not the same thing (the transform is non-linear) and would print a number no investor earned. ${S.mode==='ls'
+        ? (al.ann?'So the cumulative returns are AUM-weighted first, then annualized once.':'Under a year nothing is annualized, so the AUM-weighted cumulative return IS the figure differenced.')
+        : (al.ann?'So the gains AND the opening weights are AUM-weighted first, then one XIRR is solved from the pair — which is exactly the money-weighted rate of the aggregate book of an investor who owned the whole category in AUM proportion.':'Under a year no rate is solved at all: the gains are AUM-weighted and differenced directly, because every peer runs the identical instalment grid so the gains are already on the same rupees.')}`
+    + ` <b>This fund is excluded from its own category average</b>, and that is a deliberate convention, not an oversight: a fund that is a large share of its category would otherwise be compared largely against itself, which shrinks the printed alpha toward zero by (1 − its own AUM share) and is worst for exactly the biggest funds. The <b>Outperformance (funds)</b> row above uses the same ex-self convention. The <b>% of rated category AUM beating benchmark</b> row does NOT exclude it — that row describes the category, and this fund is part of the category.`
+    + ` On this cohort at this date the AUM-weighted average is built from <b>${al.nUsed} of ${al.nMembers>0?al.nMembers-1:0}</b> peers (ex-self), totalling <b>${fmt.cr(al.crUsed)}</b>${al.crCover!=null?`; the “% of AUM beating” row runs over <b>${al.nBeatUsed}</b> rated members holding <b>${fmt.cr(al.crBeatUsed)}</b>, which is <b>${al.crCover.toFixed(0)}%</b> of the category's <b>${fmt.cr(al.crCat)}</b>`:''}.`
+    + ` <b>Exclusions:</b> a peer with no return on this window, or with no reported AUM, is dropped from BOTH the numerator and the denominator of the average AND of the “% of AUM beating” figure — the same rule the rated denominators above follow. Counting a missing return as zero would drag the category average toward zero and flatter every fund's alpha. ${al.crCover!=null&&al.crCover<80?`<b>Note the coverage on this cohort: only ${al.crCover.toFixed(0)}% of the category's money carries a return on this window</b>, so the percentage speaks for that share and is silent about the rest.`:''}`
+    + ` The “beating” test compares the RAW shipped figures (cumulative return, or SIP gain) rather than the transformed ones: for lumpsum annualizing is monotone so the ordering is identical, and for SIP a raw gain difference is exactly how the engine defines its own beat-benchmark flag — so this row agrees with that flag by construction (checked 2026-09-01 over 68,643 fund-months at the 3-year window under both books: zero disagreements).`
+    + bench + withheld + cmp
+    + ` ${S.mode==='ls'?'Because the lumpsum returns are stored to 2 dp, an alpha inside ±0.02 pp is inside the storage noise':'Because the SIP gains are stored to 4 dp, an alpha inside ±0.0002 pp is inside the storage noise'} — read the sign of a near-zero alpha as "level", not as a verdict.`;
+}
 function renderSchemeStanding(){
   const {name,month}=S.scheme;
   const box=document.getElementById('sc-standing'); if(!box) return;
   const subEl=document.getElementById('sc-standing-sub'), methodEl=document.getElementById('sc-standing-method');
   document.getElementById('sc-standing-title').textContent='Category standing';
   const asof=fmt.date(curDates()[month]);
+  stdWantReturns();                       // this card reads returns.json now — ask, and repaint on landing
   const st=computeStanding(name, month);
+  const al=computeStandingAlpha(name, month);
   if(!st || st.state==='nocat'){ subEl.textContent='';
     box.innerHTML='<div class="sub" style="padding:16px 14px">Select a scheme with a mapped category to see its standing.</div>';
     methodEl.innerHTML=''; return; }
@@ -2745,8 +3477,16 @@ function renderSchemeStanding(){
   subEl.innerHTML=`Home category “${st.cat}” · ${basisLbl} · ${asof}`;
   const share=(st.crSelf!=null && st.crCat>0) ? st.crSelf/st.crCat : null;
   if(st.state==='unrated'){
-    box.innerHTML=`<div class="sub" style="padding:16px 14px">${share!=null?`Category AUM share: <b>${fmt.cr(st.crSelf)}</b> of <b>${fmt.cr(st.crCat)}</b> = <b>${(100*share).toFixed(2)}%</b>.<br>`:''}<b>${name||'—'}</b> is not rated on this basis at ${asof} — it needs the full window of history (and category peers) to be ranked.</div>`;
-    methodEl.innerHTML=''; return;
+    // ★ The three alpha rows do NOT need a rank — they need a return, a benchmark and the peers'
+    // AUM — so an unrated scheme still gets them instead of an empty card. Every cell that is
+    // blank names its own reason, and the note below explains each one, so three dashes here are
+    // an answer ("not measurable, and here is why"), not a silent failure.
+    box.innerHTML=`<div class="sub" style="padding:16px 14px">${share!=null?`Category AUM share: <b>${fmt.cr(st.crSelf)}</b> of <b>${fmt.cr(st.crCat)}</b> = <b>${(100*share).toFixed(2)}%</b>.<br>`:''}<b>${name||'—'}</b> is not rated on this basis at ${asof} — it needs the full window of history (and category peers) to be ranked.</div>`
+      + `<table class="rt"><thead><tr><th>Metric</th><th class="num">Value</th><th class="num">Absolute</th></tr></thead><tbody>${standingAlphaRows(al)}</tbody></table>`;
+    methodEl.innerHTML=methodNote(
+      `<b>${name}</b> is NOT RANKED in <b>${universeLabel()}</b> category “${st.cat}” on <b>${basisLbl}</b> at <b>${asof}</b> — the engine could not place it in the ordering at this date, which normally means it lacks the full window of history. Rank, quartile and both outperformance percentages therefore have no value here.`
+      + standingAlphaNote(al, name) + modeSentence());
+    return;
   }
   const pc=st.r===1?'r1':st.r<=Math.ceil(st.n/4)?'up':st.r>st.n-Math.ceil(st.n/4)?'dn':'';
   const cntPct=st.n ? 100*st.cntAtOrBelow/st.n : null;
@@ -2755,6 +3495,7 @@ function renderSchemeStanding(){
   html+=`<tr><td class="lbl">Category AUM share</td><td class="num">${share==null?'—':(100*share).toFixed(2)+'%'}</td><td class="num">${fmt.cr(st.crSelf)} of ${fmt.cr(st.crCat)}</td></tr>`;
   html+=`<tr><td class="lbl">Outperformance (funds)</td><td class="num"><span class="pill ${pc}">${st.r} / ${st.n}</span>&nbsp; ${cntPct==null?'—':cntPct.toFixed(1)+'%'}</td><td class="num">beats ${st.cntAtOrBelow-1} of ${st.n-1} peers</td></tr>`;
   html+=`<tr><td class="lbl">Outperformance (AUM)</td><td class="num">${aumPct==null?'—':aumPct.toFixed(1)+'%'}</td><td class="num">${fmt.cr(st.crAtOrBelow)} of ${fmt.cr(st.crRated)} rated</td></tr>`;
+  html+=standingAlphaRows(al);            // ★ the three adaptive alpha rows (Kyser 2026-09-01)
   html+='</tbody></table>';
   box.innerHTML=html;
   // When the category has ranks but no quartiles (the scoring path dropped it), say so —
@@ -2776,6 +3517,12 @@ function renderSchemeStanding(){
     // any as-of is a mix of month-ends — each scheme's latest disclosed figure, carried
     // forward until it discloses again. Say so rather than let the reader assume one date.
     ` Every ₹ figure here is each scheme's <b>latest disclosed monthly AUM carried forward</b>, and AMCs disclose on different dates — so members of one category can be reporting different months (audited 2026-08-11: at the 2026-08-07 as-of, 24 of the 45 Flexi Cap members reported as of 2026-07-01 and 21 as of 2026-06-01; the deck's category total reproduces the raw vendor file to the rupee).`+
+    // The same carry-forward caveat governs the AUM-WEIGHTED average below: the weights are each
+    // scheme's latest disclosed AUM AT THIS AS-OF, not at the window's start — so it is an
+    // AUM-weighted average OF PEER RETURNS, not the realised return of a portfolio held across
+    // the window. Same convention as the Outperformance (AUM) row, so the two reconcile.
+    ` That carry-forward also supplies the weights for the AUM-weighted category average below, and those weights are as of TODAY's disclosure, not the window's start — so it is an AUM-weighted average <i>of peer returns</i>, not the realised return of a portfolio actually held across the window.`+
+    standingAlphaNote(al, name)+
     modeSentence());
 }
 // ── RETURN PROFILE (Addendum §C, 2026-08-11): the numbers UNDER the quartiles. Every other
@@ -2984,7 +3731,12 @@ function renderSchemeReturns(){
   const hm  = ann ? annualizePct(rp.mktCum, months) : rp.mktCum;
   const exm = (hs!=null && hm!=null) ? hs-hm : null;
   const inv = '₹'+(100*(nInst||0)).toLocaleString('en-IN');
-  const convLbl = conv==='first' ? '1st of month' : 'month-end';
+  // ★ ONE INSTALMENT DAY FOR BOTH BOOKS — the trading day nearest the 15th (peer_monitor
+  // sip_month_grids -> grids["mid"], Kyser 2026-08-13). `conv` here is the BOOK key ('sip3y' /
+  // 'sip5y'), never a date convention, so the old `conv==='first'` test could not be true and
+  // this label always printed "month-end" — a wrong statement about the data, on four panels.
+  // (Found + fixed 2026-09-01.) SIPCONVLBL is the single source of that sentence now.
+  const convLbl = SIPCONVLBL;
   // ★ RATIFICATION R3 — the ONE display rule every SIP return on this page obeys. Under a year
   // the headline (the Value column) is the TOTAL GAIN — the profit as a share of the money
   // actually invested — with the XIRR carried beside it in Absolute; from a year up the headline
@@ -3188,15 +3940,28 @@ function pgSipState(conv){
 // object identity (then by the gain) makes the whole column ~one solve per distinct gain. Object
 // identity is stale-proof for the same reason the decode memos are — a re-fetched returns block
 // hands back new arrays, so an old entry can never be read against new data.
+// ★ THE OPENING POSITION IS PART OF THE SOLVE (fixed 2026-09-01 — this was a LIVE WRONG NUMBER).
+// This used to call solveSipXirr(offsets, gainPct/100) with no `wOpen`/`offOpen`, i.e. it priced
+// every book as a FRESH level SIP starting at the window's open. Under an investor BOOK that is
+// false whenever the window is shorter than the book: most of the money went in years earlier, and
+// pricing it as if it arrived inside the window inflates the rate — exactly the failure
+// solveSipXirr's own header warns about. Measured against the engine's `sipret` on the 3-year
+// book: the 6-Month window read 36.83% p.a. in this column where the truth is 18.92%, and the
+// 1-Year window read 5.28% against 3.11%. Only the diagonal (window == book, where wOpen is 0 by
+// construction) was ever right. The Return-profile card and the Category-standing card already
+// passed both arguments; this column is now the third place that agrees with them.
+// The memo key must carry the opening pair too: `offsets` identity fixes the CALENDAR, but wOpen
+// varies PER SCHEME, so keying on the gain alone would hand one fund another fund's rate.
 const _XIRR_MEMO=new WeakMap();   // weak, so a replaced returns block takes its solves with it
-function pgXirr(offsets, gainPct){
+function pgXirr(offsets, gainPct, wOpen, offOpen){
   if(!offsets || gainPct==null) return null;
   let inner=_XIRR_MEMO.get(offsets);
   if(!inner){ inner=new Map(); _XIRR_MEMO.set(offsets, inner); }
-  const hit=inner.get(gainPct); if(hit!==undefined) return hit;
-  const r=solveSipXirr(offsets, gainPct/100);
+  const mk = gainPct+'|'+(wOpen==null?'':wOpen)+'|'+(offOpen==null?'':offOpen);
+  const hit=inner.get(mk); if(hit!==undefined) return hit;
+  const r=solveSipXirr(offsets, gainPct/100, wOpen, offOpen);
   const v=(r==null)?null:r*100;
-  inner.set(gainPct, v); return v;
+  inner.set(mk, v); return v;
 }
 // ── Asking for the SIP file from the grid.
 // ★ ON DEMAND under LUMPSUM (F2, 2026-08-11) — this used to be a deferred auto-fetch and is not
@@ -3222,9 +3987,13 @@ function pgWantReturns(){
   if(returnsSrc() || _PG.retAsked) return;
   const p=fetchReturns(); if(!p || !p.then) return;
   _PG.retAsked=1;
+  // No view guard — same defect and same reasoning as stdWantReturns() above: with one, a reader
+  // who leaves the tab while returns.json is in flight comes back to two permanently blank Return
+  // columns, because renderIfDirty() will not repaint a view whose dirty flag the first visit
+  // already cleared. (Fixed 2026-09-01.)
   p.then(()=>{
     if(!returnsSrc()) _PG.retAsked=0;
-    else if(S.view==='scheme'){ try{ renderSchemePeers(); }catch(e){} }
+    else { try{ renderSchemePeers(); }catch(e){} }
   });
 }
 function pgWantSip(conv){
@@ -3332,6 +4101,30 @@ function computePeerGrid(name, i){
   const off =(offs && mi>=0) ? _retAt(offs, mi) : null;
   const lumpBlk=(R && R.lump) ? (R.lump[uni]||null) : null;
   const sipBlk = SG ? (SG[uni]||null) : null;
+  // ★ THE BOOK'S OPENING POSITION. `wopen` is per scheme x window x as-of (the share of the
+  // position's total COST already invested when the window opened); `sipopen` is one number per
+  // window x as-of (the window opens on a DATE, so its age is the same for every fund). Both are
+  // absent on a pre-book payload, and then w=0 makes the solve identical to the level-SIP one this
+  // grid always did — which is why the old code "worked" and was quietly wrong under a book.
+  const wBlk = SG ? ((SG.wopen||{})[uni]||null) : null;
+  const oRow = (R && R.sipopen && R.sipopen[conv] && rw) ? (R.sipopen[conv][rw]||null) : null;
+  const offOpen = (oRow && mi>=0) ? _retAt(oRow, mi) : null;
+  // ── THE COHORT'S BENCHMARK (added 2026-09-01, Kyser). A benchmark belongs to a VALUE RESEARCH
+  // category, so a single pinned benchmark row is meaningful ONLY in the VR universe: the members
+  // of an MFI all-peer category have different VR homes, or none, so there is no one index they
+  // all measure against. Under All Peers the benchmark row and the two `vs bmk` columns are simply
+  // NOT BUILT — an absent column, not a column of dashes, because a dash down every row of a
+  // 30-fund grid reads as a data outage rather than as "this comparison does not exist here".
+  const bname = vr ? benchNameFor(pcat) : null;
+  const bCapDate = vr ? (CAPPED[pcat]||null) : null;
+  const bCapped = !!(bCapDate && asof > bCapDate);   // stale vendor index: no honest comparison past it
+  // same rule as the standing card: ask the map the ACTIVE MODE reads. A category can be priced
+  // for lumpsum and carry no SIP-book series (Conglomerate Fund on the 3Y book; that plus Multi
+  // Asset Allocation and Silver FoF on the 5Y book), and calling that "absent" would be wrong.
+  const bAbsent = !!(vr && bname && !(((R && R.bench)||{})[pcat]));
+  const bNoBook = !!(vr && bname && !bAbsent && SG && !((SG.bench||{})[pcat]));
+  const bLumpCum = (vr && !bCapped && R && mi>=0) ? _retAt((((R.bench||{})[pcat]||{})[rw])||null, mi) : null;
+  const bSipGain = (vr && !bCapped && SG  && mi>=0) ? _retAt((((SG.bench||{})[pcat]||{})[rw])||null, mi) : null;
 
   // ── per block: ranks, the inclusive at-or-below measures, and the residency source
   // sipDeferred (F2): the six SIP columns that need sip_<conv>.json render a "click to load"
@@ -3400,7 +4193,11 @@ function computePeerGrid(name, i){
     r.lRet = (wm && wm>=12) ? annualizePct(r.lCum, wm) : r.lCum;
     const srec = sipBlk ? ((sipBlk[key]||{})[rw]||null) : null;
     r.sGain = srec ? _retAt(srec, i) : null;
-    r.sXirr = (off && r.sGain!=null) ? pgXirr(off, r.sGain) : null;
+    // this fund's own opening weight — without it the XIRR prices a 3-year book as a fresh SIP
+    // started at the window's open (see pgXirr's header for the measured size of that error)
+    const wrec = wBlk ? ((wBlk[key]||{})[rw]||null) : null;
+    r.sWOpen = wrec ? _retAt(wrec, i) : null;
+    r.sXirr = (off && r.sGain!=null) ? pgXirr(off, r.sGain, r.sWOpen, offOpen) : null;
     // ★ RATIFICATION R3 — the display rule for EVERY SIP return on this page. Under a year the
     // headline is the TOTAL GAIN with the XIRR as subtext; from a year up the headline is the
     // XIRR with the gain as subtext. Annualizing a four-day-old single installment into a "p.a."
@@ -3420,8 +4217,36 @@ function computePeerGrid(name, i){
       const n = cnt ? (cnt[0]+cnt[1]+cnt[2]+cnt[3]) : 0;
       r[pre+'Days']=n;
       for(let q=0;q<4;q++) r[pre+'Q'+(q+1)] = (cnt && n) ? 100*cnt[q]/n : null;
+      // Q1+Q2 = the share of rated days spent in the TOP HALF of the category. Derived from the
+      // same residency counts, not a second source, so it can never disagree with %Q1 and %Q2.
+      r[pre+'Q12'] = (cnt && n) ? 100*(cnt[0]+cnt[1])/n : null;
     });
     return r;
+  });
+
+  // ── THE PINNED BENCHMARK ROW, AND THE PER-SCHEME ALPHA COLUMNS (Kyser 2026-09-01) ────────
+  // Both sides of every alpha get the IDENTICAL transform — the same rule the Category-standing
+  // card and the Return-profile card follow, so all three agree: lumpsum annualizes from 1Y up,
+  // SIP differences XIRRs from 1Y up and GAINS below it. An annualized figure is never subtracted
+  // from a cumulative one.
+  const bLumpRet = (wm && wm>=12) ? annualizePct(bLumpCum, wm) : bLumpCum;
+  // ★ THE BENCHMARK'S OWN OPENING WEIGHT IS NOT SHIPPED (`sipgain[conv].wopen` carries only the
+  // two peer universes), so under a book its RATE is solvable only when there is no opening
+  // position at all. Tested EMPIRICALLY off the cohort rather than assumed from the window length:
+  // if any member carries wOpen > 0 the window is inside the book, and the benchmark rate is
+  // WITHHELD rather than guessed. That is the identical rule the Return-profile card applies
+  // (`!(wOpen>0)`), so the two panels blank the same cell instead of disagreeing. The GAIN is
+  // always shown — it needs no solve, and under a year it is the headline anyway.
+  const anyOpen = rows.some(r=>r.sWOpen!=null && r.sWOpen>0);
+  const bSipXirr = (off && bSipGain!=null && !anyOpen) ? pgXirr(off, bSipGain, 0, offOpen) : null;
+  const bSipRet  = (wm && wm>=12) ? bSipXirr : bSipGain;
+  const bench = { has:vr, name:bname, capped:bCapped, capDate:bCapDate, absent:bAbsent, noBook:bNoBook,
+                  lCum:bLumpCum, lRet:bLumpRet, sGain:bSipGain, sXirr:bSipXirr, sRet:bSipRet,
+                  sAnn:!!(wm && wm>=12), withheld:!!(bSipGain!=null && wm && wm>=12 && anyOpen) };
+  rows.forEach(r=>{
+    r.lVsB = (r.lRet!=null && bLumpRet!=null) ? r.lRet-bLumpRet : null;
+    r.sVsB = r.sAnn ? ((r.sXirr!=null && bSipXirr!=null) ? r.sXirr-bSipXirr : null)
+                    : ((r.sGain!=null && bSipGain!=null) ? r.sGain-bSipGain : null);
   });
 
   // Default row order = the OLD peer table's order, so the grid opens on the ordering the
@@ -3438,7 +4263,7 @@ function computePeerGrid(name, i){
   const avg = scoredRows.length ? scoredRows.reduce((s,r)=>s+r.score,0)/scoredRows.length : null;
   rows.forEach(r=>{ r.vsAvg = (avg!=null && r.score!=null) ? r.score-avg : null; });
 
-  return { state:'ok', pcat, rw, wm, asof, conv, uni, vr, scored, name, i,
+  return { state:'ok', pcat, rw, wm, asof, conv, uni, vr, scored, name, i, bench,
            nAll, crCat, avg, blocks, rows, activeBlk,
            hasRet, retPending, hasSip:!!sipBlk, hasDays:!!off, sipState, sipDeferred,
            nInst:(off&&off.length)?off.length:(wm||0) };
@@ -3481,6 +4306,8 @@ function pgColSpec(M){
     const pre=blk, n=r[pre+'Days'];
     return n ? null : '—';                       // null = the caller formats the number
   };
+  // `q` is 1..4, or the string '12' for the derived Q1+Q2 column — both read r[<blk>Q<q>], which
+  // computePeerGrid fills for all five keys from the ONE residency count array.
   const resCell=(r,blk,q)=>{
     const g=qCell(r,blk); if(g!==null) return g;
     const v=r[blk+'Q'+q];
@@ -3514,9 +4341,30 @@ function pgColSpec(M){
     { k:'score', h:'Score', cls:'num', blk:null, cell:r=> fmt.num(r.score) },
     { k:'vsAvg', h:'vs avg', cls:'num', blk:null,
       cell:r=> r.vsAvg==null ? '—' : `<span class="${r.vsAvg>=0?'delta-pos':'delta-neg'}">${(r.vsAvg>=0?'+':'')+r.vsAvg.toFixed(2)}</span>` });
-  [['l','LUMPSUM'],['s', M.conv==='first' ? 'SIP · 1st of month' : 'SIP · month-end']].forEach(([blk,label])=>{
+  // ── ALPHA vs THE COHORT'S BENCHMARK, per scheme (added 2026-09-01, Kyser) ───────────────
+  // Built ONLY in the VR universe, and only when the benchmark actually resolved: under All Peers
+  // the members of one MFI category have different VR homes (or none), so a single column cannot
+  // mean one thing down the page. An ABSENT column says that honestly; a column of dashes would
+  // read as an outage. Every value is a difference of the two figures the grid is DISPLAYING, so
+  // it reconciles by eye against the Return column and the pinned benchmark row above it.
+  const vsbCell=(r,blk)=>{
+    if(!M.hasRet) return '—';
+    if(M.retPending) return pend;
+    if(!M.rw) return nowin;
+    if(blk==='s' && !M.hasSip) return '—';
+    if(blk==='s' && M.bench.withheld)
+      return `<span class="pg-pend" title="the benchmark's own opening weight is not shipped, so its rate is withheld on a part-window book — the gain difference is still shown under a year">—</span>`;
+    const v = r[blk+'VsB'];
+    if(v==null) return '—';
+    return `<span class="${v>=0?'delta-pos':'delta-neg'}">${(v>=0?'+':'')+v.toFixed(2)} pp</span>`;
+  };
+  [['l','LUMPSUM'],['s','SIP · '+SIPCONVLBL]].forEach(([blk,label])=>{
     cols.push({ k:blk+'Ret', h:'Return', cls:'num', blk, group:label, edge:true, cell:r=>retCell(r,blk) });
+    if(M.bench.has) cols.push({ k:blk+'VsB', h:'vs bmk', cls:'num', blk, cell:r=>vsbCell(r,blk) });
     for(let q=1;q<=4;q++) cols.push({ k:blk+'Q'+q, h:'%Q'+q, cls:'num', blk, cell:r=>resCell(r,blk,q) });
+    // Q1+Q2 = time spent in the TOP HALF. Placed immediately after %Q4 so the four parts and the
+    // summary read left-to-right, and derived from the same counts so it cannot contradict them.
+    cols.push({ k:blk+'Q12', h:'%Q1+Q2', cls:'num', blk, cell:r=>resCell(r,blk,'12') });
     cols.push({ k:blk+'F', h:'Funds%', cls:'num', blk, cell:r=>obCell(r,blk,'F') });
     cols.push({ k:blk+'A', h:'AUM%',  cls:'num', blk, cell:r=>obCell(r,blk,'A') });
   });
@@ -3586,19 +4434,29 @@ function pgVisibleRows(){
 function paintPeerGrid(){
   const M=_PG.meta, host=document.getElementById('sc-pg-scroll'); if(!M||!host) return;
   const cols=pgColSpec(M), rows=pgVisibleRows();
+  // the pinned benchmark row formats exactly like the cells around it — same signed 2 dp, same
+  // pending marker — so it reads as part of the table rather than as an annotation on it
+  const sgn2=(v,d)=> v==null?'—':((v>=0?'+':'')+v.toFixed(d==null?2:d)+'%');
+  const pend2='<span class="pg-pend" title="still loading — the rest of the grid is live">···</span>';
   const idn=cols.filter(c=>!c.blk).length;
   // level 1: [Scheme (the 2 frozen identity cells)] [Category position (the rest of identity)]
   //          [LUMPSUM (7)] [SIP <conv> (7)]
   let html='<table class="rt pgrid"><thead><tr class="pg-l1">'+
     '<th class="pg-frz pg-c0" colspan="2">Scheme</th>'+
     `<th colspan="${idn-2}">Category position</th>`;
-  [['l','LUMPSUM'],['s', M.conv==='first' ? 'SIP · 1st of month' : 'SIP · month-end']].forEach(([blk,label])=>{
+  [['l','LUMPSUM'],['s','SIP · '+SIPCONVLBL]].forEach(([blk,label])=>{
     // F2: the on-demand affordance sits on the SIP block header itself — the one place that
     // names the six columns waiting on the file, so the reader can see what the click buys.
     const load = (blk==='s' && M.sipDeferred)
       ? ` <button type="button" class="pg-load" id="sc-pg-sipload" title="Fetch sip_${M.conv}.json (~16 MB) to fill this block's %Q1–%Q4 and Funds%/AUM% columns. The Return column beside them is already live — it rides returns.json.">click to load</button>`
       : '';
-    html+=`<th class="pg-blk pg-edge" colspan="7">${label}${load}</th>`;
+    // ★ COUNTED, NOT HARD-CODED. This was `colspan="7"`, right only while each block had exactly
+    // seven columns; a block now carries eight or nine, depending on whether the benchmark
+    // resolved (the `vs bmk` column exists in the VR universe only). A stale colspan does not
+    // throw — it silently shears the two header rows apart, which is the kind of defect that
+    // ships. Derive it from the column spec that actually builds the row below. (2026-09-01)
+    const nb = cols.filter(c=>c.blk===blk).length;
+    html+=`<th class="pg-blk pg-edge" colspan="${nb}">${label}${load}</th>`;
   });
   html+='</tr><tr class="pg-l2">';
   cols.forEach(c=>{
@@ -3606,6 +4464,51 @@ function paintPeerGrid(){
     html+=`<th class="${c.cls&&c.cls.indexOf('num')>=0?'num ':''}${c.hcls||''} sortable${on?' sorted':''}${c.edge?' pg-edge':''}" data-k="${c.k}">${c.h} <span class="arr">${arr}</span></th>`;
   });
   html+='</tr></thead><tbody>';
+  // ── THE BENCHMARK, PINNED ABOVE THE COHORT (Kyser 2026-09-01) ────────────────────────
+  // A ROW, not a column, and that is the design decision. The benchmark is ONE series for the
+  // whole cohort: as a column it would repeat the identical number down all 30 rows and add noise
+  // to every horizontal read. As a pinned row it sits where the eye already compares — directly
+  // above the funds, in the same two Return columns — while the per-scheme `vs bmk` column beside
+  // it carries the part that genuinely varies by fund. It is not sortable and never moves: it is
+  // the reference line, not a competitor in the ranking.
+  if(M.bench.has){
+    const B=M.bench;
+    const bcell=(blk)=>{
+      if(!M.hasRet) return '—';
+      if(M.retPending) return pend2;
+      if(!M.rw) return '—';
+      if(B.capped) return `<span class="pg-pend" title="this benchmark went stale after ${fmt.date(B.capDate)} — blanked past that date rather than computed against a frozen index">—</span>`;
+      if(B.absent) return `<span class="pg-pend" title="Value Research names this index but the vendor ships no NAV for it at all">—</span>`;
+      if(blk==='l'){
+        if(B.lRet==null) return '—';
+        const sub=(M.wm>=24 && B.lCum!=null)?`<span class="pg-sub">${sgn2(B.lCum)} cum</span>`:'';
+        return sgn2(B.lRet)+sub;
+      }
+      if(!M.hasSip) return '—';
+      if(B.noBook) return `<span class="pg-pend" title="this index is priced, but carries no ${modeLabel()} series — it lacks the history to run this instalment grid, so the engine ships no SIP gain for it">—</span>`;
+      if(B.sGain==null) return '—';
+      if(B.sAnn){
+        // the RATE may be withheld (the benchmark's own opening weight is not shipped) — show the
+        // GAIN regardless, so the reader still has the exact comparable quantity beside the dash
+        const sub=`<span class="pg-sub">gain ${sgn2(B.sGain)}</span>`;
+        return (B.sXirr==null
+          ? `<span class="pg-pend" title="the benchmark's own opening weight is not shipped, so its annual rate is withheld on a part-window book rather than guessed — the gain beside it is exact">—</span>`
+          : sgn2(B.sXirr)+' p.a.')+sub;
+      }
+      const sub = B.sXirr==null ? '' : `<span class="pg-sub">XIRR ${sgn2(B.sXirr)} p.a.</span>`;
+      return sgn2(B.sGain)+sub;
+    };
+    html+='<tr class="pg-bench">';
+    cols.forEach(c=>{
+      let v='';
+      if(c.k==='nm') v=`<b>${B.name||'Category benchmark'}</b><span class="pg-sub">category benchmark · not ranked</span>`;
+      else if(c.k==='lRet') v=bcell('l');
+      else if(c.k==='sRet') v=bcell('s');
+      else if(c.k==='lVsB'||c.k==='sVsB') v='<span style="color:var(--ink-4)">—</span>';
+      html+=`<td class="${c.cls||''}${c.edge?' pg-edge':''}">${v}</td>`;
+    });
+    html+='</tr>';
+  }
   rows.forEach(r=>{
     html+=`<tr class="${r.sel?'hl':''}">`;
     cols.forEach(c=>{ html+=`<td class="${c.cls||''}${c.edge?' pg-edge':''}">${c.cell(r)}</td>`; });
@@ -3731,21 +4634,42 @@ function exportPeerGrid(){
   const n=v=> v==null||v!==v ? '' : (Math.round(v*10000)/10000);
   const head=['#','Scheme','Fund house','Sleeve','Borrowed','Quartile','Cat AUM%','AUM cr','% of its AMC'];
   if(M.scored) head.push('Score','vs avg');
-  head.push('LUMPSUM Return%','LUMPSUM Return cumulative%','LUMPSUM %Q1','LUMPSUM %Q2','LUMPSUM %Q3','LUMPSUM %Q4','LUMPSUM rated days','LUMPSUM Funds%','LUMPSUM AUM%',
-            'SIP headline','SIP Return%','SIP gain%','SIP XIRR% p.a.','SIP %Q1','SIP %Q2','SIP %Q3','SIP %Q4','SIP rated days','SIP Funds%','SIP AUM%',
+  // The two alpha columns are exported only when they EXIST on screen (the VR universe), so the
+  // file mirrors the grid exactly instead of carrying two permanently-empty columns that a later
+  // reader would take for missing data. Same rule as the display: absent, not blank.
+  const vsb=M.bench.has;
+  head.push('LUMPSUM Return%', ...(vsb?['LUMPSUM vs benchmark pp']:[]), 'LUMPSUM Return cumulative%',
+            'LUMPSUM %Q1','LUMPSUM %Q2','LUMPSUM %Q3','LUMPSUM %Q4','LUMPSUM %Q1+Q2','LUMPSUM rated days','LUMPSUM Funds%','LUMPSUM AUM%',
+            'SIP headline','SIP Return%', ...(vsb?['SIP vs benchmark pp']:[]), 'SIP gain%','SIP XIRR% p.a.',
+            'SIP %Q1','SIP %Q2','SIP %Q3','SIP %Q4','SIP %Q1+Q2','SIP rated days','SIP Funds%','SIP AUM%',
             'Category','Universe','Basis','Window','As-of','Investment mode','SIP convention');
   let csv=head.join(',')+'\n';
+  // The pinned benchmark row is DATA, so it is exported too — FIRST, exactly where the grid shows
+  // it, and stamped 'BENCHMARK' in the '#' column so a spreadsheet sort can never let it drift
+  // into the fund list unlabelled.
+  if(M.bench.has){
+    const B=M.bench;
+    const bc=['BENCHMARK', `"${B.name||'Category benchmark'}"`, '', '', '', '', '', '', ''];
+    if(M.scored) bc.push('','');
+    bc.push(n(B.lRet), ...(vsb?['']:[]), n(B.lCum), '','','','','','','','',
+            (B.sGain==null)?'':(B.sAnn?'XIRR p.a.':'total gain'), n(B.sRet), ...(vsb?['']:[]), n(B.sGain), n(B.sXirr),
+            '','','','','','','','',
+            `"${M.pcat}"`, M.vr?'VR exact-peer':'MFI all-peer', `"${basisDesc()}"`, M.rw||'(scored basis)',
+            M.asof, `"${modeLabel()}"`, SIPCONVLBL);
+    csv+=bc.join(',')+'\n';
+  }
   rows.forEach(r=>{
     const cells=[ r.rank==null?'':r.rank, `"${r.nm}"`, `"${r.house||''}"`, `"${r.sl||''}"`, r.borrowed?'yes':'no',
                   r.q==null?'':('Q'+r.q), n(r.catAum), n(r.cr), r.a==null?'':n(100*r.a) ];
     if(M.scored) cells.push(n(r.score), n(r.vsAvg));
-    cells.push(n(r.lRet), n(r.lCum), n(r.lQ1), n(r.lQ2), n(r.lQ3), n(r.lQ4), r.lDays||0, n(r.lF), n(r.lA),
+    cells.push(n(r.lRet), ...(vsb?[n(r.lVsB)]:[]), n(r.lCum),
+               n(r.lQ1), n(r.lQ2), n(r.lQ3), n(r.lQ4), n(r.lQ12), r.lDays||0, n(r.lF), n(r.lA),
                // no SIP data loaded (or no SIP value for this fund) -> no unit label either
                (M.sipState!=='ok' || r.sRet==null) ? '' : (r.sAnn?'XIRR p.a.':'total gain'),
-               n(r.sRet), n(r.sGain), n(r.sXirr),
-               n(r.sQ1), n(r.sQ2), n(r.sQ3), n(r.sQ4), r.sDays||0, n(r.sF), n(r.sA),
+               n(r.sRet), ...(vsb?[n(r.sVsB)]:[]), n(r.sGain), n(r.sXirr),
+               n(r.sQ1), n(r.sQ2), n(r.sQ3), n(r.sQ4), n(r.sQ12), r.sDays||0, n(r.sF), n(r.sA),
                `"${M.pcat}"`, M.vr?'VR exact-peer':'MFI all-peer', `"${basisDesc()}"`, M.rw||'(scored basis)',
-               M.asof, `"${modeLabel()}"`, M.conv==='first'?'1st of month':'month-end');
+               M.asof, `"${modeLabel()}"`, SIPCONVLBL);
     csv+=cells.join(',')+'\n';
   });
   // A blank SIP cell means one of two very different things — "this fund has no value" or "the
@@ -3788,9 +4712,12 @@ function pgMethod(M){
     `The grid is the same set of measures the four cards above show for <b>${M.name}</b>, computed for each peer — so the highlighted row must reproduce those cards digit for digit.`+
     `<br><br><b>Identity columns.</b> <b>#</b> = the member's true rank inside the category on this window, from the engine's per-date descending stable sort — the SAME sort that assigns the quartiles, so rank and quartile can never disagree; it follows the investment mode (${modeLabel()}), exactly as the quartile chip does. “—” means the member is not rated on this window (it lacks the full history), “···” means the rank data is still downloading. <b>Qtl</b> = that member's quartile in this table. <b>Cat AUM%</b> = its AUM ÷ the category total of <b>${fmt.cr(M.crCat)}</b> across the <b>${M.nAll}</b> members with reported AUM (rated or not), so the column sums to ~100%. <b>AMC%</b> = its share of its OWN fund house's AUM.`+
     (M.scored?` <b>Score</b> = its ${basisDesc()} score and <b>vs avg</b> the gap to the category mean of ${fmt.num(M.avg)} that day.`:'')+
-    `<br><br><b>The two analytics blocks.</b> <b>LUMPSUM</b> always reads lumpsum-ranked data and <b>SIP</b> always reads the ${M.conv==='first'?'1st-of-month':'month-end'} SIP convention — they do not follow the mode toggle, because seeing both at once is the point of the grid. In a SIP mode the SIP block matches the mode; in Lumpsum mode it falls back to month-end and the header says so.`+
+    `<br><br><b>The two analytics blocks.</b> <b>LUMPSUM</b> always reads lumpsum-ranked data and <b>SIP</b> always reads the ${SIPCONVLBL} SIP convention — they do not follow the mode toggle, because seeing both at once is the point of the grid. Both books buy on the same day, so the convention never changes; in Lumpsum mode the SIP block falls back to the <b>3-year</b> book and the header says so.`+
     `<br><b>Return.</b> Lumpsum = the window's point-to-point calendar return.${dispRule} SIP = ₹100 invested on the <b>${convWord}</b> of each of the ${M.nInst} months in the window (${inv} in total). <b>Windows under a year lead with the TOTAL GAIN and carry the XIRR underneath; a year and longer lead with the XIRR p.a. and carry the gain underneath</b> — annualizing a few weeks of a single installment into a "per annum" number would be misleading. The XIRR is solved in the browser by bisection from the shipped gain and the age in days of every installment, the same solve the Return-profile panel runs. Sorting the column is unaffected by which one is the headline: for a fixed installment grid the XIRR is monotone in the gain, so both orderings are identical.`+
-    `<br><b>%Q1–%Q4.</b> The share of ${M.rw?`the trailing ${M.rw}`:'the window'} that the member spent in each quartile, as a percentage of the days it was <b>traded &amp; rated</b> — days on which it lacked the full window of history are not in the denominator, so these are not calendar days and the four columns sum to 100% of a DIFFERENT denominator for each fund (hover a cell for its day count). Identical definition to the residency card above. Residency is stored per scheme against its HOME peer set, so a row flagged <i>borrowed</i> shows its home category's residency, not this table's.`+
+    (M.bench.has
+      ? `<br><b>The pinned benchmark row and the <i>vs bmk</i> columns.</b> The first row of the table is <b>${M.bench.name||'the category benchmark'}</b>, Value Research's designated index for <b>${M.pcat}</b> — the same series the Return-profile card above compares against, on the same window and the same as-of, so the two cannot disagree. It is a ROW rather than a column because it is ONE series for the whole cohort: as a column it would repeat the identical number down every line. It is never sorted and never ranked. <b>vs bmk</b> beside each Return column is that fund minus the benchmark, in percentage points, and both sides carry the IDENTICAL transform — lumpsum annualizes from 1Y up, SIP differences XIRRs from 1Y up and total GAINS below — so an annualized figure is never subtracted from a cumulative one. Under a SIP book whose window is shorter than the book, the benchmark's <b>rate</b> is withheld (its own opening weight is not shipped, and guessing it would print a number nobody can reproduce) while its <b>gain</b> is still shown; the Return-profile card blanks the identical cell on the identical test.`
+      : `<br><b>No benchmark row here.</b> A benchmark belongs to a Value Research CATEGORY, and the members of an <b>MFI all-peer</b> category have different VR homes — or none — so there is no single index they all measure against. The benchmark row and the two <i>vs bmk</i> columns are therefore ABSENT rather than dashed out, because a dash down every row of the grid reads as a data outage instead of as "this comparison does not exist here". Switch the universe to <b>Exact Peers (VR)</b> to get them. (The Category-standing card above still shows the SELECTED fund's alpha against ITS OWN VR home benchmark under either universe — that one is a single fund, so it is well defined.)`)+
+    `<br><b>%Q1–%Q4 and %Q1+Q2.</b> The share of ${M.rw?`the trailing ${M.rw}`:'the window'} that the member spent in each quartile, as a percentage of the days it was <b>traded &amp; rated</b> — days on which it lacked the full window of history are not in the denominator, so these are not calendar days and the four columns sum to 100% of a DIFFERENT denominator for each fund (hover a cell for its day count). <b>%Q1+Q2</b> is the top-half share, derived from those same day counts (it is %Q1 + %Q2, not a second measurement), so it can never contradict the four columns beside it. Identical definition to the residency card above. Residency is stored per scheme against its HOME peer set, so a row flagged <i>borrowed</i> shows its home category's residency, not this table's.`+
     `<br><b>Funds% / AUM%.</b> The two outperformance measures from the Category-standing card, computed for each peer: the share of the category that is <b>at or below</b> it, by fund COUNT and by AUM. The convention is <b>inclusive</b> — a scheme counts itself, so the top fund reads 100% — and ties count as at-or-below. Both divide by the <b>rated</b> members only (a fund without the full window cannot be classified either side), which is a different denominator from Cat AUM% above. When AUM% exceeds Funds%, the fund is beating the LARGER funds.`+
     `<br><br><b>Every ₹ figure</b> is each scheme's <b>latest disclosed monthly AUM carried forward</b>, and AMCs disclose on different dates — so members of one category can be reporting different months (audited 2026-08-11: at the 2026-08-07 as-of, 24 of the 45 Flexi Cap members reported as of 2026-07-01 and 21 as of 2026-06-01; the deck's category total reproduces the raw vendor file to the rupee).`+
     ` Rounding: returns and %Q to 2 dp (matching the residency card), Funds%/AUM% to 1 dp (matching the standing card), so every figure here equals the card above it exactly.`+
