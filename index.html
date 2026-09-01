@@ -388,6 +388,18 @@
     background: linear-gradient(180deg, var(--paper-2), var(--paper));
     border-bottom: 1px solid var(--line);
   }
+  /* ░░ STICKY CONTROL BARS (Kyser 2026-09-02: changing a toggle meant scrolling all the way up
+     and back down). The tab nav was already sticky at top:0/z60; the GLOBAL control bar (#gctrl)
+     now pins under it, and each view's own filter row pins under that. The offsets are CSS vars
+     kept true by a ResizeObserver in the app script — both bars wrap responsively, and #gctrl
+     changes height when the universe/basis toggles swap controls in and out, so hardcoded
+     offsets would drift and leave either a gap or a hidden strip. Backgrounds are already
+     opaque paper; the drop shadow only separates the pinned stack from content sliding under. */
+  #gctrl { position: sticky; top: var(--tabs-h, 47px); z-index: 59; }
+  .view > .filters {
+    position: sticky; top: calc(var(--tabs-h, 47px) + var(--gctrl-h, 78px)); z-index: 58;
+    box-shadow: 0 8px 16px -14px rgba(26,20,12,.45);
+  }
   .fg { display: flex; flex-direction: column; gap: 6px; }
   .fg label {
     font-size: 9.5px; text-transform: uppercase; letter-spacing: .14em; color: var(--ink-3); font-weight: 600;
@@ -801,18 +813,21 @@
 </header>
 
 <nav class="tabs" id="tabs">
-  <button class="tab active" data-view="sleeve"><span class="tnum">01</span>Sleeve View</button>
-  <button class="tab" data-view="amc"><span class="tnum">02</span>AMC Roll-up</button>
-  <button class="tab" data-view="scheme"><span class="tnum">03</span>Scheme Detail</button>
-  <button class="tab" data-view="matrix"><span class="tnum">04</span>Quartile Matrix</button>
+  <!-- Tab order + count per Kyser 2026-09-02: AMC Roll-up leads (and is the landing tab),
+       Quartile Matrix lives inside Sleeve View now, League Table inside AMC Roll-up,
+       Data Quality inside Peer Mapping & Data. -->
+  <button class="tab active" data-view="amc"><span class="tnum">01</span>AMC Roll-up</button>
+  <button class="tab" data-view="scheme"><span class="tnum">02</span>Scheme Detail</button>
+  <button class="tab" data-view="sleeve"><span class="tnum">03</span>Sleeve View</button>
   <!-- The old "05 Composite" tab was MERGED into AMC Roll-up (2026-08-11): its KPI row, the
        Top-15 quartile-mix bar and the trend chart now live inside tab 02, driven by that tab's
        single as-of selector. Nothing was deleted — only moved — and #tab=composite still works
-       (the hash parser aliases it to amc). The remaining tabs' display numbers shift up by one;
-       the data-view keys are untouched, so every deep link keeps resolving. -->
-  <button class="tab" data-view="league"><span class="tnum">05</span>League Table</button>
-  <button class="tab" data-view="quality"><span class="tnum">06</span>Data Quality</button>
-  <button class="tab" data-view="mapping"><span class="tnum">07</span>Peer Mapping</button>
+       (the hash parser aliases it to amc). Two more merges (Kyser 2026-09-02): the League Table
+       tab folded into AMC Roll-up (its full table — Scored % + Covered AUM + click-sort +
+       export — now IS the roll-up's league card), and Data Quality folded into the bottom of
+       Peer Mapping (renamed "Peer Mapping & Data"). #tab=league and #tab=quality are aliased
+       in the hash parser, so every old deep link keeps resolving. -->
+  <button class="tab" data-view="mapping"><span class="tnum">04</span>Peer Mapping &amp; Data</button>
 </nav>
 
 <div class="filters" id="gctrl" style="border-top:2px solid var(--absl);border-bottom:1px solid var(--line);margin-bottom:2px">
@@ -823,7 +838,7 @@
   <div class="fg" id="gc-windowwrap"><label>Rolling window</label>
     <div class="seg" id="gc-window"><button data-v="1 Year" class="active">1Y</button><button data-v="3 Year">3Y</button></div></div>
   <div class="fg" id="gc-basiswrap" style="display:none"><label>Rolling window / basis</label>
-    <div class="seg" id="gc-basis"><button data-v="1M">1M</button><button data-v="3M">3M</button><button data-v="6M">6M</button><button data-v="9M">9M</button><button data-v="1Y">1Y</button><button data-v="2Y">2Y</button><button data-v="3Y">3Y</button><button data-v="5Y">5Y</button><button data-v="3Y+reward">3Y+rew</button><button data-v="Composite" class="active">Composite</button></div></div>
+    <div class="seg" id="gc-basis"><button data-v="1M">1M</button><button data-v="3M">3M</button><button data-v="6M">6M</button><button data-v="9M">9M</button><button data-v="1Y" class="active">1Y</button><button data-v="2Y">2Y</button><button data-v="3Y">3Y</button><button data-v="5Y">5Y</button><button data-v="3Y+reward">3Y+rew</button><button data-v="Composite">Composite</button></div></div>
   <div class="fg slider" id="gc-wwrap" style="display:none"><label>1Y weight (3Y = 100 &minus; w)</label>
     <div class="srow"><input type="range" id="gc-w" min="0" max="100" step="5" value="80"><span class="slidval" id="gc-wval">80 / 20</span></div></div>
   <div class="fg" id="gc-rewardwrap" style="display:none"><label>Benchmark reward</label>
@@ -913,7 +928,7 @@ const C = {
   q1:'#1f5c3d', q2:'#6fa37c', q3:'#d6a23f', q4:'#c0523e',
   q1t:'rgba(31,92,61,0.82)', q2t:'rgba(111,163,124,0.78)', q3t:'rgba(214,162,63,0.80)', q4t:'rgba(192,82,62,0.82)',
   absl:'#c8392b', navy:'#20436b', gold:'#b3852f', ink:'#16130f', ink3:'#6a5f50', ink4:'#9c8f7a',
-  line:'#ddd1b8', line2:'#ebe1cc', peer:'#c9bca3', green:'#1f5c3d', red:'#c0523e'
+  line:'#ddd1b8', line2:'#ebe1cc', peer:'#c9bca3', peerLine:'rgba(201,188,163,.38)', green:'#1f5c3d', red:'#c0523e'
 };
 const QORDER = ['% in Q1','% in Q2','% in Q3','% in Q4'];
 const QCOL   = { '% in Q1':C.q1, '% in Q2':C.q2, '% in Q3':C.q3, '% in Q4':C.q4 };
@@ -926,7 +941,7 @@ const S = {
   universe:'all',                                   // 'all' | 'vr'
   scope:'t15',                                      // house scope: 't15' Top-15 | 'all' every AMC
   window:'1 Year',                                  // all-peer rolling window
-  basis:'Composite', w:80, reward:true,             // VR score basis
+  basis:'1Y', w:80, reward:true,                    // VR score basis (default 1Y on load — Kyser 2026-09-02; Composite stays one click away)
   mode:'ls',                                        // investment mode: 'ls' lumpsum | 's3' 3-year SIP book | 's5' 5-year SIP book
   sleeve:{ fh:'Aditya', br:null, mode:'within', rankDate:null },
   amc:{ fh:'Aditya', rankDate:null },
@@ -936,6 +951,21 @@ const S = {
   league:{ date:null, sortKey:'top', sortDir:-1 },
   vrCube:null, vrKey:null, allCube:null, allKey:null
 };
+
+// Keep the sticky control bars' offsets equal to their RENDERED heights (see the CSS note at
+// #gctrl): the tab nav and #gctrl both wrap on narrow screens, and #gctrl grows/shrinks when
+// syncGlobalControls() swaps the basis/weight/reward controls in and out, so the sticky tops
+// must track live heights, not constants. Runs at parse time — both elements sit above this
+// script in the DOM.
+(function(){
+  const root=document.documentElement, tabs=document.getElementById('tabs'), g=document.getElementById('gctrl');
+  if(!tabs || !g) return;
+  const set=()=>{ root.style.setProperty('--tabs-h', tabs.offsetHeight+'px');
+                  root.style.setProperty('--gctrl-h', g.offsetHeight+'px'); };
+  if(window.ResizeObserver){ const ro=new ResizeObserver(set); ro.observe(tabs); ro.observe(g); }
+  else window.addEventListener('resize', set);
+  set();
+})();
 // ── COMPOSITE → AMC MERGE (2026-08-11): the Composite tab's panels moved INSIDE AMC Roll-up,
 // so the two tabs' as-of dates collapsed into ONE. S.amc.rankDate is the single source of
 // truth; S.composite.date survives as a read/write ALIAS of it, so every existing reader and
@@ -1364,7 +1394,7 @@ function boot(data){
 
   document.getElementById('mb-asof').textContent  = 'As of ' + fmt.date(data.meta.latest_aum_date || data.meta.latest);
   document.getElementById('mb-univ').textContent  = `${data.meta.n_vr_schemes} VR · ${data.meta.n_allpeer_schemes} all-peer · ${scopeHouses().length} houses`;
-  document.getElementById('mb-basis').textContent = `Composite · 1Y=${S.w}`;
+  document.getElementById('mb-basis').textContent = S.basis + (S.basis==='Composite' ? ` · 1Y=${S.w}` : '');
 
   buildViews();
   wireGlobalControls();
@@ -1781,10 +1811,11 @@ function wireTabs(){
     btn.addEventListener('click',()=>{ activateTab(btn.dataset.view); history.replaceState(null,'','#tab='+btn.dataset.view); });
   });
   const m=(location.hash||'').match(/tab=([\w-]+)/);
-  // Deep-link compatibility: the Composite tab was merged into AMC Roll-up (2026-08-11), so an
-  // older link or bookmark saying #tab=composite silently lands on the merged tab instead of
-  // hitting a view that no longer exists.
-  if(m) activateTab(m[1]==='composite' ? 'amc' : m[1]);
+  // Deep-link compatibility for merged tabs: Composite → AMC Roll-up (2026-08-11), League
+  // Table → AMC Roll-up and Data Quality → Peer Mapping & Data (both 2026-09-02). Old links
+  // and bookmarks land on the tab that absorbed the view instead of a view that no longer exists.
+  const ALIAS={composite:'amc', league:'amc', quality:'mapping', matrix:'sleeve'};
+  if(m) activateTab(ALIAS[m[1]]||m[1]);
 }
 function icoDown(){ return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 21h16"/></svg>'; }
 
@@ -1866,7 +1897,7 @@ function resetAsOf(){
   // P2: refillDateSelect rebuilds the option list only when the calendar behind it actually
   // changed and otherwise just moves the selection — the four selects here were being rebuilt
   // unconditionally on every universe switch (four × ~200 options × a toLocaleDateString each).
-  ['sl-rankdate','am-rankdate','mx-date','lg-date'].forEach(id=>{ const el=document.getElementById(id); if(el) refillDateSelect(el, d, li); });
+  ['sl-rankdate','am-rankdate','mx-date'].forEach(id=>{ const el=document.getElementById(id); if(el) refillDateSelect(el, d, li); });
 }
 // ── LAZY RENDERING (2026-07-16, page-speed): a control change re-renders ONLY the visible
 // view; the other seven are marked dirty and render on first visit. Before this, every
@@ -1874,9 +1905,11 @@ function resetAsOf(){
 // interaction lag KV reported.
 // (2026-08-11: 'composite' left this map when its panels moved INSIDE AMC Roll-up — renderAMC()
 //  now draws them, so they stay dirty-tracked and lazily re-rendered with their host tab.)
-const _VIEW_FNS={ sleeve:()=>renderSleeve(), amc:()=>renderAMC(),
-                  scheme:()=>renderScheme(), matrix:()=>renderMatrix(), league:()=>renderLeague(),
-                  quality:()=>renderQuality(), mapping:()=>renderMapping() };
+// (2026-09-02: 'matrix' renders inside sleeve, 'league' inside amc (renderAMCTable), and
+//  'quality' inside mapping — three tabs became sections of their host tabs, same functions.)
+const _VIEW_FNS={ sleeve:()=>{ renderSleeve(); renderMatrix(); }, amc:()=>renderAMC(),
+                  scheme:()=>renderScheme(),
+                  mapping:()=>{ renderMapping(); renderQuality(); } };
 let _DIRTY=new Set();
 // ── PER-VIEW INPUT SIGNATURE (Addendum 4 P4) ──────────────────────────────
 // renderAll() marks every view dirty and the visible one repaints. That repaint is pure work if
@@ -1902,12 +1935,12 @@ function _globalSig(){ return S.universe+'|'+S.scope+'|'+S.basis+'|'+S.w+'|'+S.r
 function viewSig(view){
   const g=_globalSig();
   switch(view){
-    case 'sleeve': return g+'|'+S.sleeve.fh+'|'+S.sleeve.br+'|'+S.sleeve.mode+'|'+S.sleeve.rankDate;
-    case 'amc':    return g+'|'+S.amc.fh+'|'+S.amc.rankDate+'|'+(S.composite.qsel||[]).join('');
+    case 'sleeve': return g+'|'+S.sleeve.fh+'|'+S.sleeve.br+'|'+S.sleeve.mode+'|'+S.sleeve.rankDate
+                          +'|'+S.matrix.metric+'|'+S.matrix.date;                  // matrix card lives here now
+    case 'amc':    return g+'|'+S.amc.fh+'|'+S.amc.rankDate+'|'+(S.composite.qsel||[]).join('')
+                          +'|'+S.league.sortKey+'|'+S.league.sortDir;              // league card lives here now
     case 'scheme': return g+'|'+S.scheme.fh+'|'+S.scheme.cat+'|'+S.scheme.sl+'|'+S.scheme.name+'|'+S.scheme.month+'|'+S.scheme.peerDate;
-    case 'matrix': return g+'|'+S.matrix.metric+'|'+S.matrix.date;
-    case 'league': return g+'|'+S.league.date+'|'+S.league.sortKey+'|'+S.league.sortDir;
-    default:       return null;                 // quality / mapping: DOM-driven filters, always render
+    default:       return null;                 // mapping (+ its data-quality block): DOM-driven filters, always render
   }
 }
 function renderIfDirty(view){
@@ -1921,7 +1954,7 @@ function renderIfDirty(view){
 }
 function renderAll(){
   _DIRTY=new Set(Object.keys(_VIEW_FNS));
-  if(!S.view) S.view=(document.querySelector('.tab.active')||{dataset:{}}).dataset.view||'sleeve';
+  if(!S.view) S.view=(document.querySelector('.tab.active')||{dataset:{}}).dataset.view||'amc';
   renderIfDirty(S.view);
 }
 
@@ -1963,7 +1996,7 @@ function lineOpts({suffix, min, max, xmin, xmax, reverse}){
 function buildViews(){
   document.getElementById('views').innerHTML = `
   <!-- ░░ 01 SLEEVE ░░ -->
-  <section class="view active" id="view-sleeve">
+  <section class="view" id="view-sleeve">
     <div class="filters">
       <div class="fg"><label>Fund House</label><select id="sl-fh"></select></div>
       <div class="fg"><label>Breakdown / Sleeve</label><select id="sl-br"></select></div>
@@ -2009,6 +2042,23 @@ function buildViews(){
         <div class="chartbox short"><canvas id="sl-bar"></canvas></div>
         <div id="sl-bar-method"></div>
       </div>
+      <!-- ░░ QUARTILE MATRIX (Kyser 2026-09-02: its own tab merged HERE, below the
+           cross-sectional snapshot — it is the same sleeve story aggregated to house level.
+           Same mx-* ids, same render functions; its metric/date controls live in the card
+           header, NOT a top-level .filters row, so the sticky bar stays this tab's own. -->
+      <div class="shead" style="margin-top:6px"><h2>Quartile matrix <em>— house × sleeve</em></h2><div class="ctx" id="mx-ctx"></div></div>
+      <div class="card">
+        <div class="card-h"><div><h3 id="mx-title">Top-half share by fund house and sleeve</h3><div class="sub" id="mx-sub"></div></div>
+          <div style="display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap">
+            <div class="fg"><label>Metric</label>
+              <div class="seg" id="mx-metric"><button data-v="tophalf" class="active">Q1+Q2 %</button><button data-v="q4">Q4 %</button><button data-v="score">Quality score</button><button data-v="q1">Q1 %</button></div></div>
+            <div class="fg"><label>As-of date</label><select id="mx-date"></select></div>
+            <button class="btn btn-dark" id="mx-exp">${icoDown()} Export CSV</button>
+          </div>
+        </div>
+        <div class="tbl-wrap" id="mx-grid"></div>
+        <div id="mx-method"></div>
+      </div>
     </div>
   </section>
 
@@ -2017,7 +2067,7 @@ function buildViews(){
        by this tab's single as-of selector am-rankdate. Every composite id (cp-*) is kept, so
        nothing was lost — only moved. The retired cp-date selector's job is now am-rankdate's;
        S.composite.date is a read/write alias of S.amc.rankDate. ░░ -->
-  <section class="view" id="view-amc">
+  <section class="view active" id="view-amc">
     <div class="filters">
       <div class="fg"><label>Fund House</label><select id="am-fh"></select></div>
       <div class="fg"><label>Show quartiles (summed)</label>
@@ -2034,6 +2084,8 @@ function buildViews(){
              2. Q1+Q2 vs Q4 over time        (am-rank)       — the house's top-half/bottom trend
              3. cross-section bar            (cp-bar)        — every house on the chosen date
              4. league table                 (am-table)      — the same cross-section, ranked
+             5. AMC summary                  (am-sum)        — the scheme-by-scheme detail, LAST
+                (moved below the league table per Kyser 2026-09-02)
            The old cp-trend card was DELETED, not moved: it plotted the same two lines as
            am-rank (verified numerically identical for Aditya — 0.00 pp gap across all 122
            months on both the 1Y and 3Y all-peer bases, because that table's coverage is 100%),
@@ -2042,17 +2094,6 @@ function buildViews(){
            was lost. Panel ids are otherwise untouched. -->
       <div class="shead"><h2>AMC roll-up <em>— one house in full, then the industry cross-section</em></h2><div class="ctx" id="am-ctx"></div></div>
       <div class="kpis" id="am-kpis"></div>
-      <!-- ★ AMC SUMMARY (Kyser 2026-09-01). The scheme-by-scheme table the CIO reads, on the tab
-           where the house is already in view, and adaptive to every toggle above it: peer
-           universe, investment mode and rolling window all re-derive it. It sits FIRST, above the
-           charts, because it is the answer and the charts are the context. -->
-      <div class="card">
-        <div class="card-h"><div><h3 id="am-sum-title">AMC summary</h3><div class="sub" id="am-sum-sub"></div></div>
-          <button class="btn btn-dark" id="am-sum-exp">${icoDown()} Export summary CSV</button>
-        </div>
-        <div class="tbl-wrap" id="am-sum"></div>
-        <div id="am-sum-method"></div>
-      </div>
       <div class="card">
         <div class="card-h"><div><h3>AMC-level quartile distribution</h3><div class="sub" id="am-stack-sub"></div></div>
           <div class="legend">
@@ -2090,9 +2131,21 @@ function buildViews(){
       <div class="card">
         <!-- the As-of selector moved to this tab's filter bar (it now drives the composite
              KPIs and the quartile-mix bar as well as this table) -->
-        <div class="card-h"><div><h3>League table</h3><div class="sub" id="am-table-sub">Every house in scope, ranked on the chosen date</div></div></div>
+        <div class="card-h"><div><h3>League table</h3><div class="sub" id="am-table-sub">Every house in scope, ranked on the chosen date — click a numeric header to re-sort</div></div>
+          <button class="btn btn-dark" id="am-lg-exp">${icoDown()} Export league CSV</button>
+        </div>
         <div class="tbl-wrap" id="am-table"></div>
         <div id="am-table-method"></div>
+      </div>
+      <!-- ★ AMC SUMMARY (Kyser 2026-09-01; MOVED below the league table per Kyser 2026-09-02 —
+           it crowded the top of the tab). The scheme-by-scheme table the CIO reads, adaptive to
+           every toggle above it: peer universe, investment mode and rolling window all re-derive it. -->
+      <div class="card">
+        <div class="card-h"><div><h3 id="am-sum-title">AMC summary</h3><div class="sub" id="am-sum-sub"></div></div>
+          <button class="btn btn-dark" id="am-sum-exp">${icoDown()} Export summary CSV</button>
+        </div>
+        <div class="tbl-wrap" id="am-sum"></div>
+        <div id="am-sum-method"></div>
       </div>
     </div>
   </section>
@@ -2163,68 +2216,18 @@ function buildViews(){
     </div>
   </section>
 
-  <!-- ░░ 04 MATRIX ░░ -->
-  <section class="view" id="view-matrix">
-    <div class="filters">
-      <div class="fg"><label>Metric</label>
-        <div class="seg" id="mx-metric"><button data-v="tophalf" class="active">Q1+Q2 %</button><button data-v="q4">Q4 %</button><button data-v="score">Quality score</button><button data-v="q1">Q1 %</button></div></div>
-      <div class="fg"><label>As-of date</label><select id="mx-date"></select></div>
-      <div class="spacer"></div>
-      <button class="btn btn-dark" id="mx-exp">${icoDown()} Export CSV</button>
-    </div>
-    <div class="content">
-      <div class="shead"><h2>Quartile matrix <em>— house × sleeve</em></h2><div class="ctx" id="mx-ctx"></div></div>
-      <div class="card">
-        <div class="card-h"><div><h3 id="mx-title">Top-half share by fund house and sleeve</h3><div class="sub" id="mx-sub"></div></div></div>
-        <div class="tbl-wrap" id="mx-grid"></div>
-        <div id="mx-method"></div>
-      </div>
-    </div>
-  </section>
+  <!-- ░░ (the 04 QUARTILE MATRIX section moved into 01 SLEEVE VIEW above, below the
+       cross-sectional snapshot — Kyser 2026-09-02; mx-* ids unchanged) ░░ -->
 
   <!-- ░░ (the 05 COMPOSITE OVERVIEW section moved into 02 AMC ROLL-UP above — see the note
        there; its filter controls, KPI row, quartile-mix bar and trend chart are unchanged,
        and the cp-* ids they render into are all still present) ░░ -->
 
   <!-- ░░ 05 LEAGUE TABLE (new-format addition) ░░ -->
-  <section class="view" id="view-league">
-    <div class="filters">
-      <div class="fg"><label>As-of date</label><select id="lg-date"></select></div>
-      <div class="spacer"></div>
-      <button class="btn btn-dark" id="lg-exp">${icoDown()} Export CSV</button>
-    </div>
-    <div class="content">
-      <div class="shead"><h2>League table <em>— every house in scope, ranked</em></h2><div class="ctx" id="lg-ctx"></div></div>
-      <div class="card">
-        <div class="card-h"><div><h3>Ranked on the chosen universe &amp; basis</h3><div class="sub">Click any numeric column header to re-sort. Aditya Birla highlighted.</div></div></div>
-        <div class="tbl-wrap" id="lg-table"></div>
-        <div id="lg-method"></div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ░░ 06 DATA QUALITY ░░ -->
-  <section class="view" id="view-quality">
-    <div class="filters">
-      <div class="fg" style="flex:1;max-width:520px"><label>Search exclusions</label><input id="dq-search" placeholder="Type item, type or reason…"></div>
-      <div class="fg"><label>Filter by type</label><select id="dq-type"></select></div>
-      <div class="spacer"></div>
-      <button class="btn btn-dark" id="dq-exp">${icoDown()} Export CSV</button>
-    </div>
-    <div class="content">
-      <div class="shead"><h2>Data quality <em>&amp; exclusions</em></h2><div class="ctx" id="dq-count"></div></div>
-      <div id="dq-capnote"></div>
-      <div class="card" style="padding-top:20px">
-        <div class="card-h"><div><h3>Excluded items</h3><div class="sub">Schemes and categories dropped from the scoring universe, with the reason</div></div></div>
-        <div class="scroll-tall"><table class="rt" id="dq-table"><thead><tr>
-          <th style="width:46%">Item</th><th style="width:22%">Type</th><th style="width:32%">Reason</th>
-        </tr></thead><tbody></tbody></table></div>
-        <div id="dq-method"></div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ░░ 07 PEER MAPPING ░░ -->
+  <!-- ░░ 05 PEER MAPPING & DATA (Kyser 2026-09-02: the old League Table tab merged into AMC
+       Roll-up; the old Data Quality tab merged into the bottom of this one — same ids, same
+       render functions, only re-homed. The dq controls live in the card header, NOT a top-level
+       .filters row, so the sticky bar stays the mapping search alone.) ░░ -->
   <section class="view" id="view-mapping">
     <div class="filters">
       <div class="fg" style="flex:1;max-width:560px"><label>Search scheme, category, benchmark or AMFI code</label><input id="pm-search" placeholder="Type to filter…"></div>
@@ -2238,6 +2241,21 @@ function buildViews(){
           <th style="width:42%">Scheme</th><th style="width:22%">Category</th><th style="width:24%">Benchmark</th><th style="width:12%">AMFI</th>
         </tr></thead><tbody></tbody></table></div>
         <div id="pm-method"></div>
+      </div>
+      <div class="shead" style="margin-top:6px"><h2>Data quality <em>&amp; exclusions</em></h2><div class="ctx" id="dq-count"></div></div>
+      <div id="dq-capnote"></div>
+      <div class="card" style="padding-top:20px">
+        <div class="card-h"><div><h3>Excluded items</h3><div class="sub">Schemes and categories dropped from the scoring universe, with the reason</div></div>
+          <div style="display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap">
+            <div class="fg" style="min-width:240px"><label>Search exclusions</label><input id="dq-search" placeholder="Type item, type or reason…"></div>
+            <div class="fg"><label>Filter by type</label><select id="dq-type"></select></div>
+            <button class="btn btn-dark" id="dq-exp">${icoDown()} Export CSV</button>
+          </div>
+        </div>
+        <div class="scroll-tall"><table class="rt" id="dq-table"><thead><tr>
+          <th style="width:46%">Item</th><th style="width:22%">Type</th><th style="width:32%">Reason</th>
+        </tr></thead><tbody></tbody></table></div>
+        <div id="dq-method"></div>
       </div>
     </div>
   </section>`;
@@ -2365,6 +2383,7 @@ function renderAMC(){
     document.getElementById('am-rankdate').onchange=e=>{ amcGotoDate(+e.target.value); };
     document.getElementById('am-exp').onclick=exportAMC;
     document.getElementById('am-sum-exp').onclick=exportAMCSummary;
+  document.getElementById('am-lg-exp').onclick=exportLeague;   // the merged League-table card's CSV
     document.getElementById('cp-exp').onclick=exportComposite;
     // quartile multi-select for the mix bar (sum of ticked) — never allow an empty selection
     document.querySelectorAll('#cp-qsel button').forEach(b=>{ b.onclick=()=>{
@@ -2404,7 +2423,7 @@ function renderAMC(){
     const s=houseSeries(f,null), isA=f===fh;
     const top=s.byQ['% in Q1'].map((v,i)=>({x:s.dates[i],y:((v||0)+(s.byQ['% in Q2'][i]||0))*100}));
     if(isA){ aTop=top.map(p=>p.y); aQ4=s.byQ['% in Q4'].map(v=>v==null?null:v*100); }
-    dsets.push({ label:houseLabel(f)+' Q1+Q2', data:top, yAxisID:'y', borderColor:isA?C.green:C.peer, borderWidth:isA?2.8:1, pointRadius:0, tension:0.3, order:isA?0:3, backgroundColor:'transparent' });
+    dsets.push({ label:houseLabel(f)+' Q1+Q2', data:top, yAxisID:'y', borderColor:isA?C.green:C.peerLine, borderWidth:isA?2.8:1, pointRadius:0, tension:0.3, order:isA?0:3, backgroundColor:'transparent' });
     if(isA) dsets.push({ label:houseLabel(f)+' Q4', data:s.byQ['% in Q4'].map((v,i)=>({x:s.dates[i],y:v==null?null:v*100})), yAxisID:'y', borderColor:C.red, borderWidth:2.4, pointRadius:0, tension:0.3, order:1, backgroundColor:'transparent' });
   });
   dsets.push({ label:'Quality score', yAxisID:'y1', data:dates.map((d,i)=>({x:d,y:qualityScore(byQ,i)})),
@@ -2570,9 +2589,10 @@ function renderAMCSummary(){
   const host=document.getElementById('am-sum'); if(!host) return;
   const fh=S.amc.fh, dates=curDates();
   const i=Math.max(0, Math.min(dates.length-1, S.amc.rankDate==null?dates.length-1:S.amc.rankDate));
-  // this table reads returns.json, so it must ask for it and repaint when it lands (hosted decks
-  // fetch it lazily; the offline deck ships it inline and this is a no-op there)
+  // this table reads returns.json AND standing.json, so it must ask for both and repaint when
+  // they land (hosted decks fetch them lazily; the offline deck ships both inline — no-ops there)
   amcWantReturns();
+  amcWantStanding();
   const M=computeAMCSummary(fh, i);
   _AMCSUM={M, fh, i, asof:dates[i]};
   const rw=RWOF[S.basis];
@@ -2700,6 +2720,25 @@ function amcWantReturns(){
     else { try{ renderAMCSummary(); }catch(e){} }
   });
 }
+// ★ FIX (Kyser 2026-09-02): the Qtl / Rank / %AUM-outperformed half of this table reads the
+// STANDING block (standing.json under lumpsum), but nothing on this tab ever fetched it — only a
+// Scheme-Detail visit or the peer grid did. On a hosted deck, landing here with a raw window
+// (1M…5Y) under Lumpsum left computeStanding() on 'stdloading' for every row: three columns of
+// permanent dashes. (The offline deck ships standing inline, which is why the 2026-09-01 headless
+// verification — run on the offline deck — could print “0 reasonless blanks” and still miss this.)
+// Same single-flight + repaint-on-arrival shape as amcWantReturns above. SIP modes need no arm
+// here: entering a SIP mode already fetches the sip_<book>.json that carries its own standing.
+let _AMC_STD_ASKED=0;
+function amcWantStanding(){
+  if(S.mode!=='ls' || !RWOF[S.basis]) return;         // only lumpsum raw windows read standing.json
+  if(standingSrc() || _AMC_STD_ASKED) return;
+  const p=fetchStanding(); if(!p || !p.then) return;
+  _AMC_STD_ASKED=1;
+  p.then(()=>{
+    if(!standingSrc()) _AMC_STD_ASKED=0;
+    else { try{ renderAMCSummary(); }catch(e){} }
+  });
+}
 function amcSummaryNote(M, fh, asof, rLo, rHi, abMag, acMag){
   const rw=RWOF[S.basis], R=M.roll, wm=rw?(WINMONTHS[rw]||null):null;
   const cov = R.totCr>0 ? 100*R.retCovCr/R.totCr : null;
@@ -2763,17 +2802,26 @@ function exportAMCSummary(){
   downloadCSV(lines.join('\n')+'\n', 'AMC_summary_'+fh+'_'+asof+'_'+String(rw||S.basis).replace(/ /g,'')+'_'+S.mode+'_'+S.universe+'.csv');
 }
 function renderAMCTable(){
-  const i=S.amc.rankDate;
-  const rows=housesPresent(null).map(fh=>{ const {byQ}=houseSeries(fh,null);
-    return { fh, q1:byQ['% in Q1']?.[i]||0, top:(byQ['% in Q1']?.[i]||0)+(byQ['% in Q2']?.[i]||0), q4:byQ['% in Q4']?.[i]||0, score:qualityScore(byQ,i) }; })
-    .sort((a,b)=>b.top-a.top); rows.forEach((r,idx)=>r.rank=idx+1); const n=rows.length;
-  let html='<table class="rt"><thead><tr><th>#</th><th>Fund House</th><th class="num">Q1</th><th class="num">Q1+Q2</th><th class="num">Q4</th><th class="num">Quality score</th></tr></thead><tbody>';
+  // 2026-09-02: this card IS the (merged) League Table tab — the FULL version: Scored % +
+  // Covered AUM columns, click-to-sort headers (state shared in S.league.sortKey/sortDir),
+  // and its own CSV export. leagueData() is the same source the old tab read, so nothing
+  // about the numbers changed — only where the table lives.
+  const i=S.amc.rankDate, rows=leagueData(i);
+  const k=S.league.sortKey, dir=S.league.sortDir;
+  rows.sort((a,b)=> (a[k]-b[k])*dir);   // dir=-1 => descending
+  rows.forEach((r,idx)=>r.rank=idx+1); const n=rows.length;
+  const cols=[['q1','Q1'],['top','Q1+Q2'],['q4','Q4'],['score','Quality score'],['cov','Scored %'],['cr','Covered AUM']];
+  let html='<table class="rt"><thead><tr><th>#</th><th>Fund House</th>';
+  cols.forEach(([key,lbl])=> html+=`<th class="num lg-sort" data-k="${key}" style="cursor:pointer">${lbl}${k===key?(dir<0?' ▾':' ▴'):''}</th>`);
+  html+='</tr></thead><tbody>';
   rows.forEach(r=>{ const cls=r.fh===S.amc.fh?'hl':''; const pc=r.rank===1?'r1':r.rank<=Math.ceil(n/4)?'up':r.rank>n-Math.ceil(n/4)?'dn':'';
-    html+=`<tr class="${cls}"><td><span class="pill ${pc}">${r.rank}</span></td><td class="lbl">${houseLabel(r.fh)}</td><td class="num">${fmt.pct(r.q1)}</td><td class="num">${fmt.pct(r.top)}</td><td class="num">${fmt.pct(r.q4)}</td><td class="num">${fmt.num(r.score)}</td></tr>`; });
+    html+=`<tr class="${cls}"><td><span class="pill ${pc}">${r.rank}</span></td><td class="lbl">${houseLabel(r.fh)}</td><td class="num">${fmt.pct(r.q1)}</td><td class="num">${fmt.pct(r.top)}</td><td class="num">${fmt.pct(r.q4)}</td><td class="num">${fmt.num(r.score)}</td><td class="num">${fmt.pct(r.cov)}</td><td class="num">${fmt.cr(r.cr)}</td></tr>`; });
   html+='</tbody></table>';
   document.getElementById('am-table').innerHTML=html;
+  document.querySelectorAll('#am-table .lg-sort').forEach(th=> th.onclick=()=>{ const key=th.dataset.k;
+    if(S.league.sortKey===key) S.league.sortDir*=-1; else { S.league.sortKey=key; S.league.sortDir=-1; } renderAMCTable(); });
   document.getElementById('am-table-method').innerHTML=methodNote(
-    `The <b>${n}</b> fund houses in scope (${scopeLabel()}), ranked by <b>Q1+Q2 share</b> on <b>${fmt.date(curDates()[i])}</b> (${basisDesc()}). Quality score = AUM-weighted quartile (1–4).`);
+    `The <b>${n}</b> fund houses in scope (${scopeLabel()}) on <b>${fmt.date(curDates()[i])}</b> (${basisDesc()}). Q1 / Q1+Q2 / Q4 are AUM shares of the house; <b>Quality score</b> = AUM-weighted quartile (Q1=4…Q4=1). <b>Scored %</b> = share of the house's covered AUM that actually has a quartile on this basis — below 100% when funds are too new for the window (e.g. sub-3-year NFOs on the 3Y basis). <b>Covered AUM</b> = the absolute Rs cr that is scored. Click a numeric header to re-sort. The selected house's row is highlighted.`);
 }
 function exportAMC(){
   const fh=S.amc.fh, {dates,byQ}=houseSeries(fh,null);
@@ -4765,12 +4813,16 @@ function renderMatrixGrid(){
   document.getElementById('mx-ctx').innerHTML=`${basisDesc()}<br>${fmt.date(curDates()[i])}`;
   const cells={}; let mn=Infinity,mx=-Infinity;
   fhs.forEach(fh=>brs.forEach(br=>{ const v=matrixValue(fh,br,i,metric); cells[fh+'|'+br]=v; if(v!=null){mn=Math.min(mn,v);mx=Math.max(mx,v);} }));
+  // Drop any sleeve column with no value for ANY house in this state (Kyser 2026-09-02: the
+  // "Other" sleeve rendered a full column of dots under VR). Dynamic on purpose — a sleeve
+  // that gains data in another universe/date reappears by itself; no name is hardcoded.
+  const brsShown=brs.filter(br=> fhs.some(fh=> cells[fh+'|'+br]!=null));
   // for Q4, low is good → invert color scale
   const norm=v=> v==null?null : isScore?(v-1)/3 : q4?(mx>mn?1-(v-mn)/(mx-mn):0.5) : (mx>mn?(v-mn)/(mx-mn):0.5);
   const disp=v=> v==null?'·' : isScore?v.toFixed(2):(v*100).toFixed(0)+'%';
-  let html='<table class="rt"><thead><tr><th>Fund House</th>'; brs.forEach(b=>html+=`<th class="num">${b}</th>`); html+='</tr></thead><tbody>';
+  let html='<table class="rt"><thead><tr><th>Fund House</th>'; brsShown.forEach(b=>html+=`<th class="num">${b}</th>`); html+='</tr></thead><tbody>';
   fhs.forEach(fh=>{ const cls=fh==='Aditya'?'hl':''; html+=`<tr class="${cls}"><td class="lbl">${houseLabel(fh)}</td>`;
-    brs.forEach(br=>{ const v=cells[fh+'|'+br]; const t=norm(v); const bg=v==null?'transparent':heatColor(t); const col=v==null?C.ink4:(t>0.32&&t<0.7?'#3b2f15':'#fff');
+    brsShown.forEach(br=>{ const v=cells[fh+'|'+br]; const t=norm(v); const bg=v==null?'transparent':heatColor(t); const col=v==null?C.ink4:(t>0.32&&t<0.7?'#3b2f15':'#fff');
       html+=`<td class="num" style="background:${bg};color:${col};font-weight:600">${disp(v)}</td>`; }); html+='</tr>'; });
   html+='</tbody></table>';
   document.getElementById('mx-grid').innerHTML=html;
@@ -4779,9 +4831,12 @@ function renderMatrixGrid(){
     : `Each cell = <b>${metric==='q1'?'Q1':metric==='q4'?'Q4':'Q1+Q2'} share within the sleeve</b> on <b>${fmt.date(curDates()[i])}</b> (${basisDesc()}). ${q4?'Lower is better, so green = low Q4.':'Green = strong, red = weak.'} Empty = no AUM in that sleeve. The selected house's row is highlighted.`);
 }
 function exportMatrix(){
-  const {metric,date:i}=S.matrix, brs=sleevesPresent(), fhs=housesPresent(null).sort(fhSort);
+  // same all-empty-column drop as the grid (Kyser 2026-09-02) — the CSV mirrors what is shown
+  const {metric,date:i}=S.matrix, fhs=housesPresent(null).sort(fhSort);
+  const vals={}; const brs=sleevesPresent().filter(br=>{ let any=false;
+    fhs.forEach(fh=>{ const v=matrixValue(fh,br,i,metric); vals[fh+'|'+br]=v; if(v!=null) any=true; }); return any; });
   let csv='Fund House,'+brs.join(',')+'\n';
-  fhs.forEach(fh=>{ csv+=fh+','+brs.map(br=>{ const v=matrixValue(fh,br,i,metric); return v==null?'':v; }).join(',')+'\n'; });
+  fhs.forEach(fh=>{ csv+=fh+','+brs.map(br=>{ const v=vals[fh+'|'+br]; return v==null?'':v; }).join(',')+'\n'; });
   downloadCSV(csv,`matrix_${metric}_${S.universe}_${curDates()[i]}.csv`);
 }
 
@@ -4930,36 +4985,11 @@ function leagueData(i){
     // with sub-3-year NFOs (no 3Y quartile yet) — NOT the total covered weight.
     return { fh, q1, top:q1+q2, q4, score:qualityScore(byQ,i)||0, cov:q1+q2+q3+q4, cr:crmap[fh]||0 }; });
 }
-function renderLeague(){
-  const dEl=document.getElementById('lg-date');
-  if(!dEl.dataset.wired){ dEl.dataset.wired='1';
-    dEl.onchange=e=>{ S.league.date=+e.target.value; renderLeagueTable(); };
-    document.getElementById('lg-exp').onclick=exportLeague;
-  }
-  S.league.date = fillDateSelect(dEl, S.league.date);
-  document.getElementById('lg-ctx').innerHTML=`${basisDesc()}<br>${fmt.date(curDates()[S.league.date])}`;
-  renderLeagueTable();
-}
-function renderLeagueTable(){
-  const i=S.league.date, rows=leagueData(i);
-  const k=S.league.sortKey, dir=S.league.sortDir;
-  rows.sort((a,b)=> (a[k]-b[k])*dir);   // dir=-1 => descending
-  rows.forEach((r,idx)=>r.rank=idx+1); const n=rows.length;
-  const cols=[['q1','Q1'],['top','Q1+Q2'],['q4','Q4'],['score','Quality score'],['cov','Scored %'],['cr','Covered AUM']];
-  let html='<table class="rt"><thead><tr><th>#</th><th>Fund House</th>';
-  cols.forEach(([key,lbl])=> html+=`<th class="num lg-sort" data-k="${key}" style="cursor:pointer">${lbl}${k===key?(dir<0?' ▾':' ▴'):''}</th>`);
-  html+='</tr></thead><tbody>';
-  rows.forEach(r=>{ const cls=r.fh==='Aditya'?'hl':''; const pc=r.rank===1?'r1':r.rank<=Math.ceil(n/4)?'up':r.rank>n-Math.ceil(n/4)?'dn':'';
-    html+=`<tr class="${cls}"><td><span class="pill ${pc}">${r.rank}</span></td><td class="lbl">${houseLabel(r.fh)}</td><td class="num">${fmt.pct(r.q1)}</td><td class="num">${fmt.pct(r.top)}</td><td class="num">${fmt.pct(r.q4)}</td><td class="num">${fmt.num(r.score)}</td><td class="num">${fmt.pct(r.cov)}</td><td class="num">${fmt.cr(r.cr)}</td></tr>`; });
-  html+='</tbody></table>';
-  document.getElementById('lg-table').innerHTML=html;
-  document.querySelectorAll('#lg-table .lg-sort').forEach(th=> th.onclick=()=>{ const key=th.dataset.k;
-    if(S.league.sortKey===key) S.league.sortDir*=-1; else { S.league.sortKey=key; S.league.sortDir=-1; } renderLeagueTable(); });
-  document.getElementById('lg-method').innerHTML=methodNote(
-    `The <b>${n}</b> fund houses in scope (${scopeLabel()}) on <b>${fmt.date(curDates()[i])}</b> (${basisDesc()}). Q1 / Q1+Q2 / Q4 are AUM shares of the house; <b>Quality score</b> = AUM-weighted quartile (Q1=4…Q4=1). <b>Scored %</b> = share of the house's covered AUM that actually has a quartile on this basis — below 100% when funds are too new for the window (e.g. sub-3-year NFOs on the 3Y basis). <b>Covered AUM</b> = the absolute Rs cr that is scored. Click a numeric header to re-sort.`);
-}
+// (renderLeague / renderLeagueTable retired 2026-09-02 — the League Table tab merged into AMC
+//  Roll-up, where renderAMCTable() now renders the identical full table from the same
+//  leagueData(). exportLeague below survives, driven by the AMC tab's as-of date.)
 function exportLeague(){
-  const i=S.league.date, rows=leagueData(i);
+  const i=S.amc.rankDate, rows=leagueData(i);
   let csv='Rank,Fund House,Q1,Q1+Q2,Q4,Quality score,Scored %,Covered AUM cr,Basis,Date\n';
   rows.sort((a,b)=>b.top-a.top).forEach((r,idx)=>{ csv+=[idx+1,r.fh,r.q1,r.top,r.q4,r.score,r.cov,Math.round(r.cr),`"${basisDesc()}"`,curDates()[i]].join(',')+'\n'; });
   downloadCSV(csv,`league_${S.universe}_${curDates()[i]}.csv`);
@@ -4999,10 +5029,8 @@ const SNAPS = [
     get:()=>S.matrix.date, set:i=>{S.matrix.date=i;},
     render:()=>renderMatrixGrid(),
     cap:()=>document.getElementById('mx-grid').closest('.card') },
-  { key:'league', sel:'lg-date', title:'League table',
-    get:()=>S.league.date, set:i=>{S.league.date=i;},
-    render:()=>renderLeagueTable(),
-    cap:()=>document.getElementById('lg-table').closest('.card') },
+  // (2026-09-02: the 'league' entry retired with its tab — the League table moved INSIDE
+  //  AMC Roll-up, whose 'amc' scrubber below already redraws it via renderAMCSnapshot.)
   { key:'sleeve', sel:'sl-rankdate', title:'Sleeve cross-section',
     get:()=>S.sleeve.rankDate, set:i=>{S.sleeve.rankDate=i;},
     render:()=>{ renderSleeveRank(); renderSleeveBar(); },
