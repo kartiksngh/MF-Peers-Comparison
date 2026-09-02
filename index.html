@@ -282,23 +282,6 @@
     --q2:         #6fa37c;
     --q3:         #d6a23f;
     --q4:         #c0523e;
-    /* Q1+Q2 = the top-half bucket. Kyser 2026-09-02: the first pick (#1d4e89) read as near-black
-       on the card — it sits at ~7:1 against the paper, which is contrast, not colour. This is the
-       sky-blue x royal-blue blend he asked for, kept dark enough to stay legible (4.2:1). */
-    --q12:        #3576cf;
-    /* ── METRIC FAMILIES (Kyser 2026-09-02) ────────────────────────────────────────────────
-       Every tile that is NOT reporting a quartile used to render in plain ink, so beside the
-       coloured quartile tiles they read as dead weight ("SIP return" in black). Colour now
-       carries a SECOND meaning, deliberately drawn from hues the quartile palette does not use,
-       so a coloured tile can never be misread as a quartile:
-         teal   = size / money      (AUM, weights, coverage — anything measured in Rs or % of AUM)
-         violet = performance       (returns, SIP/XIRR, composite quality scores)
-         slate  = a dimension label (a name, not a measurement — e.g. which sleeve)
-       Quartile hues are green 150deg / 140deg, gold 43deg, red 12deg, blue 215deg; these sit at
-       193deg, 262deg and 210deg-desaturated, so no family lands inside a quartile's hue band. */
-    --m-aum:      #0d7490;
-    --m-ret:      #6b4fb8;
-    --m-dim:      #556b82;
     --q1-t:       rgba(31,92,61,0.85);
     --q2-t:       rgba(111,163,124,0.80);
     --q3-t:       rgba(214,162,63,0.80);
@@ -446,10 +429,6 @@
     padding: 9px 14px; font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--ink-3);
     border-right: 1px solid var(--line); transition: background .15s, color .15s; white-space:nowrap;
   }
-  .seg.sm button { padding: 6px 11px; font-size: 11px; }
-  /* right-hand cluster of a card header: an inline control above the legend */
-  .ch-right { display:flex; flex-direction:column; align-items:flex-end; gap:8px; }
-  .ch-right .fg label { text-align:right; }
   .seg button:last-child { border-right: none; }
   .seg button.active { background: var(--ink); color: var(--paper); }
   .seg button:not(.active):hover { background: var(--paper-3); color: var(--ink); }
@@ -611,46 +590,6 @@
   table.rt tr.qc2 td.lbl { color: var(--q2); font-weight: 700; }
   table.rt tr.qc3 td.lbl { color: var(--q3); font-weight: 700; }
   table.rt tr.qc4 td.lbl { color: var(--q4); font-weight: 700; }
-
-  /* QUARTILE IDENTITY ON THE KPI TILES (Kyser 2026-09-02). The table rows above already colour
-     scheme names by quartile; the tiles did not -- they were classed by JUDGEMENT (good / warn /
-     accent), so "Q1+Q2 share" rendered in the ABSL red and read as a warning when it is simply the
-     top-half bucket, and "Current quartile" rendered EVERY quartile in that same accent, so a Q2
-     fund showed red. Colour must report WHICH quartile and leave the verdict to the reader.
-     Both the field name and the number wear the colour, and the label takes the value's face so
-     the pair reads as one object. Size hierarchy is kept: matching the label to the value's
-     30px would destroy the scan order. */
-  .kpi.qc .k-lbl { font-family: 'Fraunces', Georgia, serif; text-transform: none;
-                   letter-spacing: .01em; font-size: 12px; font-weight: 600; }
-  .kpi.qc.q-q1  .k-lbl, .kpi.qc.q-q1  .k-val { color: var(--q1);  }
-  .kpi.qc.q-q2  .k-lbl, .kpi.qc.q-q2  .k-val { color: var(--q2);  }
-  .kpi.qc.q-q3  .k-lbl, .kpi.qc.q-q3  .k-val { color: var(--q3);  }
-  .kpi.qc.q-q4  .k-lbl, .kpi.qc.q-q4  .k-val { color: var(--q4);  }
-  .kpi.qc.q-q12 .k-lbl, .kpi.qc.q-q12 .k-val { color: var(--q12); }
-  .kpi.qc.q-q1::before  { background: var(--q1);  }
-  .kpi.qc.q-q2::before  { background: var(--q2);  }
-  .kpi.qc.q-q3::before  { background: var(--q3);  }
-  .kpi.qc.q-q4::before  { background: var(--q4);  }
-  .kpi.qc.q-q12::before { background: var(--q12); }
-  .qt-q1 { color: var(--q1); } .qt-q2 { color: var(--q2); }
-  .qt-q3 { color: var(--q3); } .qt-q4 { color: var(--q4); } .qt-q12 { color: var(--q12); }
-
-  /* METRIC-FAMILY IDENTITY ON THE NON-QUARTILE TILES (Kyser 2026-09-02). Same construction as
-     .kpi.qc above — label and value share one colour and one face so the pair reads as a single
-     object — but drawn from the metric-family hues, never the quartile palette. A tile is
-     .kpi.mc.m-aum / .m-ret / .m-dim; .warn still wins for a genuine coverage alarm. */
-  .kpi.mc .k-lbl { font-family: 'Fraunces', Georgia, serif; text-transform: none;
-                   letter-spacing: .01em; font-size: 12px; font-weight: 600; }
-  .kpi.mc.m-aum .k-lbl, .kpi.mc.m-aum .k-val { color: var(--m-aum); }
-  .kpi.mc.m-ret .k-lbl, .kpi.mc.m-ret .k-val { color: var(--m-ret); }
-  .kpi.mc.m-dim .k-lbl, .kpi.mc.m-dim .k-val { color: var(--m-dim); }
-  .kpi.mc.m-aum::before { background: var(--m-aum); }
-  .kpi.mc.m-ret::before { background: var(--m-ret); }
-  .kpi.mc.m-dim::before { background: var(--m-dim); }
-  /* A low-coverage tile is an ALARM, not a family member: red must outrank the family colour,
-     and it is listed after so it wins on source order at equal specificity. */
-  .kpi.mc.warn .k-lbl, .kpi.mc.warn .k-val { color: var(--q4); }
-  .kpi.mc.warn::before { background: var(--q4); }
   table.rt tr.qc0 td.lbl { color: var(--ink-3); font-weight: 600; }
   table.rt tr.qhead.qh1 td { color: var(--q1); }
   table.rt tr.qhead.qh2 td { color: var(--q2); }
@@ -852,223 +791,9 @@
   .gm-actions .btn:not(.btn-dark) { background:var(--card); color:var(--ink-2); }
   .gm-actions .btn:not(.btn-dark):hover { border-color:var(--absl); color:var(--absl); }
   .gm-actions .btn[disabled] { opacity:.5; cursor:not-allowed; }
-  /* ════════════════════════════════════════════════════════════════════════════════════════
-     ░░ MAC-LIKE SURFACE  (Kyser 2026-09-02) ░░
-     The deck read as warm editorial newsprint: cream paper, a dark brown masthead, a serif
-     display face and mono metadata. Kyser asked for a professional Mac-style dashboard in the
-     spirit of the 21st.dev hero components. Three moves do almost all of the work:
-       1. GROUND -- a neutral grey page (#f5f5f7) with pure-white cards, so cards float instead
-          of tinting. Cream on cream is why the old surface felt flat.
-       2. TYPE   -- one system sans throughout (SF on a Mac, Inter here) with tight tracking and
-          TABULAR figures, instead of a display serif for headings and a mono for meta. Tabular
-          numerals matter on a dashboard: columns of digits stop shuffling as values change.
-       3. CHROME -- translucent blurred bars, a segmented-pill tab control, hairline borders and
-          soft wide shadows in place of hard rules and a heavy masthead.
-     It is applied deck-wide on purpose. Scoping a theme to two views leaves the shared masthead,
-     tabs and filter bar in the old skin, which reads as a half-finished page rather than a
-     specimen -- the exact failure of the previous attempt. Reverting is one class on <body>.
-     What is NOT touched: the quartile palette, the metric-family hues, the ABSL brand red, and
-     every number/label on the page. This layer changes surfaces, never content. */
-
-  body.theme-mac {
-    --paper:      #f5f5f7;
-    --paper-2:    #eeeef2;
-    --paper-3:    #e4e4ea;
-    --card:       #ffffff;
-    --ink:        #1d1d1f;
-    --ink-2:      #38383d;
-    --ink-3:      #6e6e73;
-    --ink-4:      #9a9aa0;
-    --line:       #d6d6db;
-    --line-2:     #e9e9ee;
-    --absl-glow:  rgba(200,57,43,0.14);
-    --absl-bg:    #fdecea;
-    --shadow-sm:  0 1px 2px rgba(0,0,0,.05), 0 4px 14px -8px rgba(0,0,0,.12);
-    --shadow-md:  0 1px 3px rgba(0,0,0,.05), 0 18px 36px -24px rgba(0,0,0,.20);
-    --shadow-lg:  0 2px 8px rgba(0,0,0,.06), 0 36px 70px -34px rgba(0,0,0,.28);
-    --r:          9px;
-    --r-lg:       16px;
-    --sans:       -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter', 'Segoe UI', system-ui, sans-serif;
-    font-family: var(--sans);
-    letter-spacing: -0.006em;
-    background: var(--paper);
-  }
-  /* the paper-grain overlay belongs to the newsprint look */
-  body.theme-mac::before { display: none; }
-
-  /* ── masthead: a light glass bar, not a dark slab ─────────────────────────────────────── */
-  body.theme-mac .masthead {
-    background: rgba(255,255,255,.78);
-    -webkit-backdrop-filter: saturate(180%) blur(22px);
-    backdrop-filter: saturate(180%) blur(22px);
-    color: var(--ink); border-bottom: 1px solid var(--line-2);
-    padding: 24px 40px 20px;
-  }
-  body.theme-mac .masthead::after { display: none; }
-  body.theme-mac .masthead h1 {
-    font-family: var(--sans); font-weight: 700; font-size: 27px;
-    letter-spacing: -0.028em; color: var(--ink);
-  }
-  body.theme-mac .masthead h1 em { font-style: normal; font-weight: 400; color: var(--ink-3); }
-  body.theme-mac .mast-kicker { font-family: var(--sans); font-size: 10.5px; letter-spacing: .14em; }
-  body.theme-mac .mast-sub { color: var(--ink-3); font-size: 13px; margin-top: 7px; }
-  body.theme-mac .mast-meta { font-family: var(--sans); gap: 9px; }
-  body.theme-mac .mast-meta .row .lbl { color: var(--ink-4); letter-spacing: .10em; font-size: 9.5px; }
-  body.theme-mac .mast-meta .row .val { color: var(--ink); font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
-  body.theme-mac .mast-badge {
-    background: rgba(0,0,0,.045); border: 1px solid rgba(0,0,0,.07); color: var(--ink-2);
-    font-family: var(--sans); font-size: 11.5px; font-weight: 500;
-  }
-
-  /* ── tabs: a macOS segmented control ──────────────────────────────────────────────────── */
-  body.theme-mac .tabs {
-    background: rgba(255,255,255,.76);
-    -webkit-backdrop-filter: saturate(180%) blur(22px);
-    backdrop-filter: saturate(180%) blur(22px);
-    border-bottom: 1px solid var(--line-2); padding: 7px 40px; gap: 3px;
-  }
-  body.theme-mac .tab {
-    font-family: var(--sans); font-size: 13px; font-weight: 600; letter-spacing: -0.008em;
-    padding: 7px 13px; border-bottom: none; margin-bottom: 0; border-radius: 8px;
-    color: var(--ink-3); transition: background .18s, color .18s, box-shadow .18s;
-  }
-  body.theme-mac .tab:hover { background: rgba(0,0,0,.045); color: var(--ink-2); }
-  body.theme-mac .tab.active {
-    background: var(--card); color: var(--ink);
-    box-shadow: 0 1px 2px rgba(0,0,0,.07), 0 0 0 1px rgba(0,0,0,.05);
-  }
-  body.theme-mac .tab .tnum { font-family: var(--sans); font-weight: 600; font-size: 10.5px; }
-  body.theme-mac .tab.active .tnum { color: var(--absl); }
-
-  /* ── filter bars ──────────────────────────────────────────────────────────────────────── */
-  body.theme-mac .filters {
-    background: rgba(255,255,255,.82);
-    -webkit-backdrop-filter: saturate(180%) blur(22px);
-    backdrop-filter: saturate(180%) blur(22px);
-    border-bottom: 1px solid var(--line-2); padding: 13px 40px;
-  }
-  body.theme-mac .view > .filters { box-shadow: 0 10px 18px -18px rgba(0,0,0,.5); }
-  /* #gctrl carries an INLINE 2px ABSL-red top border (it separated the global bar in the
-     newsprint skin). Inline styles beat the stylesheet, so it painted a red stripe straight
-     across the Mac surface — !important is the only lever short of editing the markup, and the
-     markup edit would strip the rule from the un-themed fallback too. */
-  body.theme-mac #gctrl {
-    border-top: 1px solid var(--line-2) !important;
-    border-bottom: 1px solid var(--line-2) !important;
-    margin-bottom: 0 !important;
-  }
-  body.theme-mac .fg label {
-    font-family: var(--sans); font-size: 10px; letter-spacing: .04em; text-transform: none;
-    font-weight: 600; color: var(--ink-3);
-  }
-  body.theme-mac .fg select, body.theme-mac .fg input {
-    font-family: var(--sans); font-size: 13px; border-radius: 9px; background: #fff;
-    border: 1px solid var(--line); box-shadow: 0 1px 1.5px rgba(0,0,0,.04); padding: 8px 12px;
-  }
-  body.theme-mac .fg select:hover, body.theme-mac .fg input:hover { border-color: var(--ink-4); }
-  body.theme-mac .fg select:focus, body.theme-mac .fg input:focus {
-    border-color: var(--ink-3); box-shadow: 0 0 0 3.5px rgba(0,0,0,.08);
-  }
-  body.theme-mac .seg {
-    border-radius: 9px; background: rgba(0,0,0,.05); border: 1px solid rgba(0,0,0,.05);
-    padding: 2px; gap: 2px;
-  }
-  body.theme-mac .seg button {
-    font-family: var(--sans); font-size: 12px; font-weight: 600; border-right: none;
-    border-radius: 7px; padding: 6px 12px; color: var(--ink-3);
-  }
-  body.theme-mac .seg.sm button { padding: 5px 10px; font-size: 11px; }
-  body.theme-mac .seg button.active {
-    background: #fff; color: var(--ink);
-    box-shadow: 0 1px 2px rgba(0,0,0,.10), 0 0 0 .5px rgba(0,0,0,.06);
-  }
-  body.theme-mac .seg button:not(.active):hover { background: rgba(0,0,0,.04); color: var(--ink-2); }
-  body.theme-mac .btn { border-radius: 9px; font-family: var(--sans); font-weight: 600; letter-spacing: -0.004em; }
-  body.theme-mac .btn-dark { background: var(--ink); box-shadow: 0 1px 2px rgba(0,0,0,.18); }
-  body.theme-mac .btn-dark:hover { background: #000; }
-  body.theme-mac .chk { font-family: var(--sans); }
-  body.theme-mac .slidval { font-family: var(--sans); font-variant-numeric: tabular-nums; }
-
-  /* ── content surfaces ─────────────────────────────────────────────────────────────────── */
-  body.theme-mac .content { padding: 30px 40px 90px; }
-  body.theme-mac .shead h2 {
-    font-family: var(--sans); font-weight: 700; font-size: 23px; letter-spacing: -0.026em;
-  }
-  body.theme-mac .shead h2 em { font-style: normal; font-weight: 400; color: var(--ink-3); }
-  body.theme-mac .shead .ctx { font-family: var(--sans); font-size: 11.5px; color: var(--ink-3); }
-  body.theme-mac .card {
-    background: #fff; border: 1px solid var(--line-2); border-radius: 16px; padding: 21px 23px;
-    box-shadow: 0 1px 2px rgba(0,0,0,.04), 0 14px 30px -24px rgba(0,0,0,.22);
-  }
-  body.theme-mac .card-h h3 {
-    font-family: var(--sans); font-weight: 650; font-size: 16px; letter-spacing: -0.018em;
-  }
-  body.theme-mac .card-h .sub { font-size: 12px; color: var(--ink-3); }
-
-  /* ── KPI tiles ────────────────────────────────────────────────────────────────────────── */
-  body.theme-mac .kpi {
-    background: #fff; border: 1px solid var(--line-2); border-radius: 14px; padding: 15px 17px 14px;
-    box-shadow: 0 1px 2px rgba(0,0,0,.04), 0 8px 20px -18px rgba(0,0,0,.22);
-  }
-  body.theme-mac .kpi::before { width: 3px; border-radius: 3px 0 0 3px; }
-  body.theme-mac .kpi .k-lbl {
-    font-family: var(--sans); font-size: 11.5px; text-transform: none; letter-spacing: -0.004em;
-    font-weight: 600; margin-bottom: 7px;
-  }
-  body.theme-mac .kpi .k-val {
-    font-family: var(--sans); font-size: 28px; font-weight: 640; letter-spacing: -0.035em;
-    font-variant-numeric: tabular-nums;
-  }
-  body.theme-mac .kpi .k-sub { font-family: var(--sans); font-size: 11px; color: var(--ink-4); margin-top: 6px; }
-  /* the .qc / .mc blocks above set their own Fraunces label face -- override it here so the
-     themed page stays on ONE type family. Colour is left exactly as those blocks set it. */
-  body.theme-mac .kpi.qc .k-lbl, body.theme-mac .kpi.mc .k-lbl {
-    font-family: var(--sans); font-size: 11.5px; font-weight: 600; letter-spacing: -0.004em;
-  }
-
-  /* ── tables: hairlines, not rules ─────────────────────────────────────────────────────── */
-  body.theme-mac table.rt { font-size: 12.5px; }
-  body.theme-mac table.rt th {
-    font-family: var(--sans); font-size: 10.5px; text-transform: none; letter-spacing: -0.002em;
-    font-weight: 600; color: var(--ink-3); border-bottom: 1px solid var(--line);
-    padding: 9px 10px; background: #fff;
-  }
-  body.theme-mac table.rt td {
-    font-family: var(--sans); font-variant-numeric: tabular-nums; color: var(--ink-2);
-    border-bottom: 1px solid var(--line-2); padding: 9px 10px;
-  }
-  body.theme-mac table.rt td.lbl { font-family: var(--sans); }
-  body.theme-mac table.rt tr:hover td { background: #f7f7fa; }
-  body.theme-mac table.rt tr.qhead td {
-    background: #f2f2f6; font-family: var(--sans); font-weight: 650; font-size: 12.5px;
-    border-bottom: 1px solid var(--line);
-  }
-
-  /* ── odds and ends that carry the old skin ────────────────────────────────────────────── */
-  body.theme-mac .tag {
-    background: rgba(0,0,0,.05); border-color: transparent; color: var(--ink-2);
-    font-family: var(--sans); font-size: 11px; font-weight: 500; border-radius: 100px;
-  }
-  body.theme-mac .legend { font-family: var(--sans); font-size: 11.5px; color: var(--ink-3); }
-  body.theme-mac .m-open {
-    background: rgba(0,0,0,.04); border: 1px solid var(--line-2); border-left: 3px solid var(--gold);
-    border-radius: 9px; font-family: var(--sans);
-  }
-  body.theme-mac dialog.m-modal { border-radius: 16px; border: 1px solid var(--line-2); background: #fff; }
-  body.theme-mac .m-modal-head { background: #fff; border-radius: 16px 16px 0 0; }
-  body.theme-mac .m-modal-body { font-family: var(--sans); }
-  body.theme-mac .m-close { background: rgba(0,0,0,.05); border: 1px solid var(--line-2); border-radius: 8px; font-family: var(--sans); }
-  body.theme-mac .m-modal-body code { background: #f2f2f6; border-radius: 5px; }
-
-  @media (max-width: 900px) {
-    body.theme-mac .masthead, body.theme-mac .tabs,
-    body.theme-mac .filters, body.theme-mac .content { padding-left: 20px; padding-right: 20px; }
-  }
 </style>
 </head>
-<!-- theme-mac = the Mac-style surface layer at the end of the stylesheet (Kyser 2026-09-02).
-     Delete this one class to fall straight back to the original newsprint skin. -->
-<body class="theme-mac">
+<body>
 <div id="app">
 
 <script id="peer-data" type="application/json">null</script>
@@ -1203,19 +928,8 @@ const C = {
   q1:'#1f5c3d', q2:'#6fa37c', q3:'#d6a23f', q4:'#c0523e',
   q1t:'rgba(31,92,61,0.82)', q2t:'rgba(111,163,124,0.78)', q3t:'rgba(214,162,63,0.80)', q4t:'rgba(192,82,62,0.82)',
   absl:'#c8392b', navy:'#20436b', gold:'#b3852f', ink:'#16130f', ink3:'#6a5f50', ink4:'#9c8f7a',
-  line:'#d6d6db', line2:'#e9e9ee', peer:'#c7c7cc', peerLine:'rgba(174,174,178,.40)', green:'#1f5c3d', red:'#c0523e'
+  line:'#ddd1b8', line2:'#ebe1cc', peer:'#c9bca3', peerLine:'rgba(201,188,163,.38)', green:'#1f5c3d', red:'#c0523e'
 };
-// Chart.js reads these hexes directly (it cannot see CSS variables), so the NEUTRALS above were
-// re-cut warm-cream -> Mac grey alongside the surface theme, or every axis, gridline and peer
-// line would still be drawing the old paper palette on top of the new one. The DATA colours --
-// the four quartile tokens, the ABSL brand red, navy, gold -- are deliberately untouched: they
-// carry meaning, and a theme must never silently repaint meaning.
-// Quartile -> tile class (Kyser 2026-09-02). Empty string when the quartile is unknown, so the
-// tile keeps its neutral rail rather than borrowing a colour it has not earned.
-const qCls = q => (q===1||q==='1'||q==='q1') ? 'q-q1'
-               : (q===2||q==='2'||q==='q2') ? 'q-q2'
-               : (q===3||q==='3'||q==='q3') ? 'q-q3'
-               : (q===4||q==='4'||q==='q4') ? 'q-q4' : '';
 const QORDER = ['% in Q1','% in Q2','% in Q3','% in Q4'];
 const QCOL   = { '% in Q1':C.q1, '% in Q2':C.q2, '% in Q3':C.q3, '% in Q4':C.q4 };
 const SCOREW = { '% in Q1':4, '% in Q2':3, '% in Q3':2, '% in Q4':1 };
@@ -1231,7 +945,7 @@ const S = {
   mode:'ls',                                        // investment mode: 'ls' lumpsum | 's3' 3-year SIP book | 's5' 5-year SIP book
   sleeve:{ fh:'Aditya', br:null, mode:'within', rankDate:null },
   amc:{ fh:'Aditya', rankDate:null },
-  scheme:{ fh:'Aditya', cat:'(all)', sl:'(all)', name:null, month:null, peerDate:null, smooth:0 },
+  scheme:{ fh:'Aditya', cat:'(all)', sl:'(all)', name:null, month:null, peerDate:null },
   matrix:{ metric:'tophalf', date:null },
   composite:{ date:null, qsel:[1,2] },
   league:{ date:null, sortKey:'top', sortDir:-1 },
@@ -2298,57 +2012,12 @@ function dualOpts({leftSuffix, rightLabel, rightMin, rightMax, xmin, xmax}){
       y1:{ position:'right', min:rightMin, max:rightMax, grid:{drawOnChartArea:false}, ticks:{color:C.navy,font:{size:10}}, border:{display:false},
            title:{display:!!rightLabel,text:rightLabel,color:C.navy,font:{size:10}} } } };
 }
-// noGrid  — drop the horizontal rules (Kyser 2026-09-02, on the quartile-history chart).
-// qTicks  — the y-axis is a QUARTILE axis, so label it Q1..Q4 and nothing else. Chart.js was
-//           auto-generating 0.6 / 1.5 / 2.5 / 3.5 / 4.4 on a 0.6-4.4 range, and a tick reading
-//           "2.5" on an axis whose only real values are the integers 1-4 is a half-quartile,
-//           which does not exist. afterBuildTicks replaces the generated set outright — stepSize
-//           cannot do it, because Chart.js steps UP FROM min (0.6, 1.6, 2.6...), not from 1.
-function lineOpts({suffix, min, max, xmin, xmax, reverse, noGrid, qTicks}){
-  const yTicks = qTicks
-    ? { callback:v=>'Q'+v, color:C.ink3, font:{size:11, weight:'600'} }
-    : { callback:v=>v+(suffix||''), color:C.ink3, font:{size:10} };
-  const y = { min, max, reverse:!!reverse, grace:(min==null&&max==null)?'6%':undefined,
-              ticks:yTicks, grid:{display:!noGrid, color:C.line2}, border:{display:false} };
-  if(qTicks) y.afterBuildTicks = ax => { ax.ticks = [1,2,3,4].map(v=>({value:v})); };
+function lineOpts({suffix, min, max, xmin, xmax, reverse}){
   return { maintainAspectRatio:false, responsive:true, interaction:{mode:'nearest',intersect:false}, ...chartMotion(),
     plugins:{ legend:{display:false}, tooltip:{...baseTooltip(),
       callbacks:{ label:c=> `${c.dataset.label}: ${c.parsed.y==null?'—':c.parsed.y.toFixed(1)+(suffix||'')}` } } },
-    scales:{ x:timeX(xmin,xmax), y } };
-}
-// ── SMOOTHING THE QUARTILE HISTORY (Kyser 2026-09-02, asked for "smoothen it by 20 days") ──
-// The window is counted in MONTHS, not days, and that is not a preference — the series has ONE
-// observation per month-end (peer_data.aum_dates: 154 points, 2013-12-31 -> 2026-09-01, and the
-// VR axis `months` is the same shape). A 20-day window spans less than one observation, so a
-// literal 20-day smoother would return the raw series unchanged and the control would look
-// broken. 3 / 6 / 12 months are the honest equivalents; 6m is roughly "a couple of quarters".
-//
-// The statistic is a TRAILING MEAN of the quartile: at month i, the average of the quartiles in
-// months i-n+1 .. i. A value of 2.4 therefore means "on average, between Q2 and Q3 over that
-// window" — it is not itself a quartile, which is why the raw steps stay on the chart behind it.
-// Nulls (unrated months) are skipped, and a point is only emitted when at least HALF the window
-// carries data — otherwise one stray observation inside a long gap would draw a confident line
-// across a period the fund was never ranked in.
-const SC_SMOOTH = [{v:0,l:'Raw'},{v:3,l:'3m'},{v:6,l:'6m'},{v:12,l:'12m'}];
-function rollMeanPts(pts, n){
-  if(!n || n < 2) return pts;
-  const need = Math.ceil(n/2);
-  return pts.map((p,i)=>{
-    let sum=0, cnt=0;
-    for(let j=Math.max(0,i-n+1); j<=i; j++){ const v=pts[j].y; if(v!=null){ sum+=v; cnt++; } }
-    return { x:p.x, y: cnt>=need ? sum/cnt : null };
-  });
-}
-// A ghost of the raw steps, drawn under the smoothed line so the smoothing never HIDES the data
-// it is summarising — the reader can always see the month-to-month reality it came from.
-function ghostOf(ds){
-  return { ...ds, borderColor:hexA(ds.borderColor,0.22), borderWidth:1.2, label:ds.label+' (raw)',
-           fill:false, backgroundColor:'transparent' };   // never re-paint the area under a ghost
-}
-function hexA(hex, a){
-  const m=/^#?([0-9a-f]{6})$/i.exec(hex||''); if(!m) return hex;
-  const n=parseInt(m[1],16);
-  return `rgba(${(n>>16)&255},${(n>>8)&255},${n&255},${a})`;
+    scales:{ x:timeX(xmin,xmax), y:{ min, max, reverse:!!reverse, grace:(min==null&&max==null)?'6%':undefined,
+      ticks:{callback:v=>v+(suffix||''),color:C.ink3,font:{size:10}}, grid:{color:C.line2}, border:{display:false} } } };
 }
 
 //──────────────────────────── BUILD VIEW SCAFFOLDS ─────────────────────────
@@ -2539,11 +2208,7 @@ function buildViews(){
       <div class="grid-2 sc-split" style="grid-template-columns:1.5fr 1fr">
         <div class="card">
           <div class="card-h"><div><h3 id="sc-score-title">Quartile score history</h3><div class="sub" id="sc-score-sub"></div></div>
-            <div class="ch-right">
-              <div class="fg"><label>Smooth (trailing mean)</label>
-                <div class="seg sm" id="sc-smooth"><button data-v="0" class="active">Raw</button><button data-v="3">3m</button><button data-v="6">6m</button><button data-v="12">12m</button></div></div>
-              <div class="legend" id="sc-score-legend"></div>
-            </div>
+            <div class="legend" id="sc-score-legend"></div>
           </div>
           <div class="chartbox tall"><canvas id="sc-score"></canvas></div>
           <div id="sc-score-method"></div>
@@ -2704,11 +2369,11 @@ function renderSleeve(){
   document.getElementById('sl-title').innerHTML=`${houseLabel(fh)} · ${br}`;
   document.getElementById('sl-ctx').innerHTML=`${basisDesc()}<br>Snapshot ${fmt.date(dates[li])}`;
   document.getElementById('sl-kpis').innerHTML=`
-    <div class="kpi qc q-q12"><div class="k-lbl">Q1+Q2 within sleeve</div><div class="k-val">${fmt.pct(A.top)}</div><div class="k-sub">of the sleeve's <b>rated</b> AUM</div></div>
-    <div class="kpi mc m-aum"><div class="k-lbl">Sleeve weight in AMC</div><div class="k-val">${fmt.pct(A.weight)}</div><div class="k-sub">of total ${fh} AUM</div></div>
-    <div class="kpi mc m-aum${covWarn?' warn':''}"><div class="k-lbl">Rated</div><div class="k-val">${fmt.pct(A.cov)}</div><div class="k-sub">${covWarn?'of sleeve AUM carries a quartile':'the whole sleeve is scored'}</div></div>
-    <div class="kpi mc m-ret"><div class="k-lbl">AUM-wtd quartile score</div><div class="k-val">${fmt.num(score)}</div><div class="k-sub">1 (worst) → 4 (best)</div></div>
-    <div class="kpi qc q-q4"><div class="k-lbl">Q4 within sleeve</div><div class="k-val">${fmt.pct(A.qq4)}</div><div class="k-sub">bottom-quartile AUM</div></div>`;
+    <div class="kpi good"><div class="k-lbl">Q1+Q2 within sleeve</div><div class="k-val good">${fmt.pct(A.top)}</div><div class="k-sub">of the sleeve's <b>rated</b> AUM</div></div>
+    <div class="kpi accent"><div class="k-lbl">Sleeve weight in AMC</div><div class="k-val accent">${fmt.pct(A.weight)}</div><div class="k-sub">of total ${fh} AUM</div></div>
+    <div class="kpi${covWarn?' warn':''}"><div class="k-lbl">Rated</div><div class="k-val${covWarn?' warn':''}">${fmt.pct(A.cov)}</div><div class="k-sub">${covWarn?'of sleeve AUM carries a quartile':'the whole sleeve is scored'}</div></div>
+    <div class="kpi"><div class="k-lbl">AUM-wtd quartile score</div><div class="k-val">${fmt.num(score)}</div><div class="k-sub">1 (worst) → 4 (best)</div></div>
+    <div class="kpi warn"><div class="k-lbl">Q4 within sleeve</div><div class="k-val warn">${fmt.pct(A.qq4)}</div><div class="k-sub">bottom-quartile AUM</div></div>`;
 
   document.getElementById('sl-c1-title').textContent = mode==='within'?'Quartile distribution within sleeve':'Quartile distribution as % of AMC AUM';
   document.getElementById('sl-c1-sub').textContent = mode==='within'
@@ -2885,11 +2550,11 @@ function renderAMCHouseKPIs(){
   const A=sleeveAt(byQ,i), covWarn=(A.cov!=null && A.cov<0.999);
   document.getElementById('am-ctx').innerHTML=`${basisDesc()}<br>Snapshot ${fmt.date(dates[i])}`;
   document.getElementById('am-kpis').innerHTML=`
-    <div class="kpi qc q-q1"><div class="k-lbl">Q1 share</div><div class="k-val">${fmt.pct(q1)}</div><div class="k-sub">top quartile, of all house AUM</div></div>
-    <div class="kpi qc q-q12"><div class="k-lbl">Q1+Q2 share</div><div class="k-val">${fmt.pct((q1||0)+(q2||0))}</div><div class="k-sub">top half, of <b>all</b> house AUM</div></div>
-    <div class="kpi mc m-aum${covWarn?' warn':''}"><div class="k-lbl">Rated</div><div class="k-val">${fmt.pct(A.cov)}</div><div class="k-sub">of AUM is ranked · its top half = ${fmt.pct(A.top)}</div></div>
-    <div class="kpi mc m-ret"><div class="k-lbl">Quality score</div><div class="k-val">${fmt.num(score)}</div><div class="k-sub">1 → 4, AUM-weighted</div></div>
-    <div class="kpi qc q-q4"><div class="k-lbl">Q3+Q4 share</div><div class="k-val">${fmt.pct((q3||0)+(q4||0))}</div><div class="k-sub">bottom half, of all house AUM</div></div>`;
+    <div class="kpi good"><div class="k-lbl">Q1 share</div><div class="k-val good">${fmt.pct(q1)}</div><div class="k-sub">top quartile, of all house AUM</div></div>
+    <div class="kpi accent"><div class="k-lbl">Q1+Q2 share</div><div class="k-val accent">${fmt.pct((q1||0)+(q2||0))}</div><div class="k-sub">top half, of <b>all</b> house AUM</div></div>
+    <div class="kpi${covWarn?' warn':''}"><div class="k-lbl">Rated</div><div class="k-val${covWarn?' warn':''}">${fmt.pct(A.cov)}</div><div class="k-sub">of AUM is ranked · its top half = ${fmt.pct(A.top)}</div></div>
+    <div class="kpi"><div class="k-lbl">Quality score</div><div class="k-val">${fmt.num(score)}</div><div class="k-sub">1 → 4, AUM-weighted</div></div>
+    <div class="kpi warn"><div class="k-lbl">Q3+Q4 share</div><div class="k-val warn">${fmt.pct((q3||0)+(q4||0))}</div><div class="k-sub">bottom half, of all house AUM</div></div>`;
 }
 // Everything on this tab that depends on the AS-OF DATE, and nothing else. The timeline
 // scrubber / GIF exporter calls this once per frame, so it deliberately leaves the
@@ -3297,8 +2962,6 @@ function renderScheme(){
     document.getElementById('sc-sl').onchange=e=>{ S.scheme.sl=e.target.value; S.scheme.name=null; renderScheme(); };
     document.getElementById('sc-name').onchange=e=>{ S.scheme.name=e.target.value; renderSchemeBody(); };
     document.getElementById('sc-month').onchange=e=>{ S.scheme.month=+e.target.value; renderSchemeBody(); };
-    // Smoothing is a VIEW setting on one chart, so it redraws the body and nothing else.
-    segWire('sc-smooth', v=>{ S.scheme.smooth=+v; renderSchemeBody(); });
     document.getElementById('sc-exp').onclick=exportScheme;
   }
   // dropdowns
@@ -3333,29 +2996,18 @@ function renderSchemeBody(){
   // ── score / quartile history (selected scheme)
   const ctx=document.getElementById('sc-score').getContext('2d');
   S.charts.scScore?.destroy();
-  // Smoothing (Kyser 2026-09-02): 0 = raw. When on, the raw series stays on the chart as a faint
-  // ghost UNDER the smoothed line, so the summary never conceals the observations behind it.
-  const sm = S.scheme.smooth|0;
-  const smoothSets = dss => sm ? dss.map(ghostOf).concat(dss.map(d=>({
-        ...d, data:rollMeanPts(d.data, sm), stepped:false, tension:0.35,
-        borderWidth:(d.borderWidth||2)+0.4, label:d.label+' · '+sm+'m mean' }))) : dss;
-  const smNote = sm ? ` · ${sm}-month trailing mean (raw steps kept faint behind)` : '';
-  // The subtitle led with the word "Raw". With a smoother on that is the one thing the line is
-  // NOT, so the word is dropped rather than left to contradict the sentence that follows it.
-  const rawWord = sm ? '' : 'Raw ';
-  const smMethod = sm ? ` <b>Smoothing (${sm}m):</b> each plotted point is the <b>arithmetic mean of the last ${sm} month-end values</b>, the current month included. Unrated months are skipped, and a point is drawn only where <b>at least ${Math.ceil(sm/2)} of the ${sm} months</b> carry a value — so a lone observation inside a long gap cannot draw a confident line. The result is no longer a quartile: <b>2.4 means "on average between Q2 and Q3 over that window"</b>. The faint line behind it is the unsmoothed monthly series. Note the axis is <b>one point per MONTH-END</b> (${(vr?D.months:D.aum_dates).length} points), which is why the window is counted in months — a 20-day window would span less than a single observation and change nothing.` : '';
-  if(isShortWin(S.basis)){                                // raw windows (1M..9M, 2Y, 5Y) — plot that window's quartile
+  if(isShortWin(S.basis)){                                  // raw windows (1M..9M, 2Y, 5Y) — plot that window's quartile
     const field = vr ? VRFIELD[S.basis] : ALLFIELD[S.basis];
     const rec=(vr?vrHomeRec(name):D.allpeer.find(r=>r.s===name)); const dates=vr?D.months:D.aum_dates;
     const fs=rec?qseries(rec,field):null;                   // mode-routed series (null while SIP data loads -> empty chart)
     const qline=rec?dates.map((d,i)=>({x:d,y:(fs&&fs[i]!=null)?fs[i]:null})):[];
     const {xmin,xmax}=xBounds(dates, qline.map(p=>p.y));
     const dq={ data:qline, borderColor:C.navy, borderWidth:2.4, tension:0, pointRadius:0, stepped:true, spanGaps:false, yAxisID:'y', fill:false }; dq.label=RWOF[S.basis]+' quartile';
-    S.charts.scScore=new Chart(ctx,{type:'line',data:{datasets:smoothSets([dq])},options:lineOpts({min:0.6,max:4.4,xmin,xmax,reverse:true,noGrid:true,qTicks:true})});
+    S.charts.scScore=new Chart(ctx,{type:'line',data:{datasets:[dq]},options:lineOpts({min:0.6,max:4.4,xmin,xmax,reverse:true})});
     document.getElementById('sc-score-title').textContent=RWOF[S.basis]+' quartile history';
-    document.getElementById('sc-score-sub').textContent=`${rawWord}${vr?'VR exact-peer':'MFI all-peer'} ${RWOF[S.basis]} return quartile (Q1 = top quartile, at the top of the axis)`+smNote;
+    document.getElementById('sc-score-sub').textContent=`Raw ${vr?'VR exact-peer':'MFI all-peer'} ${RWOF[S.basis]} return quartile (1 = top quartile, at the top of the axis)`;
     document.getElementById('sc-score-legend').innerHTML=`<span><span class="lline" style="background:${C.navy}"></span>${RWOF[S.basis]} quartile</span>`;
-    document.getElementById('sc-score-method').innerHTML=methodNote(`Month-end <b>${RWOF[S.basis]} quartile</b> for <b>${name}</b> (1 = top). ${scoreMethodLine()} Axis reversed so Q1 sits on top.`+smMethod);
+    document.getElementById('sc-score-method').innerHTML=methodNote(`Month-end <b>${RWOF[S.basis]} quartile</b> for <b>${name}</b> (1 = top). ${scoreMethodLine()} Axis reversed so Q1 sits on top.`);
   } else if(vr){
     const rec=vrHomeRec(name); const dates=D.months, wf=S.w/100;   // scores from the HOME peerset
     // mode-routed y/t/b series (lumpsum: the row's own arrays; SIP: the convention's block)
@@ -3370,11 +3022,11 @@ function renderSchemeBody(){
     const d1=mk(compS,C.absl,2.8,null,true); d1.label='Composite/basis';
     const d2=mk(oneY,C.navy,1.6,[4,3]); d2.label='1Y score';
     const d3=mk(threeY,C.q2,1.6,[4,3]); d3.label='3Y score';
-    S.charts.scScore=new Chart(ctx,{type:'line',data:{datasets:smoothSets([d1,d2,d3])},options:lineOpts({min:0.8,max:5.2,xmin,xmax,noGrid:true})});
+    S.charts.scScore=new Chart(ctx,{type:'line',data:{datasets:[d1,d2,d3]},options:lineOpts({min:0.8,max:5.2,xmin,xmax})});
     document.getElementById('sc-score-title').textContent='Quartile score history';
-    document.getElementById('sc-score-sub').textContent='1Y score (Q1=5…Q4=2), 3Y score (Q1=4…Q4=1, +reward), and the chosen-basis composite'+smNote;
+    document.getElementById('sc-score-sub').textContent='1Y score (Q1=5…Q4=2), 3Y score (Q1=4…Q4=1, +reward), and the chosen-basis composite';
     document.getElementById('sc-score-legend').innerHTML=`<span><span class="lline" style="background:${C.absl}"></span>Composite/basis</span><span><span class="lline" style="background:${C.navy}"></span>1Y</span><span><span class="lline" style="background:${C.q2}"></span>3Y</span>`;
-    document.getElementById('sc-score-method').innerHTML=methodNote(`Month-end <b>scores</b> for <b>${name}</b> within its VR exact-peer category. ${scoreMethodLine()} Gaps = insufficient history for that window.`+smMethod);
+    document.getElementById('sc-score-method').innerHTML=methodNote(`Month-end <b>scores</b> for <b>${name}</b> within its VR exact-peer category. ${scoreMethodLine()} Gaps = insufficient history for that window.`);
   } else {
     const rec=D.allpeer.find(r=>r.s===name); const dates=D.aum_dates;
     const a1=rec?qseries(rec,'aq1y'):null, a3=rec?qseries(rec,'aq3y'):null;   // mode-routed
@@ -3383,11 +3035,11 @@ function renderSchemeBody(){
     const {xmin,xmax}=xBounds(dates, oneY.map(p=>p.y), threeY.map(p=>p.y));
     const mk=(data,col,wd)=>({ data, borderColor:col, borderWidth:wd, tension:0, pointRadius:0, stepped:true, spanGaps:false, yAxisID:'y', fill:false });
     const d1=mk(oneY,C.navy,2.2); d1.label='1Y quartile'; const d2=mk(threeY,C.q2,2.2); d2.label='3Y quartile';
-    S.charts.scScore=new Chart(ctx,{type:'line',data:{datasets:smoothSets([d1,d2])},options:lineOpts({min:0.6,max:4.4,xmin,xmax,reverse:true,noGrid:true,qTicks:true})});
+    S.charts.scScore=new Chart(ctx,{type:'line',data:{datasets:[d1,d2]},options:lineOpts({min:0.6,max:4.4,xmin,xmax,reverse:true})});
     document.getElementById('sc-score-title').textContent='All-peer quartile history';
-    document.getElementById('sc-score-sub').textContent=rawWord+'MFI all-peer quartile (Q1 = top quartile, at the top of the axis)'+smNote;
+    document.getElementById('sc-score-sub').textContent='Raw MFI all-peer quartile (1 = top quartile, at the top of the axis)';
     document.getElementById('sc-score-legend').innerHTML=`<span><span class="lline" style="background:${C.navy}"></span>1Y quartile</span><span><span class="lline" style="background:${C.q2}"></span>3Y quartile</span>`;
-    document.getElementById('sc-score-method').innerHTML=methodNote(`Month-end <b>all-peer quartile</b> for <b>${name}</b> (1 = top). Ranked against its full MFI category on calendar 1Y/3Y returns. Axis reversed so Q1 sits on top.`+smMethod);
+    document.getElementById('sc-score-method').innerHTML=methodNote(`Month-end <b>all-peer quartile</b> for <b>${name}</b> (1 = top). Ranked against its full MFI category on calendar 1Y/3Y returns. Axis reversed so Q1 sits on top.`);
   }
 
   // While a SIP mode's data file is in flight the chart above rendered EMPTY (qseries
@@ -3402,16 +3054,16 @@ function renderSchemeBody(){
   const rowsLast=_cand.find(r=>!r.borrowed)||_cand[0];
   if(vr){ const rec=vrHomeRec(name);
     document.getElementById('sc-kpis').innerHTML=`
-      <div class="kpi qc ${qCls(rowsLast&&rowsLast.q)}"><div class="k-lbl">Current quartile</div><div class="k-val">${rowsLast&&rowsLast.q?('Q'+rowsLast.q):'—'}</div><div class="k-sub">${basisDesc()}</div></div>
-      <div class="kpi mc m-ret"><div class="k-lbl">Basis score</div><div class="k-val">${fmt.num(rowsLast?rowsLast.score:null)}</div><div class="k-sub">on ${fmt.date(curDates()[month])}</div></div>
-      <div class="kpi mc m-aum"><div class="k-lbl">% of ${fh} AUM</div><div class="k-val">${fmt.pct(rowsLast?rowsLast.a:null)}</div><div class="k-sub">house weight</div></div>
-      <div class="kpi mc m-aum"><div class="k-lbl">Scheme AUM</div><div class="k-val">${fmt.cr(rowsLast?rowsLast.cr:null)}</div><div class="k-sub">absolute</div></div>${sipKpiHTML(name,month)}`;
+      <div class="kpi accent"><div class="k-lbl">Current quartile</div><div class="k-val accent">${rowsLast&&rowsLast.q?('Q'+rowsLast.q):'—'}</div><div class="k-sub">${basisDesc()}</div></div>
+      <div class="kpi"><div class="k-lbl">Basis score</div><div class="k-val">${fmt.num(rowsLast?rowsLast.score:null)}</div><div class="k-sub">on ${fmt.date(curDates()[month])}</div></div>
+      <div class="kpi good"><div class="k-lbl">% of ${fh} AUM</div><div class="k-val good">${fmt.pct(rowsLast?rowsLast.a:null)}</div><div class="k-sub">house weight</div></div>
+      <div class="kpi"><div class="k-lbl">Scheme AUM</div><div class="k-val">${fmt.cr(rowsLast?rowsLast.cr:null)}</div><div class="k-sub">absolute</div></div>${sipKpiHTML(name,month)}`;
   } else {
     document.getElementById('sc-kpis').innerHTML=`
-      <div class="kpi qc ${qCls(rowsLast&&rowsLast.q)}"><div class="k-lbl">Current quartile</div><div class="k-val">${rowsLast&&rowsLast.q?('Q'+rowsLast.q):'—'}</div><div class="k-sub">${S.basis} all-peer</div></div>
-      <div class="kpi mc m-aum"><div class="k-lbl">% of ${fh} AUM</div><div class="k-val">${fmt.pct(rowsLast?rowsLast.a:null)}</div><div class="k-sub">house weight</div></div>
-      <div class="kpi mc m-aum"><div class="k-lbl">Scheme AUM</div><div class="k-val">${fmt.cr(rowsLast?rowsLast.cr:null)}</div><div class="k-sub">absolute</div></div>
-      <div class="kpi mc m-dim"><div class="k-lbl">Sleeve</div><div class="k-val" style="font-size:18px">${rowsLast?rowsLast.sl:'—'}</div><div class="k-sub">breakdown</div></div>${sipKpiHTML(name,month)}`;
+      <div class="kpi accent"><div class="k-lbl">Current quartile</div><div class="k-val accent">${rowsLast&&rowsLast.q?('Q'+rowsLast.q):'—'}</div><div class="k-sub">${S.basis} all-peer</div></div>
+      <div class="kpi good"><div class="k-lbl">% of ${fh} AUM</div><div class="k-val good">${fmt.pct(rowsLast?rowsLast.a:null)}</div><div class="k-sub">house weight</div></div>
+      <div class="kpi"><div class="k-lbl">Scheme AUM</div><div class="k-val">${fmt.cr(rowsLast?rowsLast.cr:null)}</div><div class="k-sub">absolute</div></div>
+      <div class="kpi"><div class="k-lbl">Sleeve</div><div class="k-val" style="font-size:18px">${rowsLast?rowsLast.sl:'—'}</div><div class="k-sub">breakdown</div></div>${sipKpiHTML(name,month)}`;
   }
 
   renderSchemeDrill(); renderSchemePeers(); renderSchemeStanding(); renderSchemeResidency(); renderSchemeReturns();
@@ -3442,7 +3094,7 @@ function sipKpiHTML(name, month){
     else if(['1M','3M','6M','9M'].includes(S.basis)){ val=sgn(rec[0])+'%'; sub='on '+sipInvested(rw)+' invested · XIRR '+sgn(rec[1])+'% p.a.'; }
     else { val=sgn(rec[1])+'% p.a.'; sub='XIRR · '+sgn(rec[0])+'% on '+sipInvested(rw)+' invested'; }
   }
-  return `<div class="kpi mc m-ret"><div class="k-lbl">SIP return (${rw||'window'})</div><div class="k-val">${val}</div><div class="k-sub">${sub}</div></div>`;
+  return `<div class="kpi"><div class="k-lbl">SIP return (${rw||'window'})</div><div class="k-val">${val}</div><div class="k-sub">${sub}</div></div>`;
 }
 // ── Quartile residency: days the selected scheme spent in each quartile over the trailing
 // rolling window ending at the as-of date. Follows the Scheme-Detail as-of date + the window
@@ -5343,10 +4995,10 @@ function renderCompositeKPIs(){
   document.getElementById('cp-ctx').innerHTML=`${basisDesc()}<br>Snapshot ${fmt.date(curDates()[i])}`;
   const q1=byQ['% in Q1']?.[i],q2=byQ['% in Q2']?.[i],q4=byQ['% in Q4']?.[i];
   document.getElementById('cp-kpis').innerHTML=`
-    <div class="kpi qc q-q1"><div class="k-lbl">Aditya Q1</div><div class="k-val">${fmt.pct(q1)}</div><div class="k-sub">top quartile</div></div>
-    <div class="kpi qc q-q12"><div class="k-lbl">Aditya Q1+Q2</div><div class="k-val">${fmt.pct((q1||0)+(q2||0))}</div><div class="k-sub">top half</div></div>
-    <div class="kpi mc m-ret"><div class="k-lbl">Aditya quality score</div><div class="k-val">${fmt.num(qualityScore(byQ,i))}</div><div class="k-sub">1 → 4</div></div>
-    <div class="kpi qc q-q4"><div class="k-lbl">Aditya Q4</div><div class="k-val">${fmt.pct(q4)}</div><div class="k-sub">bottom quartile</div></div>`;
+    <div class="kpi good"><div class="k-lbl">Aditya Q1</div><div class="k-val good">${fmt.pct(q1)}</div><div class="k-sub">top quartile</div></div>
+    <div class="kpi accent"><div class="k-lbl">Aditya Q1+Q2</div><div class="k-val accent">${fmt.pct((q1||0)+(q2||0))}</div><div class="k-sub">top half</div></div>
+    <div class="kpi"><div class="k-lbl">Aditya quality score</div><div class="k-val">${fmt.num(qualityScore(byQ,i))}</div><div class="k-sub">1 → 4</div></div>
+    <div class="kpi warn"><div class="k-lbl">Aditya Q4</div><div class="k-val warn">${fmt.pct(q4)}</div><div class="k-sub">bottom quartile</div></div>`;
 }
 // Stacked histogram of ONLY the ticked quartiles, each kept in its own Q-colour (Q1 dark-green
 // … Q4 red — the static-snapshot scheme). Y fixed 0–100%; house order FROZEN by the latest-date
