@@ -502,6 +502,238 @@
   .qt-q3 { color: var(--q3); } .qt-q4 { color: var(--q4); }
   .qt-q12 { color: var(--q12); }
 
+  /* ═══════════════════════════════════════════════════════════════════════════════════════
+     THEME SPECIMEN v2 — SCOPED TO #view-amc AND #view-scheme ONLY (Kyser 2026-09-02)
+
+     Deliberately scoped so the two re-skinned tabs sit beside the untouched ones and the
+     direction can be judged by switching tabs, not by memory. Nothing outside these two
+     sections is affected; reverting is deleting this block.
+
+     WHAT CHANGES AND WHY:
+     - GROUND. The deck's warm cream (#fbf7ee on #ffffff, tan rules) reads editorial — like a
+       printed report. A terminal should read like an instrument: a cool near-white canvas with
+       white cards lifted off it by shadow, not boxed in by borders.
+     - DEPTH INSTEAD OF LINES. Borders are reduced to a hairline and the separation is carried by
+       two-layer shadows. This is the single biggest reason macOS UI looks calm: edges are implied.
+     - NUMBERS. Every figure gets font-variant-numeric: tabular-nums so digits occupy equal width.
+       Without it, columns of numbers visibly jitter between rows — the clearest tell of a
+       generic dashboard. Data switches from the serif to the grotesk; the serif is kept ONLY for
+       section titles, which gives the page character without making the data look like an essay.
+     - COLOUR DISCIPLINE. The neutral ramp is desaturated so the quartile palette is the only
+       strong colour on screen. Colour then means something.
+     - RHYTHM. Spacing snaps to a 4px grid, radii grow to 12px, controls become macOS-style
+       segmented pills.
+     ═══════════════════════════════════════════════════════════════════════════════════════ */
+  /* ── THE CHROME. Without this the specimen is invisible: masthead + tab bar + two filter bars
+     are most of the pixels above the fold, and restyling only the section below them changes
+     almost nothing on screen. body.theme-v2 is toggled by activateTab() for the two specimen
+     tabs. macOS cues used deliberately: Apple's own #f5f5f7 canvas, a NEUTRAL near-black
+     (#1d1d1f) masthead instead of the warm brown, translucent frosted bars with backdrop blur,
+     pill segmented controls where the selected item is a white chip with a shadow rather than an
+     inverted black block, and the system font stack so it renders in SF Pro on a Mac. */
+  body.theme-v2 {
+    --v2-canvas: #f5f5f7;
+    --v2-bar:    rgba(255,255,255,.72);
+    --v2-ink:    #1d1d1f;
+    --v2-ink-2:  #424245;
+    --v2-ink-3:  #6e6e73;
+    --v2-ink-4:  #86868b;
+    --v2-hair:   rgba(0,0,0,.08);
+    --v2-sans:   -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter', system-ui, sans-serif;
+    background: var(--v2-canvas) !important;
+    font-family: var(--v2-sans);
+    color: var(--v2-ink);
+  }
+  body.theme-v2 .masthead {
+    background: #1d1d1f !important; background-image: none !important;
+    border-bottom: 0;
+  }
+  body.theme-v2 .masthead h1 { color: #f5f5f7; letter-spacing: -0.03em; }
+  body.theme-v2 .masthead h1 em { color: #d2d2d7; }
+  body.theme-v2 .mast-sub { color: #a1a1a6; font-family: var(--v2-sans); }
+  body.theme-v2 .mast-kicker { color: #ff6b5e; letter-spacing: .14em; }
+  body.theme-v2 .mast-kicker::before { background: #ff6b5e; }
+  body.theme-v2 .mast-meta .row .lbl { color: #6e6e73; }
+  body.theme-v2 .mast-meta .row .val { color: #f5f5f7; }
+  body.theme-v2 .mast-badge {
+    background: rgba(255,255,255,.08); border-color: rgba(255,255,255,.14); color: #d2d2d7;
+    border-radius: 980px;
+  }
+  /* frosted, sticky tab bar; the active tab is a soft chip, not an underline */
+  body.theme-v2 .tabs {
+    background: var(--v2-bar) !important;
+    backdrop-filter: saturate(180%) blur(20px);
+    -webkit-backdrop-filter: saturate(180%) blur(20px);
+    border-bottom: 1px solid var(--v2-hair); padding: 8px 40px; gap: 2px;
+  }
+  body.theme-v2 .tab {
+    font-family: var(--v2-sans); font-size: 13px; font-weight: 500; letter-spacing: -0.01em;
+    color: var(--v2-ink-3); border-bottom: 0 !important; border-radius: 8px;
+    padding: 8px 14px; margin-bottom: 0;
+  }
+  body.theme-v2 .tab:hover { background: rgba(0,0,0,.04); color: var(--v2-ink-2); }
+  body.theme-v2 .tab.active {
+    background: #fff; color: var(--v2-ink);
+    box-shadow: 0 1px 2px rgba(0,0,0,.10), 0 0 0 .5px rgba(0,0,0,.05);
+  }
+  body.theme-v2 .tab .tnum { color: var(--v2-ink-4); font-family: var(--v2-sans); font-size: 10px; }
+  body.theme-v2 .tab.active .tnum { color: #ff6b5e; }
+  /* filter bars become quiet frosted strips */
+  body.theme-v2 .filters {
+    background: rgba(255,255,255,.66) !important;
+    backdrop-filter: saturate(180%) blur(20px);
+    -webkit-backdrop-filter: saturate(180%) blur(20px);
+    border-bottom: 1px solid var(--v2-hair);
+    font-family: var(--v2-sans);
+  }
+  body.theme-v2 .filters label, body.theme-v2 .flabel, body.theme-v2 .filters .lbl {
+    font-family: var(--v2-sans); font-size: 10px; letter-spacing: .06em; color: var(--v2-ink-4);
+  }
+  body.theme-v2 select, body.theme-v2 input[type="text"], body.theme-v2 input[type="date"] {
+    font-family: var(--v2-sans); font-size: 12.5px; color: var(--v2-ink);
+    background: #fff; border: 1px solid var(--v2-hair); border-radius: 8px; padding: 6px 10px;
+    box-shadow: 0 1px 1px rgba(0,0,0,.03);
+  }
+  /* macOS segmented control: track is a recessed pill, the selection is a raised white chip */
+  body.theme-v2 .seg {
+    background: rgba(0,0,0,.05); border: 0; border-radius: 9px; padding: 2px; gap: 2px;
+    display: inline-flex;
+  }
+  body.theme-v2 .seg button {
+    font-family: var(--v2-sans); font-size: 12px; font-weight: 500;
+    border: 0 !important; background: transparent; color: var(--v2-ink-2);
+    border-radius: 7px; padding: 5px 12px;
+  }
+  body.theme-v2 .seg button:hover { background: rgba(0,0,0,.045); color: var(--v2-ink); }
+  body.theme-v2 .seg button.active {
+    background: #fff !important; color: var(--v2-ink) !important;
+    box-shadow: 0 1px 2px rgba(0,0,0,.12), 0 0 0 .5px rgba(0,0,0,.04);
+  }
+  body.theme-v2 .content { background: var(--v2-canvas); }
+  body.theme-v2 button { font-family: var(--v2-sans); }
+
+  #view-amc, #view-scheme {
+    --s-canvas:  #f5f5f7;
+    --s-surface: #ffffff;
+    --s-raise:   #fcfdfe;
+    --s-hair:    rgba(16,24,40,.07);
+    --s-hair-2:  rgba(16,24,40,.12);
+    --s-ink:     #101828;
+    --s-ink-2:   #344054;
+    --s-ink-3:   #667085;
+    --s-ink-4:   #98a2b3;
+    --s-grotesk: 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif;
+    --s-el-1: 0 1px 2px rgba(16,24,40,.05), 0 1px 3px rgba(16,24,40,.06);
+    --s-el-2: 0 2px 4px -2px rgba(16,24,40,.06), 0 8px 16px -4px rgba(16,24,40,.08);
+    --s-el-3: 0 4px 8px -4px rgba(16,24,40,.07), 0 20px 32px -12px rgba(16,24,40,.12);
+    background: var(--s-canvas);
+    margin: -10px -14px; padding: 18px 14px 8px;
+    border-radius: 14px;
+    font-feature-settings: 'cv05' 1, 'ss01' 1;
+  }
+  /* every number in the specimen aligns column-to-column */
+  #view-amc .k-val, #view-scheme .k-val,
+  #view-amc .rt td, #view-scheme .rt td,
+  #view-amc .rt th, #view-scheme .rt th,
+  #view-amc .ctx, #view-scheme .ctx,
+  #view-amc .k-sub, #view-scheme .k-sub { font-variant-numeric: tabular-nums; }
+
+  /* ── section heads: the serif survives here, and only here ── */
+  #view-amc .shead h2, #view-scheme .shead h2 { letter-spacing: -0.015em; color: var(--s-ink); }
+  #view-amc .shead .ctx, #view-scheme .shead .ctx { color: var(--s-ink-3); }
+
+  /* ── cards: lifted, not boxed ── */
+  #view-amc .card, #view-scheme .card {
+    background: var(--s-surface);
+    border: 1px solid var(--s-hair);
+    border-radius: 12px;
+    box-shadow: var(--s-el-2);
+    padding: 20px 22px; margin-bottom: 16px;
+    transition: box-shadow .18s ease;
+  }
+  #view-amc .card:hover, #view-scheme .card:hover { box-shadow: var(--s-el-3); }
+  #view-amc .card-h h3, #view-scheme .card-h h3 { color: var(--s-ink); font-size: 17px; }
+  #view-amc .card-h .sub, #view-scheme .card-h .sub { color: var(--s-ink-3); font-size: 11.5px; }
+  #view-amc .card-h .ctx, #view-scheme .card-h .ctx { color: var(--s-ink-4); }
+
+  /* ── KPI tiles: the rail becomes a soft top-edge tint, the card does the lifting ── */
+  #view-amc .kpi, #view-scheme .kpi {
+    background: var(--s-surface);
+    border: 1px solid var(--s-hair);
+    border-radius: 12px;
+    box-shadow: var(--s-el-1);
+    padding: 16px 18px;
+  }
+  #view-amc .kpi:hover, #view-scheme .kpi:hover { transform: translateY(-1px); box-shadow: var(--s-el-2); }
+  #view-amc .kpi::before, #view-scheme .kpi::before { width: 2px; opacity: .9; }
+  /* TYPOGRAPHY only -- no colour here. Setting colour on these selectors is what broke the
+     quartile rule the first time: "#view-amc .kpi .k-val" carries an ID, so it outranks
+     ".kpi.qc.q-q1 .k-val" (4 classes, no id) and repainted every quartile value near-black.
+     Neutral colour is applied below, and ONLY to tiles that carry no quartile identity. */
+  #view-amc .kpi .k-lbl, #view-scheme .kpi .k-lbl {
+    font-family: var(--s-grotesk); font-size: 11px; font-weight: 600;
+    letter-spacing: .02em; text-transform: none; margin-bottom: 6px;
+  }
+  #view-amc .kpi .k-val, #view-scheme .kpi .k-val {
+    font-family: var(--s-grotesk); font-size: 27px; font-weight: 600;
+    letter-spacing: -0.025em;
+  }
+  #view-amc .kpi:not(.qc) .k-lbl, #view-scheme .kpi:not(.qc) .k-lbl { color: var(--s-ink-3); }
+  #view-amc .kpi:not(.qc) .k-val, #view-scheme .kpi:not(.qc) .k-val { color: var(--s-ink); }
+  /* Re-assert quartile identity INSIDE the specimen scope, at matching id-level specificity so
+     it cannot be outranked by the theme rules above. Label and value, same colour, as specified. */
+  #view-amc .kpi.qc.q-q1  .k-lbl, #view-amc .kpi.qc.q-q1  .k-val,
+  #view-scheme .kpi.qc.q-q1  .k-lbl, #view-scheme .kpi.qc.q-q1  .k-val { color: var(--q1); }
+  #view-amc .kpi.qc.q-q2  .k-lbl, #view-amc .kpi.qc.q-q2  .k-val,
+  #view-scheme .kpi.qc.q-q2  .k-lbl, #view-scheme .kpi.qc.q-q2  .k-val { color: var(--q2); }
+  #view-amc .kpi.qc.q-q3  .k-lbl, #view-amc .kpi.qc.q-q3  .k-val,
+  #view-scheme .kpi.qc.q-q3  .k-lbl, #view-scheme .kpi.qc.q-q3  .k-val { color: var(--q3); }
+  #view-amc .kpi.qc.q-q4  .k-lbl, #view-amc .kpi.qc.q-q4  .k-val,
+  #view-scheme .kpi.qc.q-q4  .k-lbl, #view-scheme .kpi.qc.q-q4  .k-val { color: var(--q4); }
+  #view-amc .kpi.qc.q-q12 .k-lbl, #view-amc .kpi.qc.q-q12 .k-val,
+  #view-scheme .kpi.qc.q-q12 .k-lbl, #view-scheme .kpi.qc.q-q12 .k-val { color: var(--q12); }
+  #view-amc .kpi .k-sub, #view-scheme .kpi .k-sub {
+    font-family: var(--s-grotesk); font-size: 11px; color: var(--s-ink-4); margin-top: 5px;
+  }
+  /* the quartile rule still wins inside the specimen: label and value share the colour, and now
+     also share the grotesk rather than the serif */
+  #view-amc .kpi.qc .k-lbl, #view-scheme .kpi.qc .k-lbl { font-family: var(--s-grotesk); font-size: 11.5px; }
+  #view-amc .kpis, #view-scheme .kpis { gap: 12px; margin-bottom: 20px; }
+
+  /* ── segmented controls, macOS style ── */
+  #view-amc .seg, #view-scheme .seg {
+    background: rgba(16,24,40,.045); border: 1px solid var(--s-hair);
+    border-radius: 9px; padding: 2px; gap: 2px;
+  }
+  #view-amc .seg button, #view-scheme .seg button {
+    font-family: var(--s-grotesk); font-size: 11.5px; font-weight: 500;
+    border: 0; background: transparent; color: var(--s-ink-2);
+    border-radius: 7px; padding: 5px 11px; transition: background .15s, box-shadow .15s;
+  }
+  #view-amc .seg button:hover, #view-scheme .seg button:hover { background: rgba(16,24,40,.05); }
+  #view-amc .seg button.active, #view-scheme .seg button.active {
+    background: var(--s-surface); color: var(--s-ink);
+    box-shadow: 0 1px 2px rgba(16,24,40,.10), 0 0 0 .5px rgba(16,24,40,.06);
+  }
+
+  /* ── tables: hairlines, sticky head, no zebra ── */
+  #view-amc .rt, #view-scheme .rt { font-family: var(--s-grotesk); font-size: 12.5px; border-collapse: separate; border-spacing: 0; }
+  #view-amc .rt thead th, #view-scheme .rt thead th {
+    position: sticky; top: 0; z-index: 2;
+    background: var(--s-raise); color: var(--s-ink-3);
+    font-size: 10.5px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase;
+    padding: 9px 12px; border-bottom: 1px solid var(--s-hair-2);
+  }
+  #view-amc .rt tbody td, #view-scheme .rt tbody td {
+    padding: 9px 12px; border-bottom: 1px solid var(--s-hair); color: var(--s-ink-2);
+  }
+  #view-amc .rt tbody tr:hover td, #view-scheme .rt tbody tr:hover td { background: rgba(16,24,40,.025); }
+  #view-amc .rt tbody tr:last-child td, #view-scheme .rt tbody tr:last-child td { border-bottom: 0; }
+
+  /* ── legends + chips ── */
+  #view-amc .legend, #view-scheme .legend { font-family: var(--s-grotesk); font-size: 11px; color: var(--s-ink-3); }
+  #view-amc .ldot, #view-scheme .ldot { border-radius: 4px; }
+
   /* Cards */
   .card {
     background: var(--card); border: 1px solid var(--line-2); border-radius: var(--r-lg);
@@ -1765,6 +1997,12 @@ function activateTab(view){
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
   btn.classList.add('active');
   document.getElementById('view-'+view).classList.add('active');
+  // THEME SPECIMEN (Kyser 2026-09-02): the v2 theme has to reach the CHROME - masthead, tab bar,
+  // filter bars - or the change is invisible, because the chrome is most of the pixels on screen.
+  // Scoping the first attempt to the section alone left ~90% of the view untouched and it read as
+  // "no change". Toggling a BODY class lets the specimen restyle everything while still being
+  // confined to these two tabs, so the other tabs remain an untouched control.
+  document.body.classList.toggle('theme-v2', view === 'amc' || view === 'scheme');
   S.view=view;
   renderNoAnim(()=>renderIfDirty(view));                // lazy: hidden views render on first visit
   setTimeout(()=>Object.values(S.charts).forEach(c=>{ try{c.resize();}catch(e){} }), 60);
