@@ -6113,9 +6113,15 @@ function matrixValue(fh,br,i,metric){
 // Also now four stops rather than three, so the upper half has the light jade to travel through
 // instead of stretching one green across half the scale.
 // Stops chosen by sweeping the WHOLE 0..1 ramp and maximising the worst cell's text contrast,
-// not by picking four colours that look right at the ends. Endpoints are deeper and the middle
-// jade lighter than the band tokens, which is what buys the legibility AND reads richer.
-const HEAT_STOPS = [[212,72,58],[238,178,52],[104,193,148],[10,86,56]];   // Q4 -> Q3 -> Q2 -> Q1
+// not by picking four colours that look right at the ends.
+// ★ Kyser 2026-09-03, second pass: "too shiny - dull it down. The contrast is too much in green
+// and red." The first jewel set was chosen for legibility alone and came out at mean C* 51.8 --
+// on a 15x5 grid of solid fills that is a lot of saturation in one block. Re-picked for the
+// LOWEST saturation that still clears the readability floor: mean C* 30.1, a 42% drop, with the
+// red and the deep green pulled in hardest (66.5->43.4 and 31.9->20.5) because those were the
+// two he named. Worst-cell text contrast is essentially unchanged at 4.18 vs 4.21 -- the grid
+// got quieter without any number getting harder to read, which is the whole trick.
+const HEAT_STOPS = [[192,99,86],[207,174,107],[156,192,171],[53,96,78]];  // Q4 -> Q3 -> Q2 -> Q1
 function heatColor(t){
   const x = Math.max(0, Math.min(1, t)) * (HEAT_STOPS.length - 1);
   const i = Math.min(HEAT_STOPS.length - 2, Math.floor(x)), f = x - i;
@@ -6127,9 +6133,10 @@ function heatColor(t){
 // Not a luminance threshold, and emphatically not the old rule (t>0.32 && t<0.7 -> dark ink),
 // which was hand-tuned to the retired three-stop ramp: any threshold has a band where it picks
 // the worse of the two, and a threshold tied to t goes silently wrong the moment stops move.
-// Measured over the full ramp: worst cell is 4.21:1 with this rule. The ramp+rule it replaces
-// bottomed out at 2.98:1 -- so the numbers in this matrix were genuinely hard to read before.
-// 4.21 is the ceiling for a CONTINUOUS ramp with two ink colours: a light-to-dark scale must
+// Measured over the full ramp: worst cell is 4.18:1 with this rule (4.21 before the palette was
+// muted -- dulling it cost 0.03). The ramp+rule it replaces bottomed out at 2.98:1, so the
+// numbers in this matrix were genuinely hard to read before.
+// ~4.2 is the ceiling for a CONTINUOUS ramp with two ink colours: a light-to-dark scale must
 // cross a mid-luminance band where neither white nor black reaches 4.5, and the only ways past
 // that are a discontinuous palette or an outline on the type. Not worth either here.
 function heatInk(bg){
