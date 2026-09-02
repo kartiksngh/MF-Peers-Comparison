@@ -654,6 +654,9 @@
   .kpi.mc.m-aum::before { background: var(--m-aum); }
   .kpi.mc.m-ret::before { background: var(--m-ret); }
   .kpi.mc.m-dim::before { background: var(--m-dim); }
+  /* a tile whose subject IS a sleeve wears that sleeve's colour, passed in as --m-sleeve */
+  .kpi.mc.m-sleeve .k-lbl, .kpi.mc.m-sleeve .k-val { color: var(--m-sleeve, var(--m-dim)); }
+  .kpi.mc.m-sleeve::before { background: var(--m-sleeve, var(--m-dim)); }
   /* A low-coverage tile is an ALARM, not a family member: red must outrank the family colour,
      and it is listed after so it wins on source order at equal specificity. */
   .kpi.mc.warn .k-lbl, .kpi.mc.warn .k-val { color: var(--q4); }
@@ -878,16 +881,20 @@
      every number/label on the page. This layer changes surfaces, never content. */
 
   body.theme-mac {
-    --paper:      #f5f5f7;
-    --paper-2:    #eeeef2;
-    --paper-3:    #e4e4ea;
+    /* GROUND (Kyser 2026-09-02): "egg white, like the thick paper of a handicraft diary, with
+       texture". The cool Mac grey went warm and lighter -- #f7f5f0 -- and the paper grain that
+       the base skin ships but never switches on is switched on below at low opacity. The card
+       white stays pure, so cards read as sheets laid ON the paper rather than holes cut in it. */
+    --paper:      #f7f5f0;
+    --paper-2:    #f1ede5;
+    --paper-3:    #e8e2d6;
     --card:       #ffffff;
-    --ink:        #1d1d1f;
-    --ink-2:      #38383d;
-    --ink-3:      #6e6e73;
-    --ink-4:      #9a9aa0;
-    --line:       #d6d6db;
-    --line-2:     #e9e9ee;
+    --ink:        #1d1c1a;
+    --ink-2:      #3a3833;
+    --ink-3:      #6d685f;
+    --ink-4:      #9a948a;
+    --line:       #ddd7ca;
+    --line-2:     #ece7dc;
     --absl-glow:  rgba(200,57,43,0.14);
     --absl-bg:    #fdecea;
     --shadow-sm:  0 1px 2px rgba(0,0,0,.05), 0 4px 14px -8px rgba(0,0,0,.12);
@@ -900,8 +907,11 @@
     letter-spacing: -0.006em;
     background: var(--paper);
   }
-  /* the paper-grain overlay belongs to the newsprint look */
-  body.theme-mac::before { display: none; }
+  /* The paper grain is a fractal-noise SVG the base skin already ships but leaves at opacity 0.
+     Switched on faintly here -- it is what makes the ground read as thick handmade paper rather
+     than a flat fill. Kept under the content (z-index 0, #app is z-index 1) and pointer-events
+     none, so it can never intercept a click. */
+  body.theme-mac::before { display: block; opacity: .55; }
 
   /* ── CHROME: masthead + tabs + filter bars ────────────────────────────────────────────────
      Kyser 2026-09-02 raised two problems with the first cut, and they share one fix.
@@ -921,36 +931,43 @@
      The sticky offsets are computed by a ResizeObserver into --tabs-h / --gctrl-h, so the
      stack re-measures itself and nothing has to be kept in sync by hand. */
   body.theme-mac {
-    --chrome:      #e9e9ef;
-    --chrome-soft: rgba(233,233,239,.86);
-    --chrome-line: #dadae0;
-    --chrome-lbl:  #5c5c63;      /* labels ON the chrome -- darker than --ink-4 on purpose */
+    /* Kyser 2026-09-02, revised: the chrome should be "just a tiny more darker grey than the
+       universal background", not the clear step it was. Paper is #f7f5f0, chrome is #f1ede5 --
+       about 6 levels down per channel. Enough for the eye to find the edge of the toolbar,
+       not enough to read as a separate slab. The hairline does the rest of that work now. */
+    --chrome:      #f1ede5;
+    --chrome-soft: rgba(241,237,229,.90);
+    --chrome-line: #e2dccf;
+    --chrome-lbl:  #5f594f;      /* labels ON the chrome -- darker than --ink-4 on purpose */
   }
   body.theme-mac .masthead {
     background: var(--chrome-soft);
     -webkit-backdrop-filter: saturate(180%) blur(22px);
     backdrop-filter: saturate(180%) blur(22px);
     color: var(--ink); border-bottom: 1px solid var(--chrome-line);
-    padding: 13px 36px 12px; gap: 18px;
+    padding: 9px 34px 8px; gap: 16px;
   }
   body.theme-mac .masthead::after { display: none; }
   body.theme-mac .masthead h1 {
-    font-family: var(--sans); font-weight: 700; font-size: 21px;
-    letter-spacing: -0.028em; color: var(--ink); line-height: 1.15;
+    font-family: var(--sans); font-weight: 700; font-size: 18px;
+    letter-spacing: -0.026em; color: var(--ink); line-height: 1.15;
   }
   body.theme-mac .masthead h1 em { font-style: normal; font-weight: 400; color: var(--ink-3); }
   body.theme-mac .mast-kicker {
-    font-family: var(--sans); font-size: 9px; letter-spacing: .13em; margin-bottom: 5px;
+    font-family: var(--sans); font-size: 8.5px; letter-spacing: .13em; margin-bottom: 3px;
   }
-  body.theme-mac .mast-kicker::before { width: 18px; }
+  body.theme-mac .mast-kicker::before { width: 14px; }
+  /* The strapline is orientation, not a number anyone reads twice. One line, clipped -- it was
+     costing two lines of the first screen that the KPI row needed. */
   body.theme-mac .mast-sub {
-    color: var(--ink-3); font-size: 11.5px; margin-top: 4px; max-width: 620px; line-height: 1.4;
+    color: var(--ink-3); font-size: 11px; margin-top: 2px; max-width: 720px; line-height: 1.35;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
-  body.theme-mac .mast-meta { font-family: var(--sans); gap: 4px; }
+  body.theme-mac .mast-meta { font-family: var(--sans); gap: 2px; }
   body.theme-mac .mast-meta .row .lbl {
-    color: var(--chrome-lbl); letter-spacing: .09em; font-size: 8.5px; margin-bottom: 1px;
+    color: var(--chrome-lbl); letter-spacing: .08em; font-size: 8px; margin-bottom: 0;
   }
-  body.theme-mac .mast-meta .row .val { color: var(--ink); font-size: 11.5px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  body.theme-mac .mast-meta .row .val { color: var(--ink); font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; }
   body.theme-mac .mast-badge {
     background: rgba(255,255,255,.75); border: 1px solid rgba(0,0,0,.08); color: var(--ink-2);
     font-family: var(--sans); font-size: 10.5px; font-weight: 500; padding: 4px 10px;
@@ -961,11 +978,11 @@
     background: var(--chrome-soft);
     -webkit-backdrop-filter: saturate(180%) blur(22px);
     backdrop-filter: saturate(180%) blur(22px);
-    border-bottom: 1px solid var(--chrome-line); padding: 4px 36px; gap: 2px;
+    border-bottom: 1px solid var(--chrome-line); padding: 3px 34px; gap: 2px;
   }
   body.theme-mac .tab {
     font-family: var(--sans); font-size: 12.5px; font-weight: 600; letter-spacing: -0.008em;
-    padding: 5px 11px; border-bottom: none; margin-bottom: 0; border-radius: 7px;
+    padding: 4px 10px; border-bottom: none; margin-bottom: 0; border-radius: 7px;
     color: var(--chrome-lbl); transition: background .18s, color .18s, box-shadow .18s; gap: 7px;
   }
   body.theme-mac .tab:hover { background: rgba(255,255,255,.6); color: var(--ink-2); }
@@ -981,7 +998,7 @@
     background: var(--chrome-soft);
     -webkit-backdrop-filter: saturate(180%) blur(22px);
     backdrop-filter: saturate(180%) blur(22px);
-    border-bottom: 1px solid var(--chrome-line); padding: 5px 36px; gap: 13px;
+    border-bottom: 1px solid var(--chrome-line); padding: 4px 34px; gap: 12px;
   }
   body.theme-mac .view > .filters { box-shadow: 0 10px 18px -18px rgba(0,0,0,.5); }
   /* #gctrl carries an INLINE 2px ABSL-red top border (it separated the global bar in the
@@ -996,14 +1013,14 @@
   /* Every dimension in the frozen bars is on a diet: the label/control gap, the label size and
      the control's own padding. Each is small on its own; together they are the difference
      between a 211px stack and a 150px one, on a page whose whole job is the content below. */
-  body.theme-mac .fg { gap: 2px; }
+  body.theme-mac .fg { gap: 1px; }
   body.theme-mac .fg label {
-    font-family: var(--sans); font-size: 9px; letter-spacing: .05em; text-transform: none;
-    font-weight: 600; color: var(--chrome-lbl); line-height: 1.3;
+    font-family: var(--sans); font-size: 8.5px; letter-spacing: .05em; text-transform: none;
+    font-weight: 600; color: var(--chrome-lbl); line-height: 1.15;
   }
   body.theme-mac .fg select, body.theme-mac .fg input {
-    font-family: var(--sans); font-size: 12.5px; border-radius: 8px; background: #fff;
-    border: 1px solid var(--line); box-shadow: 0 1px 1.5px rgba(0,0,0,.04); padding: 5px 10px;
+    font-family: var(--sans); font-size: 12px; border-radius: 7px; background: #fff;
+    border: 1px solid var(--line); box-shadow: 0 1px 1.5px rgba(0,0,0,.04); padding: 4px 9px;
   }
   body.theme-mac .chk { padding-bottom: 4px; font-size: 12px; }
   body.theme-mac .fg select:hover, body.theme-mac .fg input:hover { border-color: var(--ink-4); }
@@ -1016,7 +1033,7 @@
   }
   body.theme-mac .seg button {
     font-family: var(--sans); font-size: 11.5px; font-weight: 600; border-right: none;
-    border-radius: 6px; padding: 4px 10px; color: var(--chrome-lbl);
+    border-radius: 6px; padding: 3px 9px; color: var(--chrome-lbl);
   }
   body.theme-mac .seg.sm button { padding: 4px 9px; font-size: 10.5px; }
   body.theme-mac .seg button.active {
@@ -1024,7 +1041,7 @@
     box-shadow: 0 1px 2px rgba(0,0,0,.10), 0 0 0 .5px rgba(0,0,0,.06);
   }
   body.theme-mac .seg button:not(.active):hover { background: rgba(0,0,0,.04); color: var(--ink-2); }
-  body.theme-mac .btn { border-radius: 8px; font-family: var(--sans); font-weight: 600; letter-spacing: -0.004em; padding: 6px 13px; font-size: 12px; }
+  body.theme-mac .btn { border-radius: 7px; font-family: var(--sans); font-weight: 600; letter-spacing: -0.004em; padding: 5px 12px; font-size: 11.5px; }
   body.theme-mac .btn-dark { background: var(--ink); box-shadow: 0 1px 2px rgba(0,0,0,.18); }
   body.theme-mac .btn-dark:hover { background: #000; }
   body.theme-mac .chk { font-family: var(--sans); }
@@ -1055,11 +1072,11 @@
      `.card--data` is set in script, not by CSS :has(), so the rule does not depend on
      :has() support in whatever browser the deck is opened in. */
   body.theme-mac {
-    --srf-data:  #fbfbfd;   /* egg white  -- a card whose subject is a table */
-    --srf-data2: #f7f7fb;   /* cement     -- its neighbour, so a pair does not merge */
-    --srf-thead: #eeeef4;   /* table header band */
-    --srf-zebra: #f5f5f9;   /* alternating rows */
-    --srf-hover: #e7e9f1;
+    --srf-data:  #fdfcf9;   /* egg white  -- a card whose subject is a table */
+    --srf-data2: #faf8f3;   /* cement     -- its neighbour, so a pair does not merge */
+    --srf-thead: #f2eee6;   /* table header band */
+    --srf-zebra: #faf8f3;   /* alternating rows */
+    --srf-hover: #f0ebe0;
   }
   body.theme-mac .card.card--data { background: var(--srf-data); }
   body.theme-mac .grid-2 > .card.card--data:nth-child(even) { background: var(--srf-data2); }
@@ -1272,13 +1289,15 @@
 const C = {
   q1:'#1f5c3d', q2:'#6fa37c', q3:'#d6a23f', q4:'#c0523e',
   q1t:'rgba(31,92,61,0.82)', q2t:'rgba(111,163,124,0.78)', q3t:'rgba(214,162,63,0.80)', q4t:'rgba(192,82,62,0.82)',
-  absl:'#c8392b', navy:'#20436b', gold:'#b3852f', ink:'#16130f', ink3:'#6a5f50', ink4:'#9c8f7a',
+  // Chart neutrals track the PAPER, not a cool grey: on an egg-white ground a blue-grey axis
+  // reads as a foreign object sitting on the sheet. Warmed to match (Kyser 2026-09-02).
+  absl:'#c8392b', navy:'#20436b', gold:'#b3852f', ink:'#1d1c1a', ink3:'#6d685f', ink4:'#9a948a',
   // peerLine = the "every other house" spaghetti behind the selected house. Kyser 2026-09-02:
   // at .40 alpha, fourteen overlapping peers read as a grey thicket competing with the two
   // lines the panel is actually about. It is CONTEXT -- the shape of the field, not a series
   // anyone traces -- so it drops to .13, and the peer stroke thins with it. line2 (the axis
   // gridlines) softens for the same reason: present when looked for, invisible when not.
-  line:'#d6d6db', line2:'#f0f0f5', peer:'#c7c7cc', peerLine:'rgba(150,150,162,.13)', green:'#1f5c3d', red:'#c0523e'
+  line:'#ddd7ca', line2:'#f1ede4', peer:'#cfc9bd', peerLine:'rgba(150,144,132,.13)', green:'#1f5c3d', red:'#c0523e'
 };
 // Chart.js reads these hexes directly (it cannot see CSS variables), so the NEUTRALS above were
 // re-cut warm-cream -> Mac grey alongside the surface theme, or every axis, gridline and peer
@@ -1304,7 +1323,7 @@ const S = {
   window:'1 Year',                                  // all-peer rolling window
   basis:'1Y', w:80, reward:true,                    // VR score basis (default 1Y on load — Kyser 2026-09-02; Composite stays one click away)
   mode:'ls',                                        // investment mode: 'ls' lumpsum | 's3' 3-year SIP book | 's5' 5-year SIP book
-  sleeve:{ fh:'Aditya', br:null, mode:'within', rankDate:null },
+  sleeve:{ fh:'Aditya', br:null, mode:'within', rankDate:null, smooth:0 },
   amc:{ fh:'Aditya', rankDate:null },
   scheme:{ fh:'Aditya', cat:'(all)', sl:'(all)', name:null, month:null, peerDate:null, smooth:0 },
   matrix:{ metric:'tophalf', date:null },
@@ -1445,16 +1464,30 @@ function gradient(ctx, area, hex, topA=0.42, botA=0.02){
 //   3. the two loud hues (gold, red) are desaturated ~12% IN THE FILL ONLY.
 // QCOL is deliberately untouched, so the legend, the strokes, the KPI tiles and the table text
 // still carry the exact palette -- the identity a reader has already learnt does not move.
-const QFILL = { '% in Q1':'#255f43', '% in Q2':'#7aa686', '% in Q3':'#cfa759', '% in Q4':'#bd6552' };
+// REVISED once more (Kyser 2026-09-02): the first pass was poster paint, and my correction
+// overshot into pastel -- "dull and stale ... make them brighter and shiny and rich". So the
+// fills are now JEWEL tones of the same four hues: more chroma and more luminance than the
+// canonical tokens, not less. Q1 goes emerald rather than bottle-green, Q2 jade, Q3 a true
+// gold, Q4 vermilion. QCOL itself is still untouched -- the tiles, tables, legend dots and
+// strokes keep the exact palette Kyser specified (dark green / light green / golden / dark
+// red), so this enriches the FILL without moving any identity a reader has learnt.
+const QFILL = { '% in Q1':'#12704a', '% in Q2':'#57b183', '% in Q3':'#e8a92e', '% in Q4':'#d4483a' };
+// The boundary is a DARKER shade of the band it caps, never a lighter or duller one (Kyser
+// 2026-09-02). Reusing the canonical token as the stroke was the bug: against a brightened
+// jade fill, the sage --q2 token reads LIGHTER than what it is supposed to be edging, so the
+// band looks like it is dissolving upward instead of being contained. Each edge here is the
+// same hue at roughly two-thirds the lightness, which is what makes a filled band read as a
+// solid object with a defined top rather than as a gradient that ran out.
+const QEDGE = { '% in Q1':'#0a4d33', '% in Q2':'#2f7d55', '% in Q3':'#a8760f', '% in Q4':'#93291d' };
 function bandDs(q, data, extra){
   return Object.assign({
     label: q.replace('% in ',''), data,
-    // The gradient runs across the WHOLE plot area, not per band, so a wide alpha range makes
-    // whichever band sits lowest the faintest -- and in a quartile stack that is Q1, the band
-    // the panel is most about. Kept deliberately narrow (0.52 -> 0.34) so the airiness comes
-    // from the low alpha rather than from a vertical ramp that encodes position as importance.
-    backgroundColor: c=>gradient(c.chart.ctx, c.chart.chartArea, QFILL[q]||QCOL[q], 0.52, 0.34),
-    borderColor: QCOL[q], borderWidth: 1.6, fill: true, tension: 0.3, pointRadius: 0, stack: 'q'
+    // Denser at the BOTTOM (0.62 -> 0.80), which is what gives a stacked area its satin sheen
+    // instead of a flat wash. The spread is deliberately small so the ramp reads as light on a
+    // surface, not as "lower band = more important". It also happens to put the richest tone
+    // under Q1, the band at the bottom of a quartile stack.
+    backgroundColor: c=>gradient(c.chart.ctx, c.chart.chartArea, QFILL[q]||QCOL[q], 0.62, 0.80),
+    borderColor: QEDGE[q] || QCOL[q], borderWidth: 1.8, fill: true, tension: 0.3, pointRadius: 0, stack: 'q'
   }, extra || {});
 }
 
@@ -2079,6 +2112,30 @@ function houseTint(fh, a){
   const n=parseInt(c.slice(1),16);
   return `rgba(${(n>>16)&255},${(n>>8)&255},${n&255},${a})`;
 }
+// ── SLEEVE COLOUR (Kyser 2026-09-02: "the sleeves also need colours of their own, right now
+// it's all grey") ─────────────────────────────────────────────────────────────────────────
+// Five sleeves, five hues, chosen to sit clear of the THREE colour systems already on the page:
+// the quartile palette (greens 140-150deg, gold 43deg, red 12deg, blue 215deg), the metric
+// families (teal 193deg, violet 262deg, slate) and the house colours. Bronze / plum / indigo /
+// olive / steel occupy gaps in all three, so a sleeve chip can never be mistaken for a quartile
+// or a metric. Unknown sleeves hash to a stable colour, same rule as houses: never grey, and
+// never a different colour on the next render.
+const SLEEVE_COLOR = {
+  'Bottoms Up':'#a35a12', 'Top Down':'#8e2f6b', 'Thematic':'#3f4fa8',
+  'Asset Allocation':'#5f7a24', 'Arbitrage+':'#0e6b9c',
+};
+const SLEEVE_FALLBACK = ['#8a5a2f','#7a3f6a','#4a5a9c','#5f6a2f','#2f6a8a','#6a4a8a'];
+function sleeveColor(sl){
+  if(!sl || sl==='(all)') return null;
+  if(SLEEVE_COLOR[sl]) return SLEEVE_COLOR[sl];
+  let h=0; for(let i=0;i<sl.length;i++) h=(h*31+sl.charCodeAt(i))>>>0;
+  return SLEEVE_FALLBACK[h % SLEEVE_FALLBACK.length];
+}
+function sleeveTint(sl, a){
+  const c=sleeveColor(sl); if(!c) return 'transparent';
+  const n=parseInt(c.slice(1),16);
+  return `rgba(${(n>>16)&255},${(n>>8)&255},${n&255},${a})`;
+}
 function dateOptions(dates, sel){ return dates.map((d,i)=>`<option value="${i}" ${i===sel?'selected':''}>${fmt.date(d)}</option>`).join(''); }
 // ── METHODOLOGY NOTES AS POPUPS (Kyser 2026-08-13) ──────────────────────────────────────
 // The notes are the reproducibility contract and are deliberately long, but inline they were
@@ -2551,13 +2608,13 @@ function stackOpts({leftMax, rightLabel, xmin, xmax}){
       y1:{ position:'right', display:!!rightLabel, grace:'12%', min:0, ticks:{callback:v=>v+'%',color:C.absl,font:{size:10}}, grid:{drawOnChartArea:false}, border:{display:false},
            title:{display:!!rightLabel,text:rightLabel,color:C.absl,font:{size:10}} } } };
 }
-function dualOpts({leftSuffix, rightLabel, rightMin, rightMax, xmin, xmax}){
+function dualOpts({leftSuffix, rightLabel, rightMin, rightMax, xmin, xmax, noGrid}){
   return { maintainAspectRatio:false, responsive:true, interaction:{mode:'index',intersect:false}, ...chartMotion(),
     plugins:{ legend:{display:false}, tooltip:{...baseTooltip(),
       callbacks:{ label:c=>{ const v=c.parsed.y; if(v==null) return `${c.dataset.label}: —`;
         return c.dataset.yAxisID==='y1' ? `${c.dataset.label}: ${v.toFixed(2)}` : `${c.dataset.label}: ${v.toFixed(1)}${leftSuffix||''}`; } } } },
     scales:{ x:timeX(xmin,xmax),
-      y:{ position:'left', min:0, grace:'8%', ticks:{callback:v=>v+(leftSuffix||''),color:C.ink3,font:{size:10}}, grid:{color:C.line2}, border:{display:false} },
+      y:{ position:'left', min:0, grace:'8%', ticks:{callback:v=>v+(leftSuffix||''),color:C.ink3,font:{size:10}}, grid:{display:!noGrid, color:C.line2}, border:{display:false} },
       y1:{ position:'right', min:rightMin, max:rightMax, grid:{drawOnChartArea:false}, ticks:{color:C.navy,font:{size:10}}, border:{display:false},
            title:{display:!!rightLabel,text:rightLabel,color:C.navy,font:{size:10}} } } };
 }
@@ -2608,6 +2665,14 @@ function ghostOf(ds){
   return { ...ds, borderColor:hexA(ds.borderColor,0.22), borderWidth:1.2, label:ds.label+' (raw)',
            fill:false, backgroundColor:'transparent' };   // never re-paint the area under a ghost
 }
+// Shared by every panel that offers a trailing-mean control, so the smoother has ONE
+// implementation and the ghost/label convention cannot drift between two charts.
+function smoothSeries(dss, n){
+  if(!n) return dss;
+  return dss.map(ghostOf).concat(dss.map(d=>Object.assign({}, d, {
+    data: rollMeanPts(d.data, n), stepped:false, tension:0.35,
+    borderWidth:(d.borderWidth||2)+0.4, label:d.label+' · '+n+'m mean' })));
+}
 function hexA(hex, a){
   const m=/^#?([0-9a-f]{6})$/i.exec(hex||''); if(!m) return hex;
   const n=parseInt(m[1],16);
@@ -2645,8 +2710,12 @@ function buildViews(){
       </div>
       <div class="grid-2">
         <div class="card">
-          <div class="card-h"><div><h3>Top-half vs bottom-quartile trend</h3><div class="sub">Within sleeve: Q1+Q2 (green) and Q4 (red)</div></div>
-            <div class="legend"><span><span class="lline" style="background:${C.green}"></span>Q1+Q2 %</span><span><span class="lline" style="background:${C.red}"></span>Q4 %</span><span><span class="lline" style="background:${C.navy}"></span>Score (R)</span></div>
+          <div class="card-h"><div><h3>Top-half vs bottom-quartile trend</h3><div class="sub" id="sl-trend-sub">Within sleeve: Q1+Q2 (green) and Q4 (red)</div></div>
+            <div class="ch-right">
+              <div class="fg"><label>Smooth (trailing mean)</label>
+                <div class="seg sm" id="sl-smooth"><button data-v="0" class="active">Raw</button><button data-v="3">3m</button><button data-v="6">6m</button><button data-v="12">12m</button></div></div>
+              <div class="legend"><span><span class="lline" style="background:${C.green}"></span>Q1+Q2 %</span><span><span class="lline" style="background:${C.red}"></span>Q4 %</span><span><span class="lline" style="background:${C.navy}"></span>Score (R)</span></div>
+            </div>
           </div>
           <div class="chartbox"><canvas id="sl-trend"></canvas></div>
           <div id="sl-trend-method"></div>
@@ -2942,6 +3011,7 @@ function renderSleeve(){
     fhSel.onchange=e=>{ S.sleeve.fh=e.target.value; renderSleeve(); };
     document.getElementById('sl-br').onchange=e=>{ S.sleeve.br=e.target.value; renderSleeve(); };
     segWire('sl-mode', v=>{ S.sleeve.mode=v; renderSleeve(); });
+    segWire('sl-smooth', v=>{ S.sleeve.smooth=+v; renderSleeveTrend(); });
     document.getElementById('sl-rankdate').onchange=e=>{ S.sleeve.rankDate=+e.target.value; renderSleeveRank(); renderSleeveBar(); };
     document.getElementById('sl-exp').onclick=exportSleeve;
   }
@@ -2965,7 +3035,7 @@ function renderSleeve(){
   const A=sleeveAt(byQ,li), score=qualityScore(byQ,li);
   const covWarn = (A.cov!=null && A.cov<0.999);
   const _slt=document.getElementById('sl-title');
-  _slt.innerHTML=`<span style="color:${houseColor(fh)}">${houseLabel(fh)}</span> · ${br}`;
+  _slt.innerHTML=`<span style="color:${houseColor(fh)}">${houseLabel(fh)}</span> · <span style="color:${sleeveColor(br)||''}">${br}</span>`;
   document.getElementById('sl-ctx').innerHTML=`${basisDesc()}<br>Snapshot ${fmt.date(dates[li])}`;
   document.getElementById('sl-kpis').innerHTML=`
     <div class="kpi qc q-q12"><div class="k-lbl">Q1+Q2 within sleeve</div><div class="k-val">${fmt.pct(A.top)}</div><div class="k-sub">of the sleeve's <b>rated</b> AUM</div></div>
@@ -3003,11 +3073,19 @@ function renderSleeveTrend(){
   const {xmin,xmax}=xBounds(dates, topHalf.map(p=>p.y), q4.map(p=>p.y));
   const ctx=document.getElementById('sl-trend').getContext('2d');
   S.charts.slTrend?.destroy();
-  S.charts.slTrend=new Chart(ctx,{type:'line',data:{datasets:[
+  // Same trailing-mean control as the quartile-history panel, on the same MONTHLY axis and
+  // through the same smoothSeries(), so the two charts cannot drift apart in convention.
+  const sm=S.sleeve.smooth|0;
+  const base=[
     { label:'Q1+Q2 %', data:topHalf, borderColor:C.green, borderWidth:2.2, tension:0.3, pointRadius:0, yAxisID:'y', backgroundColor:c=>gradient(c.chart.ctx,c.chart.chartArea,C.green,0.16,0.01), fill:true },
     { label:'Q4 %', data:q4, borderColor:C.red, borderWidth:2.2, tension:0.3, pointRadius:0, yAxisID:'y', fill:false },
     { label:'Quality score', data:scoreS, borderColor:C.navy, borderWidth:1.6, borderDash:[4,3], tension:0.3, pointRadius:0, yAxisID:'y1', fill:false }
-  ]},options:dualOpts({leftSuffix:'%', rightLabel:'Score 1–4', rightMin:1, rightMax:4, xmin, xmax})});
+  ];
+  S.charts.slTrend=new Chart(ctx,{type:'line',data:{datasets:smoothSeries(base, sm)},
+    options:dualOpts({leftSuffix:'%', rightLabel:'Score 1–4', rightMin:1, rightMax:4, xmin, xmax, noGrid:true})});
+  const _slsub=document.getElementById('sl-trend-sub');
+  if(_slsub) _slsub.textContent='Within sleeve: Q1+Q2 (green) and Q4 (red)'
+    + (sm?` · ${sm}-month trailing mean (raw kept faint behind)`:'');
   document.getElementById('sl-trend-method').innerHTML=methodNote(
     `<b>Q1+Q2 %</b> (green) and <b>Q4 %</b> (red) are the top-half and bottom-quartile shares <i>within</i> the sleeve (left axis), each as a share of the sleeve’s <b>rated</b> AUM on that date — the AUM carrying a quartile — so the line is a like-for-like read even in months when part of the sleeve was too young to rank. <b>Quality score</b> (right, 1–4) is the AUM-weighted mean quartile (Q1=4…Q4=1). Recomputed live from the chosen ${universeLabel()} basis.`);
 }
@@ -3595,7 +3673,7 @@ function renderSchemeBody(){
   const _sct=document.getElementById('sc-title');
   _sct.textContent=name||'(no scheme)';
   _sct.style.color=houseColor(fh)||'';                       // the heading carries the house
-  document.getElementById('sc-ctx').innerHTML=`<span class="tag tag-house" style="color:${houseColor(fh)};background:${houseTint(fh,0.10)}">${houseLabel(fh)}</span> ${cat!=='(all)'?`<span class="tag">${cat}</span>`:''} ${sl!=='(all)'?`<span class="tag">${sl}</span>`:''} <span class="tag">${basisDesc()}</span>`;
+  document.getElementById('sc-ctx').innerHTML=`<span class="tag tag-house" style="color:${houseColor(fh)};background:${houseTint(fh,0.10)}">${houseLabel(fh)}</span> ${cat!=='(all)'?`<span class="tag">${cat}</span>`:''} ${sl!=='(all)'?`<span class="tag" style="color:${sleeveColor(sl)};background:${sleeveTint(sl,0.10)}">${sl}</span>`:''} <span class="tag">${basisDesc()}</span>`;
 
   // ── score / quartile history (selected scheme)
   const ctx=document.getElementById('sc-score').getContext('2d');
@@ -3603,9 +3681,7 @@ function renderSchemeBody(){
   // Smoothing (Kyser 2026-09-02): 0 = raw. When on, the raw series stays on the chart as a faint
   // ghost UNDER the smoothed line, so the summary never conceals the observations behind it.
   const sm = S.scheme.smooth|0;
-  const smoothSets = dss => sm ? dss.map(ghostOf).concat(dss.map(d=>({
-        ...d, data:rollMeanPts(d.data, sm), stepped:false, tension:0.35,
-        borderWidth:(d.borderWidth||2)+0.4, label:d.label+' · '+sm+'m mean' }))) : dss;
+  const smoothSets = dss => smoothSeries(dss, sm);
   const smNote = sm ? ` · ${sm}-month trailing mean (raw steps kept faint behind)` : '';
   // The subtitle led with the word "Raw". With a smoother on that is the one thing the line is
   // NOT, so the word is dropped rather than left to contradict the sentence that follows it.
@@ -3678,7 +3754,7 @@ function renderSchemeBody(){
       <div class="kpi qc ${qCls(rowsLast&&rowsLast.q)}"><div class="k-lbl">Current quartile</div><div class="k-val">${rowsLast&&rowsLast.q?('Q'+rowsLast.q):'—'}</div><div class="k-sub">${S.basis} all-peer</div></div>
       <div class="kpi mc m-aum"><div class="k-lbl">% of ${fh} AUM</div><div class="k-val">${fmt.pct(rowsLast?rowsLast.a:null)}</div><div class="k-sub">house weight</div></div>
       <div class="kpi mc m-aum"><div class="k-lbl">Scheme AUM</div><div class="k-val">${fmt.cr(rowsLast?rowsLast.cr:null)}</div><div class="k-sub">absolute</div></div>
-      <div class="kpi mc m-dim"><div class="k-lbl">Sleeve</div><div class="k-val" style="font-size:18px">${rowsLast?rowsLast.sl:'—'}</div><div class="k-sub">breakdown</div></div>${sipKpiHTML(name,month)}`;
+      <div class="kpi mc m-sleeve" style="--m-sleeve:${sleeveColor(rowsLast&&rowsLast.sl)||'var(--m-dim)'}"><div class="k-lbl">Sleeve</div><div class="k-val" style="font-size:18px">${rowsLast?rowsLast.sl:'—'}</div><div class="k-sub">breakdown</div></div>${sipKpiHTML(name,month)}`;
   }
 
   renderSchemeDrill(); renderSchemePeers(); renderSchemeStanding(); renderSchemeResidency(); renderSchemeReturns();
