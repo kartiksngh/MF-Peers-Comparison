@@ -998,13 +998,21 @@
     margin-bottom: 11px;
   }
   body.theme-mac .masthead::after { display: none; }
+  /* Kyser 2026-09-03: "it doesn't look like the main header, and it scrolls anyway so we can
+     afford to make it larger." Right on both counts — at 18px the title was smaller than some
+     card headings, so the page's own name was not the biggest thing on it. 18 -> 27px. The
+     cost is real but lands in the one place it does not matter: the masthead is NOT part of
+     the sticky stack, so this adds nothing to the frozen bars you look past all day, only to
+     the first screen before you scroll. Tracking tightens as size grows, which is why the
+     letter-spacing goes further negative rather than staying put. */
   body.theme-mac .masthead h1 {
-    font-family: var(--sans); font-weight: 700; font-size: 18px;
-    letter-spacing: -0.026em; color: var(--ink); line-height: 1.15;
+    font-family: var(--sans); font-weight: 700; font-size: 27px;
+    letter-spacing: -0.032em; color: var(--ink); line-height: 1.1;
   }
   body.theme-mac .masthead h1 em { font-style: normal; font-weight: 400; color: var(--ink-3); }
+  /* the kicker grows with the title it sits above, or it reads as a stray caption */
   body.theme-mac .mast-kicker {
-    font-family: var(--sans); font-size: 8px; letter-spacing: .13em; margin-bottom: 3px;
+    font-family: var(--sans); font-size: 9px; letter-spacing: .15em; margin-bottom: 5px;
   }
   body.theme-mac .mast-kicker::before { width: 14px; }
   /* The strapline is orientation, not a number anyone reads twice. One line, clipped -- it was
@@ -3546,25 +3554,55 @@ function renderSleeveTrend(){
   document.getElementById('sl-trend-method').innerHTML=methodNote(
     `<b>Q1+Q2 %</b> (green) and <b>Q4 %</b> (red) are the top-half and bottom-quartile shares <i>within</i> the sleeve (left axis), each as a share of the sleeve’s <b>rated</b> AUM on that date — the AUM carrying a quartile — so the line is a like-for-like read even in months when part of the sleeve was too young to rank. <b>Quality score</b> (right, 1–4) is the AUM-weighted mean quartile (Q1=4…Q4=1). Recomputed live from the chosen ${universeLabel()} basis.`);
 }
+// ── the ranking's tie-break chain (Kyser 2026-09-03) ────────────────────────────────────────
+// The table sorted on Q1+Q2 ALONE, with no tie-break — so the six houses tied at 100% came out
+// in whatever order housesPresent() happened to produce, which put Axis (score 3.00) above
+// Mirae (4.00) and made the ranking look arbitrary exactly where it matters most: at the top.
+// Ties now fall down an explicit chain, and each step is a real claim about which house is
+// better, not a convenience:
+//   1. Q1+Q2 share        the headline — most of the sleeve's rated money in the top half
+//   2. quality score       HOW good that top half is; Q1 money beats Q2 money at the same Q1+Q2
+//   3. Q4 share, INVERTED  less money in the bottom quartile is better ("inverse of Q4")
+//   4. AUM-weighted score  a strong sleeve carrying more of the house counts for more
+//   5. house name          so the order is deterministic and cannot reshuffle between renders
+// _hi treats a missing value as worst for "higher is better" fields; _lo does the same for
+// "lower is better" ones. Without that split, a null Q4 would sort as if it were the best
+// possible Q4 and a house with no data would lead the table.
+const _hi = v => (v == null ? -Infinity : v);
+const _lo = v => (v == null ?  Infinity : v);
+function sleeveRankCmp(a, b){
+  return (_hi(b.topShare) - _hi(a.topShare))
+      || (_hi(b.score)    - _hi(a.score))
+      || (_lo(a.q4)       - _lo(b.q4))
+      || (_hi(b.wscore)   - _hi(a.wscore))
+      || houseLabel(a.fh).localeCompare(houseLabel(b.fh));
+}
 function sleeveRows(i){
   return housesPresent(S.sleeve.br).map(fh=>{ const {byQ}=houseSeries(fh,S.sleeve.br); const A=sleeveAt(byQ,i);
-    return { fh, topShare:A.top, weight:A.weight||0, q4:A.qq4, cov:A.cov, score:qualityScore(byQ,i) }; })
+    const sc=qualityScore(byQ,i), w=A.weight||0;
+    // AUM-weighted score = the sleeve's quality score TIMES how much of the house it carries.
+    // "Score" on its own is already AUM-weighted INSIDE the sleeve, so it says nothing about
+    // whether the sleeve is 3% or 24% of the house. This does: a 4.00 on 3.1% of the house is
+    // 0.12, a 3.97 on 24.2% is 0.96 — the second is eight times the firm-level bet.
+    return { fh, topShare:A.top, weight:w, q4:A.qq4, cov:A.cov, score:sc,
+             wscore: sc==null ? null : sc*w }; })
     // a house with weight but NO rated AUM has no top-half share to rank on — it is excluded from
     // the ranking rather than sorted in at a fabricated 0%.
-    .filter(r=>r.weight>0 && r.topShare!=null).sort((a,b)=>b.topShare-a.topShare);
+    .filter(r=>r.weight>0 && r.topShare!=null).sort(sleeveRankCmp);
 }
 function renderSleeveRank(){
   const i=S.sleeve.rankDate, rows=sleeveRows(i); rows.forEach((r,idx)=>r.rank=idx+1); const n=rows.length;
-  let html='<table class="rt"><thead><tr><th>#</th><th>Fund House</th><th class="num">Q1+Q2</th><th class="num">Q4</th><th class="num">Score</th><th class="num">Weight</th><th class="num">Rated</th></tr></thead><tbody>';
+  let html='<table class="rt"><thead><tr><th>#</th><th>Fund House</th><th class="num">Q1+Q2</th><th class="num">Q4</th><th class="num">Score</th><th class="num">Weight</th><th class="num">Rated</th>'
+    + '<th class="num" title="Quality score x sleeve weight - the score weighted by how much of the house this sleeve actually carries">AUM-wtd score</th></tr></thead><tbody>';
   rows.forEach(r=>{ const cls=r.fh===S.sleeve.fh?'hl':''; const pc=r.rank===1?'r1':r.rank<=Math.ceil(n/4)?'up':r.rank>n-Math.ceil(n/4)?'dn':'';
     // a thinly-rated sleeve's Q1+Q2 rests on a small slice of its money — flag it in the row
     // itself, so the rank can never be read without the coverage that qualifies it.
     const thin=(r.cov!=null && r.cov<0.9);
-    html+=`<tr class="${cls}"><td><span class="pill ${pc}">${r.rank}</span></td><td class="lbl">${houseLabel(r.fh)}</td><td class="num">${fmt.pct(r.topShare)}</td><td class="num">${fmt.pct(r.q4)}</td><td class="num">${fmt.num(r.score)}</td><td class="num">${fmt.pct(r.weight)}</td><td class="num${thin?' warn':''}"${thin?' title="only this share of the sleeve carries a quartile on this basis — the Q1+Q2 beside it is a share of that slice, not of the whole sleeve"':''}>${fmt.pct(r.cov)}</td></tr>`; });
+    html+=`<tr class="${cls}"><td><span class="pill ${pc}">${r.rank}</span></td><td class="lbl">${houseLabel(r.fh)}</td><td class="num">${fmt.pct(r.topShare)}</td><td class="num">${fmt.pct(r.q4)}</td><td class="num">${fmt.num(r.score)}</td><td class="num">${fmt.pct(r.weight)}</td><td class="num${thin?' warn':''}"${thin?' title="only this share of the sleeve carries a quartile on this basis — the Q1+Q2 beside it is a share of that slice, not of the whole sleeve"':''}>${fmt.pct(r.cov)}</td><td class="num">${r.wscore==null?'—':fmt.num(r.wscore)}</td></tr>`; });
   html+='</tbody></table>';
   document.getElementById('sl-rank').innerHTML=html;
   document.getElementById('sl-rank-method').innerHTML=methodNote(
-    `The fund houses in scope (${scopeLabel()}) ranked by <b>Q1+Q2 share within the ${S.sleeve.br} sleeve</b> on <b>${fmt.date(curDates()[i])}</b> (${basisDesc()}). “Score” = AUM-weighted quartile (1–4); “Weight” = sleeve size in each house. <b>Rated</b> = the share of that sleeve's AUM that actually carries a quartile on this basis, and is the <b>denominator of the Q1+Q2 and Q4 columns</b> — a house showing 100% Q1+Q2 on 30% Rated has its top half measured on 30% of its sleeve money, the rest being funds too young for the window. A house whose sleeve has no rated AUM at all is left out of the ranking rather than shown at 0%.`);
+    `The fund houses in scope (${scopeLabel()}) ranked by <b>Q1+Q2 share within the ${S.sleeve.br} sleeve</b> on <b>${fmt.date(curDates()[i])}</b> (${basisDesc()}), with ties broken in order by <b>Score</b>, then by <b>Q4 inverted</b> (less bottom-quartile money ranks higher), then by <b>AUM-weighted score</b>, then by name so the order never reshuffles between renders. “Score” = AUM-weighted quartile (1–4) <i>within</i> the sleeve; “Weight” = sleeve size in each house; <b>“AUM-wtd score” = Score × Weight</b> — the same quality reading scaled by how much of the house rides on this sleeve, so a 4.00 on 3% of a house (0.12) is not read as the equal of a 3.97 on 24% (0.96). <b>Rated</b> = the share of that sleeve's AUM that actually carries a quartile on this basis, and is the <b>denominator of the Q1+Q2 and Q4 columns</b> — a house showing 100% Q1+Q2 on 30% Rated has its top half measured on 30% of its sleeve money, the rest being funds too young for the window. A house whose sleeve has no rated AUM at all is left out of the ranking rather than shown at 0%.`);
 }
 function renderSleeveBar(){
   const i=S.sleeve.rankDate, rows=sleeveRows(i);
@@ -5626,7 +5664,15 @@ function pgColSpec(M){
   // is only fetched on demand while the reader is in Lumpsum (see pgWantSip for the measured cost).
   const sipoff=`<span class="pg-pend pg-off" title="needs sip_${M.conv}.json — click “load” on the SIP block header above to fetch it">·</span>`;
   const sgn=(v,d)=> v==null?'—':((v>=0?'+':'')+v.toFixed(d==null?2:d)+'%');
-  const pos=(v,d)=> v==null?'—':(v.toFixed(d==null?2:d)+'%');
+  // 1dp, not 2 (Kyser 2026-09-03). This is the grid's percent formatter — Return, %Q1..%Q4,
+  // %Q1+Q2 and Cat AUM% all run through it, and at 25 columns the second decimal was adding
+  // width to every one of them while carrying nothing a reader acts on. The neighbouring
+  // Funds%/AUM% columns were already 1dp via fmt.pct, so this also makes the row internally
+  // consistent instead of mixing two precisions across one line.
+  // NOT applied to the Score column: that is a 1-to-4 quality score, and the sleeve ranking
+  // now breaks ties on it, so rounding 3.88 and 3.94 both to "3.9" would make correctly
+  // ordered rows look arbitrarily ordered.
+  const pos=(v,d)=> v==null?'—':(v.toFixed(d==null?1:d)+'%');
   const B=M.blocks;
   const retCell=(r,blk)=>{
     if(!M.hasRet) return '<span class="pg-pend" title="this deck was built without the return block">—</span>';
