@@ -2290,6 +2290,53 @@ function buildViews(){
 }
 
 //──────────────────────────── 01 SLEEVE VIEW ───────────────────────────────
+
+// ── THE SLEEVE DENOMINATOR — one definition, used by every sleeve panel ────────────────────
+// (Kyser 2026-09-02: "Q1+Q2 is showing 100.1%, higher than the max possible 100% — which raises
+// a question over the entire method." He was right to ask, and the method turned out to have two
+// separate faults living in the same expression.)
+//
+// The payload ships FIVE series per (house, sleeve, window): the four quartile bands and
+// `% of AMC AUM`. They are NOT the same population:
+//   · a band  = that quartile's share of the HOUSE's total AUM, summed over the sleeve's schemes
+//               THAT CARRY A QUARTILE on this date;
+//   · the weight = the sleeve's share of the house's AUM, summed over ALL its schemes, rated or
+//               not (peer_monitor.sleeve_amc_tables builds it from a separate right-join).
+// So bands <= weight, and the four bands sum to the sleeve's RATED AUM, not to its weight.
+//
+// FAULT 1 — the impossible number. Both are rounded to 4 dp INDEPENDENTLY (peer_monitor `_series`),
+// so (Q1+Q2)/weight carries up to one rounding step of numerator-vs-denominator drift: 1e-4/weight.
+// On ABSL/Bottoms Up (weight 0.1207) that is +0.083% -> the 100.083% on screen. On a small sleeve
+// it is far worse: Sundaram/Arbitrage+ (weight 0.0021) printed 104.76%. 3,660 of 38,858 sleeve
+// cells in the shipped payload exceeded 100%. Every one of them was off by exactly one ulp
+// (+-0.0001) — which is the reassuring part: the bands never genuinely exceed the weight, so the
+// underlying quartile arithmetic was never double-counting. It was a transport artefact.
+//
+// FAULT 2 — the one that actually mattered, found while fixing the first. Dividing by `weight`
+// charges UNRATED AUM against the top-half share, as though a fund too young to rank had been
+// judged and failed. 10,642 of 35,374 rated cells (30%) hold genuinely unrated AUM, sometimes
+// nearly all of it. The honest denominator is the sleeve's RATED AUM = the sum of the four bands.
+// That is also what every OTHER view already uses (the AMC roll-up's Qtl column is explicitly a
+// share "of quartile-bearing AUM", and the cube paths accumulate `tA` over rated schemes only),
+// so this removes a cross-view inconsistency as well as the >100%.
+//
+// ★ AND THE TRAP IN THAT FIX: rebasing onto rated AUM without SHOWING the coverage would turn
+// PGIM/Arbitrage+/3Y from "4.69% in the top half" into "100.00%" — a sleeve whose AUM is 95%
+// unrated would print a perfect score. So `cov` is returned alongside and every panel that shows
+// a rebased share must show it. A denominator you cannot see is a denominator you cannot trust.
+function sleeveAt(byQ, i){
+  const g=q=>{ const a=byQ[q]; const v=(a && i<a.length)?a[i]:null; return v==null?null:v; };
+  const q1=g('% in Q1'), q2=g('% in Q2'), q3=g('% in Q3'), q4=g('% in Q4');
+  const rated=(q1||0)+(q2||0)+(q3||0)+(q4||0);
+  const wArr=byQ[WEIGHT_QT], wRaw=(wArr && i<wArr.length)?wArr[i]:null;
+  const R=rated>0?rated:null, W=(wRaw!=null&&wRaw>0)?wRaw:null;
+  return { q1:q1||0, q2:q2||0, q3:q3||0, q4:q4||0, rated:R, weight:W,
+    // rated AUM is a SUBSET of the sleeve by construction, so a ratio above 1 can only be the
+    // 4-dp transport drift above — clamp the DISPLAY, never the underlying quantity.
+    cov:(R!=null&&W!=null)?Math.min(1,R/W):null,
+    top:R!=null?((q1||0)+(q2||0))/R:null,
+    qq4:R!=null?(q4||0)/R:null };
+}
 function renderSleeve(){
   const D=S.data, fhSel=document.getElementById('sl-fh');
   if(!fhSel.dataset.wired){
@@ -2312,23 +2359,26 @@ function renderSleeve(){
   const {fh,br,mode}=S.sleeve;
   const {dates,byQ}=houseSeries(fh,br);
   const li=dates.length-1, weight=byQ[WEIGHT_QT]||[];
+  // 'within' rebases each band onto the sleeve's RATED AUM (see sleeveAt) so the four bands sum
+  // to exactly 100%; 'amc' shows them raw as a share of house AUM, where they sum to the weight.
   const norm=q=>{ const raw=byQ[q]||[]; if(mode==='amc') return raw.map(v=>v==null?null:v*100);
-    return raw.map((v,i)=>{ const w=weight[i]; return (v==null||!w)?null:(v/w)*100; }); };
+    return raw.map((v,i)=>{ const r=sleeveAt(byQ,i).rated; return (v==null||!r)?null:(v/r)*100; }); };
 
-  const q1=byQ['% in Q1']?.[li], q2=byQ['% in Q2']?.[li], q4=byQ['% in Q4']?.[li], w=weight[li];
-  const topShare=w?((q1||0)+(q2||0))/w:null, score=qualityScore(byQ,li);
+  const A=sleeveAt(byQ,li), score=qualityScore(byQ,li);
+  const covWarn = (A.cov!=null && A.cov<0.999);
   document.getElementById('sl-title').innerHTML=`${houseLabel(fh)} · ${br}`;
   document.getElementById('sl-ctx').innerHTML=`${basisDesc()}<br>Snapshot ${fmt.date(dates[li])}`;
   document.getElementById('sl-kpis').innerHTML=`
-    <div class="kpi good"><div class="k-lbl">Q1+Q2 within sleeve</div><div class="k-val good">${fmt.pct(topShare)}</div><div class="k-sub">top-half of sleeve AUM</div></div>
-    <div class="kpi accent"><div class="k-lbl">Sleeve weight in AMC</div><div class="k-val accent">${fmt.pct(w)}</div><div class="k-sub">of total ${fh} AUM</div></div>
+    <div class="kpi good"><div class="k-lbl">Q1+Q2 within sleeve</div><div class="k-val good">${fmt.pct(A.top)}</div><div class="k-sub">of the sleeve's <b>rated</b> AUM</div></div>
+    <div class="kpi accent"><div class="k-lbl">Sleeve weight in AMC</div><div class="k-val accent">${fmt.pct(A.weight)}</div><div class="k-sub">of total ${fh} AUM</div></div>
+    <div class="kpi${covWarn?' warn':''}"><div class="k-lbl">Rated</div><div class="k-val${covWarn?' warn':''}">${fmt.pct(A.cov)}</div><div class="k-sub">${covWarn?'of sleeve AUM carries a quartile':'the whole sleeve is scored'}</div></div>
     <div class="kpi"><div class="k-lbl">AUM-wtd quartile score</div><div class="k-val">${fmt.num(score)}</div><div class="k-sub">1 (worst) → 4 (best)</div></div>
-    <div class="kpi warn"><div class="k-lbl">Q4 within sleeve</div><div class="k-val warn">${fmt.pct(w?(q4||0)/w:null)}</div><div class="k-sub">bottom-quartile AUM</div></div>`;
+    <div class="kpi warn"><div class="k-lbl">Q4 within sleeve</div><div class="k-val warn">${fmt.pct(A.qq4)}</div><div class="k-sub">bottom-quartile AUM</div></div>`;
 
   document.getElementById('sl-c1-title').textContent = mode==='within'?'Quartile distribution within sleeve':'Quartile distribution as % of AMC AUM';
   document.getElementById('sl-c1-sub').textContent = mode==='within'
-    ? 'Each band = that quartile’s share of the sleeve (sums to 100%); red line = sleeve weight in the house'
-    : 'Each band = that quartile’s share of total AMC AUM (sums to the sleeve weight)';
+    ? 'Each band = that quartile’s share of the sleeve’s RATED AUM (sums to 100%); red line = sleeve weight in the house'
+    : 'Each band = that quartile’s share of total AMC AUM (sums to the sleeve’s rated AUM, at or below the weight line)';
 
   const series=QORDER.map(q=>norm(q));
   const {xmin,xmax}=xBounds(dates, ...series, weight);
@@ -2342,15 +2392,15 @@ function renderSleeve(){
     options:stackOpts({leftMax:mode==='within'?100:undefined, rightLabel:'Sleeve weight %', xmin, xmax})});
   document.getElementById('sl-c1-method').innerHTML=methodNote(
     (mode==='within'
-      ? `For ${fh}, ${br}: ${scoreMethodLine()} Each scheme’s <b>share of the house’s total AUM</b> is summed by quartile then <b>divided by the sleeve’s total weight</b> so the four bands sum to 100%. The dashed red line (right axis) is the sleeve’s raw weight in the house.`
-      : `Bands show each quartile’s share of <b>total ${fh} AUM</b>; they sum to the sleeve’s overall weight (dashed line). ${scoreMethodLine()}`));
+      ? `For ${fh}, ${br}: ${scoreMethodLine()} Each scheme’s <b>share of the house’s total AUM</b> is summed by quartile, then divided by the <b>sleeve’s rated AUM</b> — the sum of those same four bands — so they sum to exactly 100%. The denominator is deliberately the rated AUM and <b>not</b> the sleeve’s total weight: a fund too young to carry a quartile on this window is absent from both the numerator and the denominator, rather than counted as having failed to reach the top half. On <b>${fmt.date(dates[li])}</b>, <b>${fmt.pct(A.cov)}</b> of this sleeve’s AUM is rated${covWarn?` — so these bands describe that ${fmt.pct(A.cov)} slice, not the whole sleeve`:''}. The dashed red line (right axis) is the sleeve’s raw weight in the house, which does include the unrated part.`
+      : `Bands show each quartile’s share of <b>total ${fh} AUM</b>; they sum to the sleeve’s <b>rated</b> AUM, which sits at or below the weight line (dashed) by exactly the unrated share — <b>${fmt.pct(A.cov)}</b> of this sleeve is rated on <b>${fmt.date(dates[li])}</b>. ${scoreMethodLine()}`));
 
   renderSleeveTrend(); renderSleeveRank(); renderSleeveBar();
 }
 function renderSleeveTrend(){
-  const {fh,br}=S.sleeve, {dates,byQ}=houseSeries(fh,br), weight=byQ[WEIGHT_QT]||[];
-  const topHalf=dates.map((d,i)=>{ const w=weight[i]; const t=(byQ['% in Q1']?.[i]||0)+(byQ['% in Q2']?.[i]||0); return {x:d,y:w?(t/w)*100:null}; });
-  const q4=dates.map((d,i)=>{ const w=weight[i]; const v=byQ['% in Q4']?.[i]; return {x:d,y:(w&&v!=null)?(v/w)*100:null}; });
+  const {fh,br}=S.sleeve, {dates,byQ}=houseSeries(fh,br);
+  const topHalf=dates.map((d,i)=>{ const A=sleeveAt(byQ,i); return {x:d,y:A.top==null?null:A.top*100}; });
+  const q4=dates.map((d,i)=>{ const A=sleeveAt(byQ,i); return {x:d,y:A.qq4==null?null:A.qq4*100}; });
   const scoreS=dates.map((d,i)=>({x:d,y:qualityScore(byQ,i)}));
   const {xmin,xmax}=xBounds(dates, topHalf.map(p=>p.y), q4.map(p=>p.y));
   const ctx=document.getElementById('sl-trend').getContext('2d');
@@ -2361,23 +2411,27 @@ function renderSleeveTrend(){
     { label:'Quality score', data:scoreS, borderColor:C.navy, borderWidth:1.6, borderDash:[4,3], tension:0.3, pointRadius:0, yAxisID:'y1', fill:false }
   ]},options:dualOpts({leftSuffix:'%', rightLabel:'Score 1–4', rightMin:1, rightMax:4, xmin, xmax})});
   document.getElementById('sl-trend-method').innerHTML=methodNote(
-    `<b>Q1+Q2 %</b> (green) and <b>Q4 %</b> (red) are the top-half and bottom-quartile shares <i>within</i> the sleeve (left axis). <b>Quality score</b> (right, 1–4) is the AUM-weighted mean quartile (Q1=4…Q4=1). Recomputed live from the chosen ${universeLabel()} basis.`);
+    `<b>Q1+Q2 %</b> (green) and <b>Q4 %</b> (red) are the top-half and bottom-quartile shares <i>within</i> the sleeve (left axis), each as a share of the sleeve’s <b>rated</b> AUM on that date — the AUM carrying a quartile — so the line is a like-for-like read even in months when part of the sleeve was too young to rank. <b>Quality score</b> (right, 1–4) is the AUM-weighted mean quartile (Q1=4…Q4=1). Recomputed live from the chosen ${universeLabel()} basis.`);
 }
 function sleeveRows(i){
-  return housesPresent(S.sleeve.br).map(fh=>{ const {byQ}=houseSeries(fh,S.sleeve.br); const w=byQ[WEIGHT_QT]?.[i]||0;
-    const top=(byQ['% in Q1']?.[i]||0)+(byQ['% in Q2']?.[i]||0);
-    return { fh, topShare:w?top/w:0, weight:w, q4:w?(byQ['% in Q4']?.[i]||0)/w:0, score:qualityScore(byQ,i) }; })
-    .filter(r=>r.weight>0).sort((a,b)=>b.topShare-a.topShare);
+  return housesPresent(S.sleeve.br).map(fh=>{ const {byQ}=houseSeries(fh,S.sleeve.br); const A=sleeveAt(byQ,i);
+    return { fh, topShare:A.top, weight:A.weight||0, q4:A.qq4, cov:A.cov, score:qualityScore(byQ,i) }; })
+    // a house with weight but NO rated AUM has no top-half share to rank on — it is excluded from
+    // the ranking rather than sorted in at a fabricated 0%.
+    .filter(r=>r.weight>0 && r.topShare!=null).sort((a,b)=>b.topShare-a.topShare);
 }
 function renderSleeveRank(){
   const i=S.sleeve.rankDate, rows=sleeveRows(i); rows.forEach((r,idx)=>r.rank=idx+1); const n=rows.length;
-  let html='<table class="rt"><thead><tr><th>#</th><th>Fund House</th><th class="num">Q1+Q2</th><th class="num">Q4</th><th class="num">Score</th><th class="num">Weight</th></tr></thead><tbody>';
+  let html='<table class="rt"><thead><tr><th>#</th><th>Fund House</th><th class="num">Q1+Q2</th><th class="num">Q4</th><th class="num">Score</th><th class="num">Weight</th><th class="num">Rated</th></tr></thead><tbody>';
   rows.forEach(r=>{ const cls=r.fh===S.sleeve.fh?'hl':''; const pc=r.rank===1?'r1':r.rank<=Math.ceil(n/4)?'up':r.rank>n-Math.ceil(n/4)?'dn':'';
-    html+=`<tr class="${cls}"><td><span class="pill ${pc}">${r.rank}</span></td><td class="lbl">${houseLabel(r.fh)}</td><td class="num">${fmt.pct(r.topShare)}</td><td class="num">${fmt.pct(r.q4)}</td><td class="num">${fmt.num(r.score)}</td><td class="num">${fmt.pct(r.weight)}</td></tr>`; });
+    // a thinly-rated sleeve's Q1+Q2 rests on a small slice of its money — flag it in the row
+    // itself, so the rank can never be read without the coverage that qualifies it.
+    const thin=(r.cov!=null && r.cov<0.9);
+    html+=`<tr class="${cls}"><td><span class="pill ${pc}">${r.rank}</span></td><td class="lbl">${houseLabel(r.fh)}</td><td class="num">${fmt.pct(r.topShare)}</td><td class="num">${fmt.pct(r.q4)}</td><td class="num">${fmt.num(r.score)}</td><td class="num">${fmt.pct(r.weight)}</td><td class="num${thin?' warn':''}"${thin?' title="only this share of the sleeve carries a quartile on this basis — the Q1+Q2 beside it is a share of that slice, not of the whole sleeve"':''}>${fmt.pct(r.cov)}</td></tr>`; });
   html+='</tbody></table>';
   document.getElementById('sl-rank').innerHTML=html;
   document.getElementById('sl-rank-method').innerHTML=methodNote(
-    `The fund houses in scope (${scopeLabel()}) ranked by <b>Q1+Q2 share within the ${S.sleeve.br} sleeve</b> on <b>${fmt.date(curDates()[i])}</b> (${basisDesc()}). “Score” = AUM-weighted quartile (1–4); “Weight” = sleeve size in each house.`);
+    `The fund houses in scope (${scopeLabel()}) ranked by <b>Q1+Q2 share within the ${S.sleeve.br} sleeve</b> on <b>${fmt.date(curDates()[i])}</b> (${basisDesc()}). “Score” = AUM-weighted quartile (1–4); “Weight” = sleeve size in each house. <b>Rated</b> = the share of that sleeve's AUM that actually carries a quartile on this basis, and is the <b>denominator of the Q1+Q2 and Q4 columns</b> — a house showing 100% Q1+Q2 on 30% Rated has its top half measured on 30% of its sleeve money, the rest being funds too young for the window. A house whose sleeve has no rated AUM at all is left out of the ranking rather than shown at 0%.`);
 }
 function renderSleeveBar(){
   const i=S.sleeve.rankDate, rows=sleeveRows(i);
@@ -2391,10 +2445,13 @@ function renderSleeveBar(){
   document.getElementById('sl-bar-method').innerHTML=methodNote(`Same metric as the league table, drawn as a cross-section so you can see where <b>${S.sleeve.fh}</b> (red) sits on <b>${fmt.date(curDates()[i])}</b>.`);
 }
 function exportSleeve(){
-  const {fh,br,mode}=S.sleeve, {dates,byQ}=houseSeries(fh,br), w=byQ[WEIGHT_QT]||[];
-  let csv='Date,Q1,Q2,Q3,Q4,Sleeve weight,Basis\n';
-  dates.forEach((d,i)=>{ const f=q=>{ const raw=byQ[q]?.[i]; if(raw==null) return ''; return mode==='amc'?raw:(w[i]?raw/w[i]:''); };
-    csv+=[d,f('% in Q1'),f('% in Q2'),f('% in Q3'),f('% in Q4'),w[i]??'',basisDesc()].join(',')+'\n'; });
+  const {fh,br,mode}=S.sleeve, {dates,byQ}=houseSeries(fh,br);
+  // Ships the denominator itself (rated AUM + its share of the sleeve) so the CSV can be
+  // re-derived off-deck without re-deciding which denominator was used.
+  let csv='Date,Q1,Q2,Q3,Q4,Sleeve weight,Rated AUM (share of house),Rated % of sleeve,Basis\n';
+  dates.forEach((d,i)=>{ const A=sleeveAt(byQ,i);
+    const f=q=>{ const raw=byQ[q]?.[i]; if(raw==null) return ''; return mode==='amc'?raw:(A.rated?raw/A.rated:''); };
+    csv+=[d,f('% in Q1'),f('% in Q2'),f('% in Q3'),f('% in Q4'),A.weight??'',A.rated??'',A.cov??'',basisDesc()].join(',')+'\n'; });
   downloadCSV(csv, `sleeve_${fh}_${br}_${S.universe}.csv`);
 }
 
@@ -2482,12 +2539,22 @@ function renderAMCHouseKPIs(){
   const fh=S.amc.fh, {dates,byQ}=houseSeries(fh,null);
   const i=Math.max(0, Math.min(dates.length-1, S.amc.rankDate==null?dates.length-1:S.amc.rankDate));
   const q1=byQ['% in Q1']?.[i],q2=byQ['% in Q2']?.[i],q3=byQ['% in Q3']?.[i],q4=byQ['% in Q4']?.[i], score=qualityScore(byQ,i);
+  // ★ 2026-09-02 — THESE KPIs AND THE ROLL-UP TABLE BELOW USE DIFFERENT DENOMINATORS, ON PURPOSE.
+  // The KPIs answer "how much of this house's money is in the top half" (denominator = ALL of the
+  // house's AUM, so an unrated fund dilutes the share, which is the honest read for a CIO asking
+  // where the money sits). The table's Qtl column answers "of the money that IS ranked, how much
+  // ranks well" (denominator = quartile-bearing AUM). Both are legitimate; two numbers on one
+  // screen both called "Q1+Q2" were not. The Rated KPI is what reconciles them —
+  //     Q1+Q2 of house AUM  =  Rated  x  Q1+Q2 of rated AUM
+  // — so the reader can move between the two rather than wondering which is wrong.
+  const A=sleeveAt(byQ,i), covWarn=(A.cov!=null && A.cov<0.999);
   document.getElementById('am-ctx').innerHTML=`${basisDesc()}<br>Snapshot ${fmt.date(dates[i])}`;
   document.getElementById('am-kpis').innerHTML=`
-    <div class="kpi good"><div class="k-lbl">Q1 share</div><div class="k-val good">${fmt.pct(q1)}</div><div class="k-sub">top quartile</div></div>
-    <div class="kpi accent"><div class="k-lbl">Q1+Q2 share</div><div class="k-val accent">${fmt.pct((q1||0)+(q2||0))}</div><div class="k-sub">top half of house AUM</div></div>
+    <div class="kpi good"><div class="k-lbl">Q1 share</div><div class="k-val good">${fmt.pct(q1)}</div><div class="k-sub">top quartile, of all house AUM</div></div>
+    <div class="kpi accent"><div class="k-lbl">Q1+Q2 share</div><div class="k-val accent">${fmt.pct((q1||0)+(q2||0))}</div><div class="k-sub">top half, of <b>all</b> house AUM</div></div>
+    <div class="kpi${covWarn?' warn':''}"><div class="k-lbl">Rated</div><div class="k-val${covWarn?' warn':''}">${fmt.pct(A.cov)}</div><div class="k-sub">of AUM is ranked · its top half = ${fmt.pct(A.top)}</div></div>
     <div class="kpi"><div class="k-lbl">Quality score</div><div class="k-val">${fmt.num(score)}</div><div class="k-sub">1 → 4, AUM-weighted</div></div>
-    <div class="kpi warn"><div class="k-lbl">Q3+Q4 share</div><div class="k-val warn">${fmt.pct((q3||0)+(q4||0))}</div><div class="k-sub">bottom half</div></div>`;
+    <div class="kpi warn"><div class="k-lbl">Q3+Q4 share</div><div class="k-val warn">${fmt.pct((q3||0)+(q4||0))}</div><div class="k-sub">bottom half, of all house AUM</div></div>`;
 }
 // Everything on this tab that depends on the AS-OF DATE, and nothing else. The timeline
 // scrubber / GIF exporter calls this once per frame, so it deliberately leaves the
