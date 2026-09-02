@@ -978,11 +978,17 @@
     color: var(--ink-3); font-size: 11px; margin-top: 2px; max-width: 720px; line-height: 1.35;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
-  body.theme-mac .mast-meta { font-family: var(--sans); gap: 2px; }
-  body.theme-mac .mast-meta .row .lbl {
-    color: var(--chrome-lbl); letter-spacing: .08em; font-size: 8px; margin-bottom: 0;
+  body.theme-mac .mast-meta {
+    font-family: var(--sans); gap: 5px; display: flex; flex-direction: column;
+    align-items: flex-end; text-align: right;
   }
-  body.theme-mac .mast-meta .row .val { color: var(--ink); font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  body.theme-mac .mast-facts {
+    display: flex; align-items: center; gap: 6px; flex-wrap: wrap; justify-content: flex-end;
+  }
+  body.theme-mac .mast-facts .val {
+    color: var(--ink); font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums;
+  }
+  body.theme-mac .mast-facts .sep { color: var(--ink-4); font-size: 11px; }
   body.theme-mac .mast-badge {
     background: rgba(255,255,255,.75); border: 1px solid rgba(0,0,0,.08); color: var(--ink-2);
     font-family: var(--sans); font-size: 10px; font-weight: 500; padding: 4px 10px;
@@ -1005,8 +1011,21 @@
     background: var(--card); color: var(--ink);
     box-shadow: 0 1px 2px rgba(0,0,0,.09), 0 0 0 .5px rgba(0,0,0,.06);
   }
-  body.theme-mac .tab .tnum { font-family: var(--sans); font-weight: 600; font-size: 9px; }
-  body.theme-mac .tab.active .tnum { color: var(--absl); }
+  /* ── A SHADE PER TAB (Kyser 2026-09-03) ────────────────────────────────────────────────
+     The 01/02/03/04 numerals are gone; each tab instead carries its own shade of grey, running
+     dark to light left to right. It gives the four a fixed visual order and a landmark you can
+     aim for without reading, which is what the numerals were doing less elegantly. The ACTIVE
+     tab is still pure white with a shadow, so selection reads as "lifted off the bar" and is
+     never confused with one tab merely being a lighter grey than its neighbour. */
+  body.theme-mac .tab[data-view="amc"]     { background: #dcdce4; }
+  body.theme-mac .tab[data-view="scheme"]  { background: #e3e3ea; }
+  body.theme-mac .tab[data-view="sleeve"]  { background: #eaeaf0; }
+  body.theme-mac .tab[data-view="mapping"] { background: #f1f1f5; }
+  body.theme-mac .tab:hover { background: #fff; color: var(--ink-2); }
+  body.theme-mac .tab.active {
+    background: #fff; color: var(--ink);
+    box-shadow: 0 1px 2px rgba(0,0,0,.10), 0 0 0 .5px rgba(0,0,0,.07);
+  }
 
   /* ── filter bars ──────────────────────────────────────────────────────────────────────── */
   body.theme-mac .filters {
@@ -1179,13 +1198,22 @@
   <div>
     <div class="mast-kicker">Aditya Birla Sun Life · Investment Research</div>
     <h1>Peer Performance <em>Monitor</em></h1>
-    <div class="mast-sub">Quartile positioning, AUM concentration and a tunable composite score across equity &amp; hybrid sleeves — benchmarked against the Top-15 industry AMCs.</div>
   </div>
+  <!-- Kyser 2026-09-03: the right side was SEVEN lines (a badge plus three label/value pairs
+       stacked) against two on the left, so it alone set the masthead's height. It is now two
+       lines to match: the as-of badge, then one run of facts separated by dots. The uppercase
+       micro-labels are gone from the page and kept as title attributes -- "UNIVERSE" above
+       "511 VR - 924 all-peer - 15 houses" was a line of type that told the reader nothing the
+       value did not already say. -->
   <div class="mast-meta">
     <div class="mast-badge"><span class="dot"></span><span id="mb-asof">—</span></div>
-    <div class="row"><span class="lbl">Universe</span><span class="val" id="mb-univ">—</span></div>
-    <div class="row"><span class="lbl">Default basis</span><span class="val" id="mb-basis">—</span></div>
-    <div class="row"><span class="lbl">Investment mode</span><span class="val" id="mb-mode">Lumpsum</span></div>
+    <div class="mast-facts">
+      <span class="val" id="mb-univ" title="Universe">—</span>
+      <span class="sep">·</span>
+      <span class="val" id="mb-basis" title="Default basis">—</span>
+      <span class="sep">·</span>
+      <span class="val" id="mb-mode" title="Investment mode">Lumpsum</span>
+    </div>
   </div>
 </header>
 
@@ -1193,9 +1221,9 @@
   <!-- Tab order + count per Kyser 2026-09-02: AMC Roll-up leads (and is the landing tab),
        Quartile Matrix lives inside Sleeve View now, League Table inside AMC Roll-up,
        Data Quality inside Peer Mapping & Data. -->
-  <button class="tab active" data-view="amc"><span class="tnum">01</span>AMC Roll-up</button>
-  <button class="tab" data-view="scheme"><span class="tnum">02</span>Scheme Detail</button>
-  <button class="tab" data-view="sleeve"><span class="tnum">03</span>Sleeve View</button>
+  <button class="tab active" data-view="amc">AMC Roll-up</button>
+  <button class="tab" data-view="scheme">Scheme Detail</button>
+  <button class="tab" data-view="sleeve">Sleeve View</button>
   <!-- The old "05 Composite" tab was MERGED into AMC Roll-up (2026-08-11): its KPI row, the
        Top-15 quartile-mix bar and the trend chart now live inside tab 02, driven by that tab's
        single as-of selector. Nothing was deleted — only moved — and #tab=composite still works
@@ -1204,7 +1232,7 @@
        export — now IS the roll-up's league card), and Data Quality folded into the bottom of
        Peer Mapping (renamed "Peer Mapping & Data"). #tab=league and #tab=quality are aliased
        in the hash parser, so every old deep link keeps resolving. -->
-  <button class="tab" data-view="mapping"><span class="tnum">04</span>Peer Mapping &amp; Data</button>
+  <button class="tab" data-view="mapping">Peer Mapping &amp; Data</button>
 </nav>
 
 <div class="filters" id="gctrl" style="border-top:2px solid var(--absl);border-bottom:1px solid var(--line);margin-bottom:2px">
@@ -3443,10 +3471,27 @@ function amcGotoDate(i){
 // that difference too. A bar beside four tinted cells cannot be confused with them at any
 // intensity, which retires the adjacency question for that pair entirely.
 const AMCSUM_C = { outperf:'#1f5c3d', ret:'#b3852f', pos:'#20436b', neg:'#c0523e' };
-const AMCSUM_MAX = 0.42;          // the darkest tint is 42% of the anchor over the card — a wash
+// ★ RAMP REBUILT 2026-09-03 (Kyser: "we need a better colour gradient"). Two real faults:
+//  1. THE BASE WAS THE OLD CARD COLOUR. It mixed toward a hard-coded cream [0xfb,0xf7,0xee]
+//     from the newsprint skin. The cards are white now, so every tint was being blended over a
+//     background that is no longer there -- which is exactly what made the ramp look muddy.
+//     It now mixes over the real data-card surface.
+//  2. IT INTERPOLATED IN sRGB. sRGB is gamma-encoded, so a straight numeric average between two
+//     colours passes through a darker, desaturated middle -- the classic muddy midtone. Mixing
+//     in LINEAR light and converting back gives an even ramp, which is the whole job of a
+//     heat scale: equal steps in value should look like equal steps in colour.
+// The range also opens up (0.42 -> 0.62) because a wash that tops out at 42% cannot separate
+// the top decile from the median, and a slight ease lifts the low end off the card.
+const AMCSUM_MAX = 0.62;
+const _AMC_BASE = [0xfb, 0xfb, 0xfd];      // --srf-data, the surface these cells actually sit on
+const _s2l = v => { v/=255; return v<=0.04045 ? v/12.92 : Math.pow((v+0.055)/1.055, 2.4); };
+const _l2s = v => Math.round(255*(v<=0.0031308 ? v*12.92 : 1.055*Math.pow(v,1/2.4)-0.055));
 function _amcMix(hexTo, t){
-  const c=[0xfb,0xf7,0xee], d=[1,3,5].map(k=>parseInt(hexTo.slice(k,k+2),16));
-  const m=c.map((v,k)=>Math.round(v+(d[k]-v)*AMCSUM_MAX*Math.max(0,Math.min(1,t))));
+  const k = Math.max(0, Math.min(1, t));
+  const eased = Math.pow(k, 0.82);                       // lift the low end off the bare card
+  const a = AMCSUM_MAX * eased;
+  const d = [1,3,5].map(i=>parseInt(hexTo.slice(i,i+2),16));
+  const m = _AMC_BASE.map((base,i)=> _l2s(_s2l(base) + (_s2l(d[i]) - _s2l(base)) * a));
   return 'rgb('+m[0]+','+m[1]+','+m[2]+')';
 }
 const amcSeqBg = (anchor, v, lo, hi) =>
@@ -3473,7 +3518,17 @@ function computeAMCSummary(fh, i){
       qdigit: st.state==='ok' ? st.qdigit : null,
       aumPct: (st.state==='ok' && st.crRated>0) ? 100*st.crAtOrBelow/st.crRated : null });
   });
-  rows.sort((a,b)=> (b.cr||0)-(a.cr||0));        // biggest money first: how a CIO reads a house
+  // DEFAULT ORDER (Kyser 2026-09-03): quartile first -- Q1, Q2, Q3, Q4, then unrated -- and
+  // biggest money first WITHIN each quartile. Reading a house top-down then answers the question
+  // a CIO actually asks in that order: what is winning, and how much money is behind it.
+  // Unrated funds sort LAST rather than being scattered by AUM: a fund with no quartile has not
+  // failed, it simply is not in the comparison, and putting it between Q2 and Q3 would imply a
+  // standing it does not have. The generic click-to-sort on this table can still re-order it on
+  // any column; this is only where it starts.
+  rows.sort((a,b)=>{
+    const qa=(a.qdigit>=1&&a.qdigit<=4)?a.qdigit:9, qb=(b.qdigit>=1&&b.qdigit<=4)?b.qdigit:9;
+    return qa!==qb ? qa-qb : (b.cr||0)-(a.cr||0);
+  });
   // ── THE ROLL-UP. Rule 2 again, and the reason `xform` is exported from computeStandingAlpha:
   // the house return weights the RAW inputs (and, under a book, the opening weights) and
   // transforms ONCE. An AUM-weighted average of the schemes' XIRRs is a different, unearned number.
@@ -3574,13 +3629,27 @@ function renderAMCSummary(){
          : al.benchWhy==='noaxis' ? 'as-of is not on the benchmark calendar' : '';
   };
   const u = M.unit ? ' <span class="am-unit">('+M.unit+')</span>' : '';
+  // The cohort column exists only where a shared benchmark exists -- see the note on the header
+  // cell below. Computed once here so the header, every row and the roll-up footer can never
+  // disagree about how many columns this table has.
+  const cohortCol = S.universe==='vr';
   let html='<table class="rt amcsum"><thead><tr>'
     +'<th>Scheme</th><th>Category</th><th class="num">AUM</th><th class="num">Qtl</th><th class="num">Rank</th>'
     +'<th class="num">%AUM outperformed</th>'
     +'<th class="num">Return'+u+'</th>'
     +'<th class="num">&alpha; vs benchmark</th>'
     +'<th class="num">&alpha; vs cat avg <small>(ex-self)</small></th>'
-    +'<th class="num">% of rated cat AUM beating bmk</th></tr></thead><tbody>';
+    // ── THE COHORT COLUMN IS VR-ONLY (Kyser 2026-09-03: "it is coming as empty - fix that").
+    // It was empty for a REASON, not by accident: computeStandingAlpha sets cWhy='allpeer' and
+    // never computes aumBeat outside the VR universe, because "% of the category beating its
+    // benchmark" needs ONE shared index for the cohort, and an MFI all-peer category's members
+    // have different Value-Research homes or none. There is no benchmark to beat, so there is
+    // no honest number to print -- filling it would mean inventing one.
+    // The fix is therefore to stop showing a column that cannot hold a value here. Forty-five
+    // em-dashes read as a broken feed; an absent column with one line saying why does not.
+    // In Exact Peers (VR) the column returns, populated.
+    +(cohortCol ? '<th class="num">% of rated cat AUM beating bmk</th>' : '')
+    +'</tr></thead><tbody>';
   M.rows.forEach(r=>{
     const al=r.al, ok=!!(al && al.state==='ok');
     const ret=ok?al.own:null, ab=ok?al.alphaBench:null, ac=ok?al.alphaCat:null, cb=ok?al.aumBeat:null;
@@ -3605,10 +3674,13 @@ function renderAMCSummary(){
       +'<td class="num" style="'+amcSeqBg(AMCSUM_C.ret, ret, rLo, rHi)+'" title="'+esc(ret==null?why(al):(al.unit||''))+'">'+rt(ret)+'</td>'
       +'<td class="num '+(ab==null?'':(ab>=0?'delta-pos':'delta-neg'))+'" style="'+amcDivBg(ab, abMag, 1)+'" title="'+esc(abT)+'">'+pp(ab)+'</td>'
       +'<td class="num '+(ac==null?'':(ac>=0?'delta-pos':'delta-neg'))+'" style="'+amcDivBg(ac, acMag, 0.6)+'" title="'+esc(acT)+'">'+pp(ac)+'</td>'
-      +'<td class="num" title="'+esc(cbT)+'">'
-        +(cb==null ? '—'
-                   : '<span class="am-barwrap"><span class="am-bar" style="width:'+Math.max(0,Math.min(100,cb)).toFixed(1)+'%"></span></span><span class="am-barnum">'+cb.toFixed(1)+'%</span>')
-      +'</td></tr>';
+      +(cohortCol
+        ? '<td class="num" title="'+esc(cbT)+'">'
+          +(cb==null ? '—'
+                     : '<span class="am-barwrap"><span class="am-bar" style="width:'+Math.max(0,Math.min(100,cb)).toFixed(1)+'%"></span></span><span class="am-barnum">'+cb.toFixed(1)+'%</span>')
+          +'</td>'
+        : '')
+      +'</tr>';
   });
   const R=M.roll;
   const qT = R.q1==null ? '' : ('Q1 '+R.q1.toFixed(1)+'% · Q1+Q2 '+R.q12.toFixed(1)+'% · Q4 '+R.q4.toFixed(1)+'% of '+fmt.cr(R.qCovCr)+' carrying a quartile');
@@ -3622,7 +3694,7 @@ function renderAMCSummary(){
     +'<td class="num" title="'+esc('the AUM-weighted RAW return, transformed once — NOT an average of the schemes’ rates; covers '+fmt.cr(R.retCovCr))+'">'+rt(R.ret)+'</td>'
     +'<td class="num '+(R.alphaBench==null?'':(R.alphaBench>=0?'delta-pos':'delta-neg'))+'" title="'+esc('AUM-weighted across the '+fmt.cr(R.abCovCr)+' that has a usable benchmark on this window')+'">'+pp(R.alphaBench)+'</td>'
     +'<td class="num '+(R.alphaCat==null?'':(R.alphaCat>=0?'delta-pos':'delta-neg'))+'" title="'+esc('AUM-weighted across '+fmt.cr(R.acCovCr))+'">'+pp(R.alphaCat)+'</td>'
-    +'<td class="num" title="not aggregatable: each fund’s figure describes a DIFFERENT category, so averaging them would answer no question">—</td>'
+    +(cohortCol ? '<td class="num" title="not aggregatable: each fund’s figure describes a DIFFERENT category, so averaging them would answer no question">—</td>' : '')
     +'</tr></tfoot></table>';
   host.innerHTML=html;
   document.getElementById('am-sum-method').innerHTML=amcSummaryNote(M, fh, dates[i], rLo, rHi, abMag, acMag);
