@@ -437,6 +437,20 @@
   input[type=range]::-webkit-slider-thumb { -webkit-appearance:none; appearance:none; width:16px; height:16px; border-radius:50%; background: var(--absl); border:2px solid var(--card); box-shadow: var(--shadow-sm); cursor:pointer; }
   input[type=range]::-moz-range-thumb { width:16px; height:16px; border-radius:50%; background: var(--absl); border:2px solid var(--card); cursor:pointer; }
   .slidval { font-family:'JetBrains Mono',monospace; font-size:13px; font-weight:600; color:var(--absl); min-width:54px; }
+  /* ── date-range crop controls ──────────────────────────────────────────────────────────
+     .fg input carries min-width:230px for the search boxes, which would make two date fields
+     plus a button wider than the rest of the control bar put together — hence the override.  */
+  .drow { display:flex; align-items:center; gap:7px; margin-top:2px; }
+  .fg input.dtin { min-width:0; width:132px; padding:7px 9px; font-size:12px;
+                   font-family:'JetBrains Mono',monospace; cursor:pointer; }
+  .dsep { font-size:10px; color:var(--ink-3); text-transform:uppercase; letter-spacing:.1em; }
+  .xrst { font-family:'Inter',sans-serif; font-size:11px; font-weight:600; padding:7px 12px;
+          background:var(--card); border:1px solid var(--line); color:var(--ink-2);
+          border-radius:var(--r); cursor:pointer; transition:border-color .15s, color .15s; }
+  .xrst:hover:not(:disabled) { border-color:var(--absl); color:var(--absl); }
+  /* Disabled is the RESTING state — there is nothing to reset until a crop exists — so it has
+     to read as calm rather than broken: dimmed, not greyed out to illegibility. */
+  .xrst:disabled { opacity:.38; cursor:default; }
 
   .seg {
     display: inline-flex; border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; background: var(--card);
@@ -801,6 +815,11 @@
   .loading .lt { font-family: 'Fraunces', serif; font-size: 17px; font-style: italic; }
 
   .tag { display:inline-block; padding: 3px 9px; border-radius: 100px; font-size: 10px; font-family:'JetBrains Mono',monospace; font-weight:600; background: var(--paper-3); color: var(--ink-2); border:1px solid var(--line); }
+  /* The sleeve chip in the Sleeve-tab heading. Sized to sit inside a title line without
+     shouting: it exists so the sleeve is separated from the house name by SHAPE, not only by
+     hue, because the literal sleeve primaries run close to some house colours. */
+  .sl-chip { display:inline-block; vertical-align:2px; margin-left:6px; padding:2px 10px; border-radius:100px;
+             font-size:0.62em; font-weight:700; letter-spacing:.02em; border:1px solid transparent; }
   .tag.t-vr { background:#eef3ee; color:var(--q1); border-color:#cfe0d3; }
   .tag.t-cat { background:#fbf2dd; color:var(--gold); border-color:#ecdcb4; }
   .tag.t-sch { background:#f6e6e2; color:var(--absl-2); border-color:#ecccc4; }
@@ -1250,6 +1269,8 @@
     <label class="chk"><input type="checkbox" id="gc-reward" checked> +1 if beats 3Y benchmark</label></div>
   <div class="fg"><label>Investment mode</label>
     <div class="seg" id="gc-mode"><button data-v="ls" class="active">Lumpsum</button><button data-v="s3">3Y SIP book</button><button data-v="s5">5Y SIP book</button></div></div>
+  <div class="fg" id="gc-xrwrap"><label>Date range &middot; charts</label>
+    <div class="drow"><input type="date" id="gc-from" class="dtin" aria-label="Chart range start" title="Start date — blank means the start of the history"><span class="dsep">to</span><input type="date" id="gc-to" class="dtin" aria-label="Chart range end" title="End date — blank means the latest date"><button type="button" id="gc-xreset" class="xrst" disabled title="Reset to the full history. You can also double-click any chart.">Reset</button></div></div>
   <div class="spacer"></div>
   <div class="fg"><label>Currently showing</label><div class="tag" id="gc-summary" style="margin-top:6px">&mdash;</div></div>
 </div>
@@ -1385,6 +1406,10 @@ const S = {
   matrix:{ metric:'tophalf', date:null },
   composite:{ date:null, qsel:[1,2] },
   league:{ date:null, sortKey:'top', sortDir:-1 },
+  // ── x-axis crop, shared by the typed date boxes AND drag-to-crop on any chart ──
+  // ms epoch, or null for "no crop". xrFull is the widest natural span any chart has asked
+  // for, learned in timeX() — it bounds the date inputs to dates the data actually covers.
+  xr:{ from:null, to:null }, xrFull:{ from:null, to:null },
   vrCube:null, vrKey:null, allCube:null, allKey:null
 };
 
@@ -2217,7 +2242,10 @@ const HOUSE_COLOR = {
   '360':'#671d5b', Aditya:'#c8392b', Axis:'#ae2974', BARODA:'#90476b',
   BHARAT:'#8c3a21', Bajaj:'#ae29ae', Bandhan:'#1d207c', Bank:'#97732b',
   Baroda:'#90476b', Canara:'#2929ae', DSP:'#26285e', Edelweiss:'#747039',
-  Franklin:'#a72f47', Groww:'#7829ae', HDFC:'#268743', HSBC:'#268777',
+  // Groww moved 2026-09-03: #7829ae sat dE00 5.21 from Kotak's #7b3fa0 -- two purples, and
+  // both are on screen together under the All-AMCs scope. Missed originally because the
+  // generator optimised dE76, which over-states separation in exactly the purple region.
+  Franklin:'#a72f47', Groww:'#5c521f', HDFC:'#268743', HSBC:'#268777',
   HeliosMF:'#614082', ICICI:'#b7621a', ITI:'#904747', Invesco:'#632133',
   JM:'#8c217e', JioBlackRock:'#404f82', Kotak:'#7b3fa0', LIC:'#3a6b19',
   Mahindra:'#26734a', Mirae:'#6c7c1d', Motilal:'#985f3e', NJ:'#50196b',
@@ -2236,7 +2264,10 @@ const HOUSE_COLOR = {
 // (not order of appearance) is what keeps a house's colour stable across renders and scope
 // changes; memoised so the sort happens once.
 const HOUSE_FALLBACK = ['#7d5b2a','#3f6f5a','#6b3f6b','#2f5a7d','#7d3f4a',
-                        '#4a6b2f','#5a4a7d','#7d6b3f','#2f6b6b','#6b4a2f'];
+                        // slot 5 moved 2026-09-03: #4a6b2f was dE00 4.24 from LIC's #3a6b19,
+                        // so the first unmapped house to land here would have been mistaken
+                        // for LIC MF. Now #87491c, dE00 7.67 from its nearest neighbour.
+                        '#87491c','#5a4a7d','#7d6b3f','#2f6b6b','#6b4a2f'];
 const _hcMemo = new Map();
 let _hcSeen = [];
 function houseColor(fh){
@@ -2261,23 +2292,32 @@ function houseTint(fh, a){
 // olive / steel occupy gaps in all three, so a sleeve chip can never be mistaken for a quartile
 // or a metric. Unknown sleeves hash to a stable colour, same rule as houses: never grey, and
 // never a different colour on the next render.
-// ★ Kyser 2026-09-03: "sleeve colours can be primary 4 colours, and Arbitrage+ in dark grey."
-// Delivered as asked, with two forced adjustments and the measurements behind them, because
-// the literal primaries fail on grounds that are not matters of taste:
-//   * literal yellow #e0a800 is 2.15:1 on white -- illegible as the text it is used for.
-//     Darkened to #96700a (4.55:1). Same hue.
-//   * literal red #d02020 sits dE 10.8 from the Aditya house red. The Sleeve heading prints
-//     "<house> - <sleeve>" side by side, so those two would have been the same red in the one
-//     place they always appear together. Moved to the magenta-rose end of the red family.
-// Residual proximities, stated rather than hidden: Bottoms Up is dE 16.2 from the --m-ret
-// violet, Thematic dE 20.6 from the Q3 gold, Arbitrage+ dE 20.2 from the --m-dim slate. Those
-// three are below a 25 threshold but never encode the same thing in the same place; say the
-// word and any of them can move further.
+// ★ Kyser 2026-09-03, confirmed after being shown the collision cost: TAKE THE LITERAL
+// PRIMARIES. Done. The rule applied to each is "the most primary rung that is still legible",
+// not "a primary", because sleeveColor() is used ONLY as TEXT in this deck (the sl-title at
+// ~3183, the sc-ctx tag at ~3872, the Sleeve KPI tile at ~3953) and never as a chart series.
+// A colour that cannot be read is not a colour choice, so contrast >= 4.0 on white is the one
+// hard floor. Measured with CIEDE2000 (not dE76, which under-states blue separation and
+// over-states yellow) by scratchpad/sleeve_primaries.py against all 49 houses + 16 C tokens:
+//   * BLUE  #0000ff  literal primary blue, contrast 8.59. Taken exactly.
+//   * RED   #ee1111  contrast 4.45. Brighter than the Aditya house red #c8392b rather than
+//     darker, which is what pulls it to dE00 7.0 -- the earlier candidate sat at 2.9.
+//   * GREEN #0f8a2e  contrast 4.47, the most primary green above the floor.
+//   * YELLOW stays #96700a, and this one is a CEILING, not a preference: literal #ffd700 is
+//     1.40:1 on white and #d4a017 is still only 2.38:1. Nothing more yellow than #96700a
+//     clears 4.0, so #96700a already IS the primary yellow, as dark as legibility permits.
+//     If yellow is wanted vivid, it needs a second token used only on filled areas -- say
+//     the word and it is a small change.
+// Minimum pairwise dE00 across the five sleeves: 29.3 -- they are unmistakable from each other.
+// The residual sleeve-vs-HOUSE proximities (red vs Aditya 7.0, green vs HDFC/Shriram 4.0,
+// yellow vs Bank 3.5) are real, and they land in exactly one place: the sl-title line prints
+// "<house> - <sleeve>" together. That line now gives the sleeve a CHIP (tinted pill), so the
+// two are told apart by shape even when the hues are close, and hue is no longer load-bearing.
 const SLEEVE_COLOR = {
-  'Bottoms Up':'#1a3fb0',        // primary blue
-  'Top Down':'#b0197a',          // the red slot, moved off the house red
-  'Thematic':'#96700a',          // the yellow slot, darkened to be legible
-  'Asset Allocation':'#17803a',  // primary green
+  'Bottoms Up':'#0000ff',        // primary blue, literal
+  'Top Down':'#ee1111',          // primary red, brightest rung clearing 4.0:1
+  'Thematic':'#96700a',          // primary yellow at its legibility ceiling (see note above)
+  'Asset Allocation':'#0f8a2e',  // primary green
   'Arbitrage+':'#4a4a4a',        // dark grey, as asked
 };
 const SLEEVE_FALLBACK = ['#8a5a2f','#7a3f6a','#4a5a9c','#5f6a2f','#2f6a8a','#6a4a8a'];
@@ -2621,6 +2661,13 @@ function wireGlobalControls(){
   segWire('gc-mode',     v=>{ setMode(v); });
   document.getElementById('gc-w').oninput=e=>{ S.w=+e.target.value; document.getElementById('gc-wval').textContent=`${S.w} / ${100-S.w}`; syncGlobalControls(); renderAll(); };
   document.getElementById('gc-reward').onchange=e=>{ S.reward=e.target.checked; renderAll(); };
+  // Date range. 'change' rather than 'input': a date field fires input on every keystroke while
+  // a year is being typed, so 'input' would kick a full renderAll() for "2", "20", "202"...
+  const gf=document.getElementById('gc-from'), gt=document.getElementById('gc-to'),
+        gr=document.getElementById('gc-xreset');
+  if(gf) gf.onchange=readRangeInputs;
+  if(gt) gt.onchange=readRangeInputs;
+  if(gr) gr.onclick=clearCrop;
 }
 // ── investment-mode switch: flush every mode-scoped cache and redraw everything. The as-of
 // calendars (months / aum_dates) do NOT change with the mode, so resetAsOf() is deliberately
@@ -2693,7 +2740,13 @@ function dataLanded(){ _DATA_EPOCH++; }
 // tab on the old scope while the state said otherwise. (Caught by the 2026-08-13 headless
 // probe: housesPresent() correctly returned 39 houses the instant the toggle flipped, but the
 // league table stayed on its 15-house frame because this signature had not moved.)
-function _globalSig(){ return S.universe+'|'+S.scope+'|'+S.basis+'|'+S.w+'|'+S.reward+'|'+S.mode+'|'+_DATA_EPOCH; }
+// S.xr (the date-range crop) belongs here for the SAME reason S.scope does, and it was caught
+// the same way: the headless probe typed a range, S.xr moved, renderAll() ran -- and every
+// chart stayed on the full history, because this signature had not changed and renderIfDirty()
+// short-circuits on an unchanged signature. The crop is a global input to every time-axis
+// chart on every tab, so it goes in the GLOBAL half of the signature, not a per-view one.
+function _globalSig(){ return S.universe+'|'+S.scope+'|'+S.basis+'|'+S.w+'|'+S.reward+'|'+S.mode
+                            +'|'+S.xr.from+'|'+S.xr.to+'|'+_DATA_EPOCH; }
 function viewSig(view){
   const g=_globalSig();
   switch(view){
@@ -2718,6 +2771,9 @@ function renderAll(){
   _DIRTY=new Set(Object.keys(_VIEW_FNS));
   if(!S.view) S.view=(document.querySelector('.tab.active')||{dataset:{}}).dataset.view||'amc';
   renderIfDirty(S.view);
+  // AFTER the render, not before: timeX() learns the natural date extent while the charts are
+  // being built, so the date pickers can only be bounded to real data once a render has run.
+  try{ syncRangeInputs(); }catch(e){}
 }
 
 //──────────────────────────── CHART OPTION FACTORIES ───────────────────────
@@ -2752,7 +2808,195 @@ function baseTooltip(){
     filter:i=> i.parsed.y!=null,
     itemSort:(a,b)=> ((b.parsed.y==null?-1e9:b.parsed.y)-(a.parsed.y==null?-1e9:a.parsed.y)) };
 }
-function timeX(xmin,xmax){ return { type:'time', time:{unit:'year'}, min:xmin, max:xmax, grid:{display:false}, ticks:{color:C.ink3, font:{size:10}}, border:{color:C.line} }; }
+// ── DATE RANGE: typed inputs + drag-to-crop + reset (Kyser 2026-09-03) ─────────────────────
+// Two asks that turn out to be one feature: "give interactibility like zoom crop reset in all
+// graphs (like we have in vistas terminal)" and "add start and end time input ... which user
+// can manually enter the date range and the charts adjust to that range".
+//
+// ONE state serves both, and that is the whole design decision. I had recommended inlining
+// chartjs-plugin-zoom; the date inputs change that answer, because the plugin keeps its zoom
+// INSIDE each chart. Drag to zoom on one panel and type a date in the box and there would be
+// two truths about "what window am I looking at" with no rule for which wins — and, worse,
+// each panel would be cropped differently while the deck's whole job is comparing panels on
+// one window. So both paths write S.xr, and every time-axis chart reads it through timeX(),
+// which is already the single funnel stackOpts / dualOpts / lineOpts all route through.
+// Drag a box on any chart -> the date boxes fill in. Type in the boxes -> every chart crops
+// together. Double-click any chart, or hit Reset -> back to full history.
+function toMs(v){
+  if(v==null) return null;
+  if(typeof v==='number') return isFinite(v)? v : null;
+  const t=new Date(v).getTime();
+  return isFinite(t)? t : null;
+}
+// The input wants a LOCAL yyyy-mm-dd. toISOString() would render it in UTC and, for anyone
+// east of Greenwich, land the box one day before the date that was actually picked.
+function msToInput(ms){
+  if(ms==null) return '';
+  const d=new Date(ms), p=n=>String(n).padStart(2,'0');
+  return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`;
+}
+function cropActive(){ return S.xr.from!=null || S.xr.to!=null; }
+function timeX(xmin,xmax){
+  // Learn the natural extent from whatever the charts ask for, so the date pickers can bound
+  // themselves to real data without this function needing to know the payload's shape.
+  const lo0=toMs(xmin), hi0=toMs(xmax);
+  if(lo0!=null && (S.xrFull.from==null || lo0<S.xrFull.from)) S.xrFull.from=lo0;
+  if(hi0!=null && (S.xrFull.to  ==null || hi0>S.xrFull.to  )) S.xrFull.to  =hi0;
+  // A fixed yearly unit is right for the full ~13-year span and wrong for a cropped one: crop
+  // to six months and 'year' yields one tick or none. Under a crop, let Chart.js pick the unit
+  // for the span it was actually handed.
+  return { type:'time', time: cropActive()? {} : {unit:'year'},
+    min: S.xr.from!=null ? S.xr.from : xmin,
+    max: S.xr.to  !=null ? S.xr.to   : xmax,
+    grid:{display:false},
+    ticks:{color:C.ink3, font:{size:10}, autoSkip:true, maxRotation:0, maxTicksLimit:12},
+    border:{color:C.line} };
+}
+function applyCrop(a,b){
+  const lo=Math.min(a,b), hi=Math.max(a,b);
+  if(!isFinite(lo)||!isFinite(hi)) return;
+  if(hi-lo < 7*864e5) return;             // under a week is a mis-drag, not an intent
+  S.xr.from=Math.round(lo); S.xr.to=Math.round(hi);
+  syncRangeInputs(); renderAll();
+}
+function clearCrop(){
+  if(!cropActive()) return;
+  S.xr.from=null; S.xr.to=null;
+  syncRangeInputs(); renderAll();
+}
+function syncRangeInputs(){
+  const f=document.getElementById('gc-from'), t=document.getElementById('gc-to'),
+        r=document.getElementById('gc-xreset');
+  if(!f||!t) return;
+  const lo=msToInput(S.xrFull.from), hi=msToInput(S.xrFull.to);
+  if(lo){ f.min=lo; t.min=lo; }
+  if(hi){ f.max=hi; t.max=hi; }
+  f.value = S.xr.from!=null ? msToInput(S.xr.from) : '';
+  t.value = S.xr.to  !=null ? msToInput(S.xr.to)   : '';
+  if(r) r.disabled = !cropActive();
+}
+function readRangeInputs(){
+  const f=document.getElementById('gc-from'), t=document.getElementById('gc-to');
+  if(!f||!t) return;
+  // "from" at the start of its day, "to" at the END of its day — otherwise picking the last
+  // date in the data crops the axis at that date's midnight and the final observation, the one
+  // the whole deck is usually about, falls off the right edge.
+  let a=f.value? new Date(f.value+'T00:00:00').getTime() : null;
+  let b=t.value? new Date(t.value+'T23:59:59').getTime() : null;
+  // An inverted range is a typo with an obvious intent. Swap it and re-sync so the boxes show
+  // what actually happened, rather than silently refusing and looking broken.
+  if(a!=null && b!=null && b<a){ const s=a; a=b; b=s; }
+  S.xr.from=a; S.xr.to=b;
+  syncRangeInputs(); renderAll();
+}
+// ── the drag-crop overlay ──────────────────────────────────────────────────────────────────
+// Drawn as a fixed-position DIV over the page rather than onto the canvas: painting into the
+// chart would mean forcing a redraw on every mousemove, and a Chart.js redraw re-runs the
+// gradient callbacks and the bar-value plugin ~60 times a second for a selection rectangle.
+let _cropBox=null, _swallowClick=false;
+function cropBoxShow(l,t,w,h){
+  if(!_cropBox){ _cropBox=document.createElement('div'); document.body.appendChild(_cropBox); }
+  _cropBox.style.cssText='position:fixed;z-index:9998;pointer-events:none;display:block;'
+    +`left:${l}px;top:${t}px;width:${w}px;height:${h}px;`
+    +'background:rgba(32,67,107,.10);border-left:1px solid rgba(32,67,107,.55);'
+    +'border-right:1px solid rgba(32,67,107,.55)';
+}
+function cropBoxHide(){ if(_cropBox) _cropBox.style.display='none'; }
+// A completed drag must not also read as a click — several panels navigate on canvas click
+// (amcGotoDate and friends), and releasing the mouse after a crop would otherwise jump the
+// as-of date at the same time. Capture phase, one event, self-clearing.
+// stopPropagation only -- NOT preventDefault. Calling preventDefault on the first click of a
+// double-click suppresses the dblclick event that Chromium would otherwise synthesise from it,
+// which silently killed double-click-to-reset. Stopping propagation is enough: it keeps the
+// click away from the panel handlers, which is the entire point.
+window.addEventListener('click', e=>{
+  if(_swallowClick){ _swallowClick=false; e.stopPropagation(); }
+}, true);
+// ── double-click to reset, detected HERE rather than via the dblclick event ────────────────
+// The obvious implementation -- a 'dblclick' listener on each canvas -- does not survive this
+// deck, and the headless probe caught it: a single click on a chart already navigates the
+// as-of date, that navigation re-renders the panel, and the canvas the first click landed on
+// is gone before the second arrives. Chromium only synthesises dblclick when both clicks share
+// one target, so the reset silently never fired. (Proof it was this and not a dead handler: a
+// synthetic dblclick dispatched at the same element DID reset.)
+// Detecting the double-press at the window, against S.charts read at press time, is immune to
+// the element being replaced -- there is no target to keep alive between the two clicks.
+let _lastPress = {t:0, x:0, y:0};
+function overTimeChart(e){
+  const cs = S.charts || {};
+  for(const k in cs){
+    const c = cs[k];
+    if(!c || !c.canvas || !c.scales || !c.scales.x || c.scales.x.type!=='time') continue;
+    const r = c.canvas.getBoundingClientRect();
+    if(e.clientX>=r.left && e.clientX<=r.right && e.clientY>=r.top && e.clientY<=r.bottom) return true;
+  }
+  return false;
+}
+window.addEventListener('mousedown', e=>{
+  _swallowClick=false;                       // a fresh press: any pending swallow is stale
+  const now=Date.now();
+  if(now-_lastPress.t < 420 && Math.abs(e.clientX-_lastPress.x)<6 && Math.abs(e.clientY-_lastPress.y)<6
+     && overTimeChart(e)){
+    _lastPress={t:0,x:0,y:0};
+    clearCrop();                             // no-op when nothing is cropped, so it is safe here
+    return;
+  }
+  _lastPress={t:now, x:e.clientX, y:e.clientY};
+}, true);
+Chart.register({
+  id:'dragCrop',
+  afterInit(chart){
+    // Time axes only. The cross-section bars are categorical (one bar per house) — there is no
+    // date to crop to, and a selection rectangle there would promise something it cannot do.
+    // Read the LIVE scale where it exists and fall back to the config: afterInit fires at the
+    // end of initialize(), and which of the two is populated is a Chart.js internal detail
+    // that a version bump could change. Either answering 'time' is enough.
+    const xs = (chart.scales && chart.scales.x) || (chart.options && chart.options.scales && chart.options.scales.x);
+    if(!xs || xs.type!=='time') return;
+    const cv=chart.canvas, st={on:false,x0:0,x1:0,moved:false};
+    chart.$crop=st;
+    const px = e => e.clientX - cv.getBoundingClientRect().left;
+    st.down=e=>{
+      if(e.button!==0) return;
+      const a=chart.chartArea; if(!a) return;
+      const x=px(e); if(x<a.left||x>a.right) return;
+      st.on=true; st.moved=false; st.x0=x; st.x1=x; cv.style.cursor='col-resize';
+    };
+    st.move=e=>{
+      if(!st.on) return;
+      const a=chart.chartArea; if(!a) return;
+      st.x1=Math.max(a.left, Math.min(a.right, px(e)));
+      if(Math.abs(st.x1-st.x0)>4) st.moved=true;
+      if(!st.moved) return;
+      const r=cv.getBoundingClientRect();
+      cropBoxShow(r.left+Math.min(st.x0,st.x1), r.top+a.top, Math.abs(st.x1-st.x0), a.bottom-a.top);
+      e.preventDefault();
+    };
+    st.up=()=>{
+      if(!st.on) return;
+      st.on=false; cv.style.cursor=''; cropBoxHide();
+      if(!st.moved || Math.abs(st.x1-st.x0)<8) return;   // a click, not a crop — leave it be
+      const sc=chart.scales && chart.scales.x; if(!sc) return;
+      _swallowClick=true;
+      applyCrop(sc.getValueForPixel(Math.min(st.x0,st.x1)),
+                sc.getValueForPixel(Math.max(st.x0,st.x1)));
+    };
+    cv.addEventListener('mousedown', st.down);
+    // move/up go on the WINDOW, not the canvas: a drag that ends outside the plot (which is most
+    // of them, at the edges) would otherwise never fire mouseup and would leave the box stuck on.
+    window.addEventListener('mousemove', st.move, {passive:false});
+    window.addEventListener('mouseup',   st.up);
+  },
+  // Every render destroys and rebuilds these charts, so without this the window listeners would
+  // accumulate one set per chart per render for the life of the session.
+  beforeDestroy(chart){
+    const st=chart.$crop; if(!st) return;
+    chart.canvas.removeEventListener('mousedown', st.down);
+    window.removeEventListener('mousemove', st.move);
+    window.removeEventListener('mouseup',   st.up);
+    chart.$crop=null;
+  }
+});
 function stackOpts({leftMax, rightLabel, xmin, xmax}){
   // stacked bands keep DATASET order in the tooltip (Q1..Q4 top-down) — value-sorting them
   // would scramble the band story, so the ranked itemSort from baseTooltip is switched off here
@@ -3205,7 +3449,14 @@ function renderSleeve(){
   const A=sleeveAt(byQ,li), score=qualityScore(byQ,li);
   const covWarn = (A.cov!=null && A.cov<0.999);
   const _slt=document.getElementById('sl-title');
-  _slt.innerHTML=`<span style="color:${houseColor(fh)}">${houseLabel(fh)}</span> · <span style="color:${sleeveColor(br)||''}">${br}</span>`;
+  // House and sleeve are the ONE place two different colour systems print side by side, and
+  // with literal primaries some pairs are genuinely close in hue (red vs Aditya dE00 7.0,
+  // green vs HDFC 4.0). Hue therefore cannot be the only thing separating them: the house
+  // stays plain coloured text and the sleeve becomes a tinted chip, so the two are told apart
+  // by SHAPE first. This is what makes the primaries safe here rather than backing off them.
+  _slt.innerHTML=`<span style="color:${houseColor(fh)}">${houseLabel(fh)}</span>`
+    + ` <span class="sl-chip" style="color:${sleeveColor(br)||''};background:${sleeveTint(br,0.12)};`
+    + `border-color:${sleeveTint(br,0.30)}">${br}</span>`;
   document.getElementById('sl-ctx').innerHTML=`${basisDesc()}<br>Snapshot ${fmt.date(dates[li])}`;
   document.getElementById('sl-kpis').innerHTML=`
     <div class="kpi qc q-q12"><div class="k-lbl">Q1+Q2 within sleeve</div><div class="k-val">${fmt.pct(A.top)}</div><div class="k-sub">of the sleeve's <b>rated</b> AUM</div></div>
