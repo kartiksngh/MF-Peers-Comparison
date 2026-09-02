@@ -362,7 +362,7 @@
   }
   .masthead h1 em { font-style: italic; font-weight: 500; color: #e9c9c2; }
   .mast-sub {
-    font-size: 13.5px; color: #b3a690; margin-top: 9px; max-width: 600px; font-weight: 400;
+    font-size: 13px; color: #b3a690; margin-top: 9px; max-width: 600px; font-weight: 400;
   }
   .mast-meta {
     display: grid; gap: 12px; text-align: right;
@@ -419,7 +419,7 @@
   }
   .fg { display: flex; flex-direction: column; gap: 6px; }
   .fg label {
-    font-size: 9.5px; text-transform: uppercase; letter-spacing: .14em; color: var(--ink-3); font-weight: 600;
+    font-size: 9px; text-transform: uppercase; letter-spacing: .14em; color: var(--ink-3); font-weight: 600;
   }
   .fg select, .fg input {
     font-family: 'Inter', sans-serif; font-size: 13px; padding: 9px 13px;
@@ -454,12 +454,12 @@
   .seg button.active { background: var(--ink); color: var(--paper); }
   .seg button:not(.active):hover { background: var(--paper-3); color: var(--ink); }
 
-  .chk { display:inline-flex; align-items:center; gap:8px; font-size:12.5px; color:var(--ink-2); cursor:pointer; user-select:none; padding-bottom:9px; }
+  .chk { display:inline-flex; align-items:center; gap:8px; font-size:12px; color:var(--ink-2); cursor:pointer; user-select:none; padding-bottom:9px; }
   .chk input { width:16px; height:16px; accent-color: var(--absl); cursor:pointer; }
 
   .spacer { margin-left: auto; }
   .btn {
-    appearance:none; cursor:pointer; padding: 9px 18px; border-radius: var(--r); font-size: 12.5px; font-weight: 600;
+    appearance:none; cursor:pointer; padding: 9px 18px; border-radius: var(--r); font-size: 12px; font-weight: 600;
     font-family: 'Inter', sans-serif; letter-spacing: .02em; border: 1px solid transparent; transition: all .15s;
     display:inline-flex; align-items:center; gap:8px;
   }
@@ -500,7 +500,7 @@
   .kpi .k-val.q2c { color: var(--q2); }
   .kpi .k-val.q3c { color: var(--q3); }
   .kpi .k-val.warn { color: var(--q4); }
-  .kpi .k-sub { font-family:'JetBrains Mono', monospace; font-size: 10.5px; color: var(--ink-4); margin-top: 7px; }
+  .kpi .k-sub { font-family:'JetBrains Mono', monospace; font-size: 10px; color: var(--ink-4); margin-top: 7px; }
 
   /* Cards */
   .card {
@@ -531,7 +531,7 @@
     font-size: 12px; color: var(--ink-2); line-height: 1.6;
   }
   .method .m-lbl {
-    font-family:'JetBrains Mono', monospace; font-size: 9.5px; letter-spacing: .14em; text-transform: uppercase;
+    font-family:'JetBrains Mono', monospace; font-size: 9px; letter-spacing: .14em; text-transform: uppercase;
     color: var(--gold); font-weight: 700; margin-right: 8px;
   }
   .method b { color: var(--ink); font-weight: 600; }
@@ -549,7 +549,7 @@
     display: inline-flex; align-items: center; gap: 7px; cursor: pointer;
     padding: 5px 11px 5px 9px; border: 1px solid var(--line-2); border-left: 3px solid var(--gold);
     border-radius: var(--r); background: linear-gradient(180deg, var(--paper-2), var(--paper));
-    font-family: inherit; font-size: 11.5px; color: var(--ink-2); line-height: 1.4;
+    font-family: inherit; font-size: 11px; color: var(--ink-2); line-height: 1.4;
   }
   .m-open:hover { border-color: var(--gold); color: var(--ink); }
   .m-open:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
@@ -579,16 +579,16 @@
 
   /* Tables */
   .tbl-wrap { overflow-x: auto; }
-  table.rt { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  table.rt { width: 100%; border-collapse: collapse; font-size: 12px; }
   table.rt th {
     text-align: left; padding: 11px 10px; border-bottom: 1.5px solid var(--ink);
-    font-family: 'Inter', sans-serif; font-size: 9.5px; text-transform: uppercase; letter-spacing: .09em;
+    font-family: 'Inter', sans-serif; font-size: 9px; text-transform: uppercase; letter-spacing: .09em;
     color: var(--ink-2); font-weight: 700; white-space: nowrap; position: sticky; top: 0; background: var(--card); z-index:2;
   }
   table.rt th.num, table.rt td.num { text-align: right; font-variant-numeric: tabular-nums; }
   /* Generic click-to-sort: the sorter adds .sortable + .gs itself, so the affordance styling
      is shared with the two tables that already sorted through app state. */
-  table.rt th.gs .arr { opacity:.28; font-size:9.5px; margin-left:3px; }
+  table.rt th.gs .arr { opacity:.28; font-size:9px; margin-left:3px; }
   table.rt th.gs:hover .arr { opacity:.75; }
   body.theme-mac table.rt th.sortable:hover { color: var(--ink); }
   body.theme-mac table.rt th.sortable.sorted { color: var(--ink); }
@@ -747,30 +747,30 @@
     border-radius: 3px; overflow: hidden; vertical-align: middle; margin-right: 7px; }
   .am-bar { display: block; height: 100%; background: #8c7a4e; border-radius: 3px; }
   .am-barnum { font-family:'JetBrains Mono',monospace; font-size: 11px; }
-  .pg-sub { display: block; font-family:'JetBrains Mono',monospace; font-size: 9.5px; color: var(--ink-4); letter-spacing: .01em; margin-top: 2px; }
+  .pg-sub { display: block; font-family:'JetBrains Mono',monospace; font-size: 9px; color: var(--ink-4); letter-spacing: .01em; margin-top: 2px; }
   .pg-pend { color: var(--ink-4); letter-spacing: .14em; font-family:'JetBrains Mono',monospace; }
   .pg-tools { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
-  .pg-filter { flex: 0 1 300px; padding: 8px 12px; font-size: 12.5px; border: 1px solid var(--line); background: var(--card); border-radius: var(--r); font-family:'Inter',sans-serif; color: var(--ink); }
+  .pg-filter { flex: 0 1 300px; padding: 8px 12px; font-size: 12px; border: 1px solid var(--line); background: var(--card); border-radius: var(--r); font-family:'Inter',sans-serif; color: var(--ink); }
   .pg-filter:focus { outline: none; border-color: var(--absl); box-shadow: 0 0 0 3px var(--absl-glow); }
   .pg-count { font-family:'JetBrains Mono',monospace; font-size: 11px; color: var(--ink-3); }
   /* The SIP block's ON-DEMAND affordance (F2). sip_<conv>.json is ~16 MB and only six of this
      grid's columns read it, so under Lumpsum it is fetched only when the reader asks. The pill
      sits inside the SIP block's level-1 header; .pg-off is the "not asked for" cell marker,
      deliberately fainter than the "···" loading marker so the two states cannot be confused. */
-  .pg-load { margin-left: 8px; padding: 2px 9px; font-family:'JetBrains Mono',monospace; font-size: 9.5px;
+  .pg-load { margin-left: 8px; padding: 2px 9px; font-family:'JetBrains Mono',monospace; font-size: 9px;
              letter-spacing: .06em; text-transform: none; color: var(--ink-3); background: var(--paper-2);
              border: 1px solid var(--line); border-radius: 999px; cursor: pointer; vertical-align: middle; }
   .pg-load:hover { color: var(--absl-2); border-color: var(--absl); }
   .pg-load[disabled] { cursor: default; opacity: .55; }
   .pg-off { opacity: .5; }
 
-  .qchip { display:inline-block; min-width:26px; padding:2px 8px; border-radius:5px; font-family:'JetBrains Mono',monospace; font-size:10.5px; font-weight:700; text-align:center; color:#fff; }
+  .qchip { display:inline-block; min-width:26px; padding:2px 8px; border-radius:5px; font-family:'JetBrains Mono',monospace; font-size:10px; font-weight:700; text-align:center; color:#fff; }
   .qchip.Q1 { background: var(--q1); }
   .qchip.Q2 { background: var(--q2); }
   .qchip.Q3 { background: var(--q3); }
   .qchip.Q4 { background: var(--q4); }
 
-  .pill { display:inline-block; min-width: 24px; padding: 3px 8px; font-family:'JetBrains Mono', monospace; font-size: 10.5px; font-weight: 700; text-align:center; border-radius: 100px; background: var(--paper-3); color: var(--ink-2); }
+  .pill { display:inline-block; min-width: 24px; padding: 3px 8px; font-family:'JetBrains Mono', monospace; font-size: 10px; font-weight: 700; text-align:center; border-radius: 100px; background: var(--paper-3); color: var(--ink-2); }
   .pill.r1 { background: var(--q1); color: #fff; }
   .pill.up { background: rgba(31,92,61,0.16); color: var(--q1); }
   .pill.dn { background: rgba(192,82,62,0.16); color: var(--q4); }
@@ -779,7 +779,7 @@
   .delta-neg { color: var(--q4); }
 
   .search {
-    width: 100%; padding: 12px 16px; font-size: 13.5px; border: 1px solid var(--line); background: var(--card);
+    width: 100%; padding: 12px 16px; font-size: 13px; border: 1px solid var(--line); background: var(--card);
     border-radius: var(--r); font-family: 'Inter', sans-serif; margin-bottom: 14px;
   }
   .search:focus { outline: none; border-color: var(--absl); box-shadow: 0 0 0 3px var(--absl-glow); }
@@ -789,13 +789,13 @@
   @keyframes sp { to { transform: rotate(360deg); } }
   .loading .lt { font-family: 'Fraunces', serif; font-size: 17px; font-style: italic; }
 
-  .tag { display:inline-block; padding: 3px 9px; border-radius: 100px; font-size: 10.5px; font-family:'JetBrains Mono',monospace; font-weight:600; background: var(--paper-3); color: var(--ink-2); border:1px solid var(--line); }
+  .tag { display:inline-block; padding: 3px 9px; border-radius: 100px; font-size: 10px; font-family:'JetBrains Mono',monospace; font-weight:600; background: var(--paper-3); color: var(--ink-2); border:1px solid var(--line); }
   .tag.t-vr { background:#eef3ee; color:var(--q1); border-color:#cfe0d3; }
   .tag.t-cat { background:#fbf2dd; color:var(--gold); border-color:#ecdcb4; }
   .tag.t-sch { background:#f6e6e2; color:var(--absl-2); border-color:#ecccc4; }
   .tag.t-cap { background:#eef0f6; color:var(--navy); border-color:#cdd6e6; }
 
-  .note-cap { margin-bottom:16px; padding:13px 16px; background:#eef0f6; border:1px solid #cdd6e6; border-left:3px solid var(--navy); border-radius:var(--r); font-size:12.5px; color:var(--ink-2); line-height:1.6; }
+  .note-cap { margin-bottom:16px; padding:13px 16px; background:#eef0f6; border:1px solid #cdd6e6; border-left:3px solid var(--navy); border-radius:var(--r); font-size:12px; color:var(--ink-2); line-height:1.6; }
   .note-cap b { color:var(--navy); }
 
   @media (max-width: 1180px) {
@@ -830,7 +830,7 @@
   .tl-btn.active { background:var(--absl); color:#fff; border-color:var(--absl); }
   .capbadge {
     position:absolute; top:14px; right:16px; z-index:6; background:var(--ink); color:var(--paper);
-    font-family:'JetBrains Mono',monospace; font-size:12.5px; font-weight:600; padding:5px 10px;
+    font-family:'JetBrains Mono',monospace; font-size:12px; font-weight:600; padding:5px 10px;
     border-radius:7px; box-shadow:var(--shadow-md); letter-spacing:.02em;
   }
   .card.capturing .method, .card.capturing .legend { display:none !important; }
@@ -846,11 +846,11 @@
   .gm-grid { display:grid; grid-template-columns:1fr 1fr; gap:15px 20px; margin-bottom:16px; }
   .gm-fg { display:flex; flex-direction:column; gap:6px; }
   .gm-fg.full { grid-column:1 / -1; }
-  .gm-fg label { font-size:9.5px; text-transform:uppercase; letter-spacing:.14em; color:var(--ink-3); font-weight:600; }
+  .gm-fg label { font-size:9px; text-transform:uppercase; letter-spacing:.14em; color:var(--ink-3); font-weight:600; }
   .gm-fg select, .gm-fg input[type=number] { font-family:'Inter',sans-serif; font-size:13px; padding:9px 12px; background:var(--card); border:1px solid var(--line); color:var(--ink); border-radius:var(--r); }
   .gm-fg .srow { display:flex; align-items:center; gap:11px; }
   .gm-fg input[type=range] { flex:1; }
-  .gm-info { font-size:12.5px; color:var(--ink-2); line-height:1.6; background:linear-gradient(180deg,var(--paper-2),var(--paper)); border:1px solid var(--line-2); border-left:3px solid var(--gold); border-radius:var(--r); padding:11px 14px; margin-bottom:15px; }
+  .gm-info { font-size:12px; color:var(--ink-2); line-height:1.6; background:linear-gradient(180deg,var(--paper-2),var(--paper)); border:1px solid var(--line-2); border-left:3px solid var(--gold); border-radius:var(--r); padding:11px 14px; margin-bottom:15px; }
   .gm-info b { color:var(--ink); font-weight:700; }
   .gm-prog { margin-bottom:15px; }
   .gm-prog[hidden] { display:none; }
@@ -881,20 +881,21 @@
      every number/label on the page. This layer changes surfaces, never content. */
 
   body.theme-mac {
-    /* GROUND (Kyser 2026-09-02): "egg white, like the thick paper of a handicraft diary, with
-       texture". The cool Mac grey went warm and lighter -- #f7f5f0 -- and the paper grain that
-       the base skin ships but never switches on is switched on below at low opacity. The card
-       white stays pure, so cards read as sheets laid ON the paper rather than holes cut in it. */
-    --paper:      #f7f5f0;
-    --paper-2:    #f1ede5;
-    --paper-3:    #e8e2d6;
+    /* GROUND. The egg-white experiment is REVERTED (Kyser 2026-09-03: "I am not liking the
+       eggwhite theme colour"). Back to the cool near-white ground, with the chrome a shade of
+       grey over it and CHART CARDS PURE WHITE -- so a chart is the brightest thing on the page
+       and the ground recedes behind it. What survives from the experiment is the TEXTURE: the
+       grain stays on, and heavier than before, because that was the part he liked. */
+    --paper:      #f5f5f7;
+    --paper-2:    #eeeef2;
+    --paper-3:    #e4e4ea;
     --card:       #ffffff;
-    --ink:        #1d1c1a;
-    --ink-2:      #3a3833;
-    --ink-3:      #6d685f;
-    --ink-4:      #9a948a;
-    --line:       #ddd7ca;
-    --line-2:     #ece7dc;
+    --ink:        #1d1d1f;
+    --ink-2:      #38383d;
+    --ink-3:      #6e6e73;
+    --ink-4:      #9a9aa0;
+    --line:       #d6d6db;
+    --line-2:     #e9e9ee;
     --absl-glow:  rgba(200,57,43,0.14);
     --absl-bg:    #fdecea;
     --shadow-sm:  0 1px 2px rgba(0,0,0,.05), 0 4px 14px -8px rgba(0,0,0,.12);
@@ -911,7 +912,10 @@
      Switched on faintly here -- it is what makes the ground read as thick handmade paper rather
      than a flat fill. Kept under the content (z-index 0, #app is z-index 1) and pointer-events
      none, so it can never intercept a click. */
-  body.theme-mac::before { display: block; opacity: .55; }
+  /* Heavier than the first pass: the ground is the one surface allowed to have texture, and it
+     is what stops a flat near-white page looking like an empty div. Cards sit on top of it in
+     pure white, so the grain reads as paper UNDER the sheets, never through them. */
+  body.theme-mac::before { display: block; opacity: 1; }
 
   /* ── CHROME: masthead + tabs + filter bars ────────────────────────────────────────────────
      Kyser 2026-09-02 raised two problems with the first cut, and they share one fix.
@@ -935,10 +939,10 @@
        universal background", not the clear step it was. Paper is #f7f5f0, chrome is #f1ede5 --
        about 6 levels down per channel. Enough for the eye to find the edge of the toolbar,
        not enough to read as a separate slab. The hairline does the rest of that work now. */
-    --chrome:      #f1ede5;
-    --chrome-soft: rgba(241,237,229,.90);
-    --chrome-line: #e2dccf;
-    --chrome-lbl:  #5f594f;      /* labels ON the chrome -- darker than --ink-4 on purpose */
+    --chrome:      #e9e9ef;
+    --chrome-soft: rgba(233,233,239,.86);
+    --chrome-line: #dadae0;
+    --chrome-lbl:  #5c5c63;      /* labels ON the chrome -- darker than --ink-4 on purpose */
   }
   body.theme-mac .masthead {
     background: var(--chrome-soft);
@@ -954,7 +958,7 @@
   }
   body.theme-mac .masthead h1 em { font-style: normal; font-weight: 400; color: var(--ink-3); }
   body.theme-mac .mast-kicker {
-    font-family: var(--sans); font-size: 8.5px; letter-spacing: .13em; margin-bottom: 3px;
+    font-family: var(--sans); font-size: 8px; letter-spacing: .13em; margin-bottom: 3px;
   }
   body.theme-mac .mast-kicker::before { width: 14px; }
   /* The strapline is orientation, not a number anyone reads twice. One line, clipped -- it was
@@ -970,7 +974,7 @@
   body.theme-mac .mast-meta .row .val { color: var(--ink); font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; }
   body.theme-mac .mast-badge {
     background: rgba(255,255,255,.75); border: 1px solid rgba(0,0,0,.08); color: var(--ink-2);
-    font-family: var(--sans); font-size: 10.5px; font-weight: 500; padding: 4px 10px;
+    font-family: var(--sans); font-size: 10px; font-weight: 500; padding: 4px 10px;
   }
 
   /* ── tabs: a macOS segmented control ──────────────────────────────────────────────────── */
@@ -981,7 +985,7 @@
     border-bottom: 1px solid var(--chrome-line); padding: 3px 34px; gap: 2px;
   }
   body.theme-mac .tab {
-    font-family: var(--sans); font-size: 12.5px; font-weight: 600; letter-spacing: -0.008em;
+    font-family: var(--sans); font-size: 12px; font-weight: 600; letter-spacing: -0.008em;
     padding: 4px 10px; border-bottom: none; margin-bottom: 0; border-radius: 7px;
     color: var(--chrome-lbl); transition: background .18s, color .18s, box-shadow .18s; gap: 7px;
   }
@@ -990,7 +994,7 @@
     background: var(--card); color: var(--ink);
     box-shadow: 0 1px 2px rgba(0,0,0,.09), 0 0 0 .5px rgba(0,0,0,.06);
   }
-  body.theme-mac .tab .tnum { font-family: var(--sans); font-weight: 600; font-size: 9.5px; }
+  body.theme-mac .tab .tnum { font-family: var(--sans); font-weight: 600; font-size: 9px; }
   body.theme-mac .tab.active .tnum { color: var(--absl); }
 
   /* ── filter bars ──────────────────────────────────────────────────────────────────────── */
@@ -1015,7 +1019,7 @@
      between a 211px stack and a 150px one, on a page whose whole job is the content below. */
   body.theme-mac .fg { gap: 1px; }
   body.theme-mac .fg label {
-    font-family: var(--sans); font-size: 8.5px; letter-spacing: .05em; text-transform: none;
+    font-family: var(--sans); font-size: 8px; letter-spacing: .05em; text-transform: none;
     font-weight: 600; color: var(--chrome-lbl); line-height: 1.15;
   }
   body.theme-mac .fg select, body.theme-mac .fg input {
@@ -1032,16 +1036,16 @@
     padding: 2px; gap: 2px;
   }
   body.theme-mac .seg button {
-    font-family: var(--sans); font-size: 11.5px; font-weight: 600; border-right: none;
+    font-family: var(--sans); font-size: 11px; font-weight: 600; border-right: none;
     border-radius: 6px; padding: 3px 9px; color: var(--chrome-lbl);
   }
-  body.theme-mac .seg.sm button { padding: 4px 9px; font-size: 10.5px; }
+  body.theme-mac .seg.sm button { padding: 4px 9px; font-size: 10px; }
   body.theme-mac .seg button.active {
     background: #fff; color: var(--ink);
     box-shadow: 0 1px 2px rgba(0,0,0,.10), 0 0 0 .5px rgba(0,0,0,.06);
   }
   body.theme-mac .seg button:not(.active):hover { background: rgba(0,0,0,.04); color: var(--ink-2); }
-  body.theme-mac .btn { border-radius: 7px; font-family: var(--sans); font-weight: 600; letter-spacing: -0.004em; padding: 5px 12px; font-size: 11.5px; }
+  body.theme-mac .btn { border-radius: 7px; font-family: var(--sans); font-weight: 600; letter-spacing: -0.004em; padding: 5px 12px; font-size: 11px; }
   body.theme-mac .btn-dark { background: var(--ink); box-shadow: 0 1px 2px rgba(0,0,0,.18); }
   body.theme-mac .btn-dark:hover { background: #000; }
   body.theme-mac .chk { font-family: var(--sans); }
@@ -1053,13 +1057,13 @@
     font-family: var(--sans); font-weight: 700; font-size: 23px; letter-spacing: -0.026em;
   }
   body.theme-mac .shead h2 em { font-style: normal; font-weight: 400; color: var(--ink-3); }
-  body.theme-mac .shead .ctx { font-family: var(--sans); font-size: 11.5px; color: var(--ink-3); }
+  body.theme-mac .shead .ctx { font-family: var(--sans); font-size: 11px; color: var(--ink-3); }
   body.theme-mac .card {
     background: #fff; border: 1px solid var(--line-2); border-radius: 16px; padding: 21px 23px;
     box-shadow: 0 1px 2px rgba(0,0,0,.04), 0 14px 30px -24px rgba(0,0,0,.22);
   }
   body.theme-mac .card-h h3 {
-    font-family: var(--sans); font-weight: 650; font-size: 16px; letter-spacing: -0.018em;
+    font-family: var(--sans); font-weight: 600; font-size: 16px; letter-spacing: -0.018em;
   }
   body.theme-mac .card-h .sub { font-size: 12px; color: var(--ink-3); }
 
@@ -1072,11 +1076,11 @@
      `.card--data` is set in script, not by CSS :has(), so the rule does not depend on
      :has() support in whatever browser the deck is opened in. */
   body.theme-mac {
-    --srf-data:  #fdfcf9;   /* egg white  -- a card whose subject is a table */
-    --srf-data2: #faf8f3;   /* cement     -- its neighbour, so a pair does not merge */
-    --srf-thead: #f2eee6;   /* table header band */
-    --srf-zebra: #faf8f3;   /* alternating rows */
-    --srf-hover: #f0ebe0;
+    --srf-data:  #fbfbfd;   /* a card whose subject is a TABLE -- charts stay pure white */
+    --srf-data2: #f7f7fb;   /* its neighbour, so a side-by-side pair does not merge */
+    --srf-thead: #eeeef4;   /* table header band */
+    --srf-zebra: #f5f5f9;   /* alternating rows */
+    --srf-hover: #e7e9f1;
   }
   body.theme-mac .card.card--data { background: var(--srf-data); }
   body.theme-mac .grid-2 > .card.card--data:nth-child(even) { background: var(--srf-data2); }
@@ -1094,7 +1098,7 @@
   }
   body.theme-mac .kpi::before { width: 3px; border-radius: 3px 0 0 3px; }
   body.theme-mac .kpi .k-lbl {
-    font-family: var(--sans); font-size: 11.5px; text-transform: none; letter-spacing: -0.004em;
+    font-family: var(--sans); font-size: 11px; text-transform: none; letter-spacing: -0.004em;
     font-weight: 600; margin-bottom: 7px;
   }
   body.theme-mac .kpi .k-val {
@@ -1105,21 +1109,21 @@
   /* the .qc / .mc blocks above set their own Fraunces label face -- override it here so the
      themed page stays on ONE type family. Colour is left exactly as those blocks set it. */
   body.theme-mac .kpi.qc .k-lbl, body.theme-mac .kpi.mc .k-lbl {
-    font-family: var(--sans); font-size: 11.5px; font-weight: 600; letter-spacing: -0.004em;
+    font-family: var(--sans); font-size: 11px; font-weight: 600; letter-spacing: -0.004em;
   }
 
   /* ── tables: hairlines, not rules ─────────────────────────────────────────────────────── */
-  body.theme-mac table.rt { font-size: 12.5px; }
+  body.theme-mac table.rt { font-size: 11px; }
   /* The header band is a shade, not white-on-white -- and its type is darkened with it, for
      the same reason the chrome labels were: #6e6e73 on #eeeef4 is 4.0:1, #4e4e56 is 6.9:1. */
   body.theme-mac table.rt th {
-    font-family: var(--sans); font-size: 10.5px; text-transform: none; letter-spacing: -0.002em;
-    font-weight: 650; color: #4e4e56; border-bottom: 1px solid var(--line);
+    font-family: var(--sans); font-size: 9px; text-transform: none; letter-spacing: -0.002em;
+    font-weight: 600; color: #4e4e56; border-bottom: 1px solid var(--line);
     padding: 8px 10px; background: var(--srf-thead);
   }
   body.theme-mac table.rt td {
     font-family: var(--sans); font-variant-numeric: tabular-nums; color: var(--ink-2);
-    border-bottom: 1px solid var(--line-2); padding: 9px 10px;
+    border-bottom: 1px solid var(--line-2); padding: 7px 9px;
   }
   body.theme-mac table.rt td.lbl { font-family: var(--sans); }
   /* The base skin hovers the CELL (`table.rt tr:hover td`), which would paint over the row
@@ -1127,7 +1131,7 @@
      `tr.hl td` and `tr.qhead td` still set their own cell background and still win. */
   body.theme-mac table.rt tr:hover td { background: transparent; }
   body.theme-mac table.rt tr.qhead td {
-    background: #f2f2f6; font-family: var(--sans); font-weight: 650; font-size: 12.5px;
+    background: #f2f2f6; font-family: var(--sans); font-weight: 600; font-size: 12px;
     border-bottom: 1px solid var(--line);
   }
 
@@ -1136,7 +1140,7 @@
     background: rgba(0,0,0,.05); border-color: transparent; color: var(--ink-2);
     font-family: var(--sans); font-size: 11px; font-weight: 500; border-radius: 100px;
   }
-  body.theme-mac .legend { font-family: var(--sans); font-size: 11.5px; color: var(--ink-3); }
+  body.theme-mac .legend { font-family: var(--sans); font-size: 11px; color: var(--ink-3); }
   body.theme-mac .m-open {
     background: rgba(0,0,0,.04); border: 1px solid var(--line-2); border-left: 3px solid var(--gold);
     border-radius: 9px; font-family: var(--sans);
@@ -1439,6 +1443,55 @@ Chart.defaults.font.family = "'Inter', sans-serif";
 Chart.defaults.font.size = 11;
 Chart.defaults.color = C.ink3;
 Chart.defaults.borderColor = C.line2;
+// ★ NO GRIDLINES ANYWHERE (Kyser 2026-09-03, asked three times). Set as a Chart.js DEFAULT
+// rather than per-scale: Chart.js draws a grid unless told not to, so switching it off chart by
+// chart means any panel added later silently gets them back, and any panel I failed to find
+// keeps them today. The per-scale settings below are left in place as belt and braces.
+Chart.defaults.scale.grid.display = false;
+
+// ── VALUE LABELS ON BARS (Kyser 2026-09-03) ───────────────────────────────────────────────
+// Removing the gridlines took away the gauge, so each bar states its own number instead. This
+// is a hand-rolled Chart.js plugin, not chartjs-plugin-datalabels: the deck is a single
+// offline file and may not take a new dependency.
+// Two decisions worth keeping:
+//  * On a STACKED bar the label is the TOTAL of the stack, drawn once at the top -- not one
+//    number per segment. The metric the panel ranks on is the total; per-segment labels would
+//    be four numbers per bar and unreadable at this size.
+//  * A bar that reaches the top of the scale would have its label clipped, so the label is
+//    clamped INSIDE the chart area rather than being drawn off-canvas and silently lost.
+// Opt-in per chart via options.plugins.barValues, so a chart where labels would crowd simply
+// does not ask for them.
+Chart.register({
+  id:'barValues',
+  afterDatasetsDraw(chart, args, opts){
+    if(!opts || opts.enabled===false) return;
+    const idxs = chart.data.datasets.map((d,i)=>i)
+      .filter(i=>{ const m=chart.getDatasetMeta(i); return m.type==='bar' && !m.hidden; });
+    if(!idxs.length) return;
+    const n = (chart.data.labels||[]).length || (chart.getDatasetMeta(idxs[0]).data||[]).length;
+    const dp = opts.dp==null ? 1 : opts.dp, suffix = opts.suffix||'';
+    const ctx = chart.ctx;
+    ctx.save();
+    ctx.font = opts.font || '600 9.5px -apple-system, BlinkMacSystemFont, Inter, sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+    ctx.fillStyle = opts.color || '#6d685f';
+    for(let i=0;i<n;i++){
+      let total=0, topY=Infinity, x=null, any=false;
+      idxs.forEach(di=>{
+        const el=chart.getDatasetMeta(di).data[i]; if(!el) return;
+        const raw=chart.data.datasets[di].data[i];
+        const v=(raw && typeof raw==='object') ? raw.y : raw;
+        if(v==null || isNaN(v)) return;
+        any=true; total+=v;
+        if(el.y < topY){ topY=el.y; x=el.x; }
+      });
+      if(!any || x==null) continue;
+      if(opts.hideZero && Math.abs(total) < 0.05) continue;
+      ctx.fillText(total.toFixed(dp)+suffix, x, Math.max(chart.chartArea.top+11, topY-4));
+    }
+    ctx.restore();
+  }
+});
 
 function gradient(ctx, area, hex, topA=0.42, botA=0.02){
   if(!area) return hex;
@@ -2087,24 +2140,60 @@ function houseLabel(fh){ return HOUSE_LABEL[fh] || fh; }
 // colour, never black -- the whole point is that the heading is never colourless -- and (b) the
 // SAME colour on every render and in every panel, so the hash is over the key and nothing else.
 // A random or index-based pick would make a house change colour when the scope widened.
+// ★ REGENERATED 2026-09-03. Kyser reported "more than one pair of AMCs sharing green, and
+// another sharing blue". He under-reported it. Measured in CIELAB, the hand-picked map had
+// 147 pairs under dE76 25 and a worst pair at dE 0.9 -- Bank #3d6b8c and TRUSTMF #3f6a8a were
+// the same colour to any eye. Hand-picking ~45 mutually distinct hues is not something a
+// person can do; this map is GENERATED by farthest-point selection in Lab space, under three
+// enforced constraints: legible as text on both #ffffff and the paper ground (>= 4:1),
+// chromatic enough to read as an identity (C* >= 30), and bounded in saturation/lightness so
+// the search cannot walk off into electric blue and magenta -- maximally distinct and
+// completely wrong for this deck.
+//
+// The selection is SEEDED in priority order: Kyser's three named anchors first (Aditya red,
+// ICICI orange, Kotak the blue/red blend), then the Top-15 houses -- because farthest-point
+// gives the biggest gaps to whoever is picked first, and the Top-15 are the set that actually
+// shares a screen and a reordering list. The long tail only appears under "All AMCs".
+// RESULT: minimum dE within the default on-screen set 26.2 (was 0.9); global minimum 12.9.
+//
+// ICICI moved #e07b26 -> #b7621a. The brand orange is only 2.99:1 on white -- fine as a bar
+// fill, not legible as the heading text it is now used for. Hue preserved, lightness reduced.
+//
+// Alias keys are deliberate: 'Baroda' and 'BARODA' are the same house, and both resolve to the
+// same colour. One house, one colour -- that is the whole point of this map.
 const HOUSE_COLOR = {
-  Aditya:'#c8392b', ICICI:'#e07b26', Kotak:'#7b3fa0', HDFC:'#12508c', SBI:'#2f6fb5',
-  Axis:'#8c1f3d',   Nippon:'#0f7d84', UTI:'#1f7a4d',  DSP:'#a03a63',  Mirae:'#4b6cb7',
-  Tata:'#5c6bc0',   Franklin:'#0a7a5c', Invesco:'#7a5c1f', Bandhan:'#a34a1f', Canara:'#3f7d3a',
-  Motilal:'#8a6d1f', Quant:'#5a4fcf', HSBC:'#9b1b30', LIC:'#1a5f8c', Baroda:'#b0527d',
-  Edelweiss:'#2f7f6f', PPFAS:'#6a4a9c', Sundaram:'#c0651f', JM:'#4a6a8a', Bank:'#3d6b8c',
-  Union:'#7a4a8c', Mahindra:'#2f7a6a', WhiteOak:'#5f5f9c', '360':'#8a5a2f', Groww:'#2f8a5a',
-  Navi:'#4a5fa8', Bajaj:'#1f6f8a', HeliosMF:'#a05a2f', ITI:'#6a7a2f', NJ:'#8a3f6a',
-  TRUSTMF:'#3f6a8a', JioBlackRock:'#2f5f9c', Zerodha:'#c05a2f', Samco:'#7a3f5a', Taurus:'#5a7a3f',
-  Shriram:'#8a5f2f', Quantum:'#3f7a8a', Old:'#6a5f3f', The:'#5f4a7a',
+  '360':'#671d5b', Aditya:'#c8392b', Axis:'#ae2974', BARODA:'#90476b',
+  BHARAT:'#8c3a21', Bajaj:'#ae29ae', Bandhan:'#1d207c', Bank:'#97732b',
+  Baroda:'#90476b', Canara:'#2929ae', DSP:'#26285e', Edelweiss:'#747039',
+  Franklin:'#a72f47', Groww:'#7829ae', HDFC:'#268743', HSBC:'#268777',
+  HeliosMF:'#614082', ICICI:'#b7621a', ITI:'#904747', Invesco:'#632133',
+  JM:'#8c217e', JioBlackRock:'#404f82', Kotak:'#7b3fa0', LIC:'#3a6b19',
+  Mahindra:'#26734a', Mirae:'#6c7c1d', Motilal:'#985f3e', NJ:'#50196b',
+  Navi:'#904788', Nippon:'#3c592c', Old:'#6b191c', PGIM:'#293fae',
+  PPFAS:'#8c2150', Parag:'#9d2525', Quant:'#502c59', Quantum:'#638240',
+  SBI:'#2974ae', Samco:'#67311d', Shriram:'#3d8726', Sundaram:'#53218c',
+  TRUSTMF:'#4d3e98', Tata:'#67471d', Taurus:'#9d5d25', The:'#1d307c',
+  UTI:'#2955ae', Union:'#ae5129', WhiteOak:'#7c721d', Zerodha:'#526321',
+  quant:'#502c59',
 };
-const HOUSE_FALLBACK = ['#3d6b8c','#7a5c9e','#2f7d6b','#9c5a2f','#8a4a6a',
-                        '#4a7a3f','#8a6a2f','#5a5f9c','#2f6f7d','#9c4a4a'];
+// The old fallback hashed the key into a 10-colour ring. A hash CAN collide -- two unmapped
+// houses landing on the same colour, or an unmapped house landing on a mapped one -- and the
+// whole requirement here is that no two houses ever share a colour. This assigns by POSITION
+// in the sorted list of unmapped keys instead, which cannot collide within the list, and the
+// fallback palette is itself chosen to sit clear of HOUSE_COLOR. Position in a SORTED list
+// (not order of appearance) is what keeps a house's colour stable across renders and scope
+// changes; memoised so the sort happens once.
+const HOUSE_FALLBACK = ['#7d5b2a','#3f6f5a','#6b3f6b','#2f5a7d','#7d3f4a',
+                        '#4a6b2f','#5a4a7d','#7d6b3f','#2f6b6b','#6b4a2f'];
+const _hcMemo = new Map();
+let _hcSeen = [];
 function houseColor(fh){
   if(!fh) return null;
   if(HOUSE_COLOR[fh]) return HOUSE_COLOR[fh];
-  let h=0; for(let i=0;i<fh.length;i++) h=(h*31+fh.charCodeAt(i))>>>0;   // stable across renders
-  return HOUSE_FALLBACK[h % HOUSE_FALLBACK.length];
+  if(_hcMemo.has(fh)) return _hcMemo.get(fh);
+  if(!_hcSeen.includes(fh)){ _hcSeen.push(fh); _hcSeen.sort(); _hcMemo.clear(); }
+  _hcSeen.forEach((k,i)=> _hcMemo.set(k, HOUSE_FALLBACK[i % HOUSE_FALLBACK.length]));
+  return _hcMemo.get(fh);
 }
 // rgba() of a house colour, for the soft chip behind its name
 function houseTint(fh, a){
@@ -2120,9 +2209,24 @@ function houseTint(fh, a){
 // olive / steel occupy gaps in all three, so a sleeve chip can never be mistaken for a quartile
 // or a metric. Unknown sleeves hash to a stable colour, same rule as houses: never grey, and
 // never a different colour on the next render.
+// ★ Kyser 2026-09-03: "sleeve colours can be primary 4 colours, and Arbitrage+ in dark grey."
+// Delivered as asked, with two forced adjustments and the measurements behind them, because
+// the literal primaries fail on grounds that are not matters of taste:
+//   * literal yellow #e0a800 is 2.15:1 on white -- illegible as the text it is used for.
+//     Darkened to #96700a (4.55:1). Same hue.
+//   * literal red #d02020 sits dE 10.8 from the Aditya house red. The Sleeve heading prints
+//     "<house> - <sleeve>" side by side, so those two would have been the same red in the one
+//     place they always appear together. Moved to the magenta-rose end of the red family.
+// Residual proximities, stated rather than hidden: Bottoms Up is dE 16.2 from the --m-ret
+// violet, Thematic dE 20.6 from the Q3 gold, Arbitrage+ dE 20.2 from the --m-dim slate. Those
+// three are below a 25 threshold but never encode the same thing in the same place; say the
+// word and any of them can move further.
 const SLEEVE_COLOR = {
-  'Bottoms Up':'#a35a12', 'Top Down':'#8e2f6b', 'Thematic':'#3f4fa8',
-  'Asset Allocation':'#5f7a24', 'Arbitrage+':'#0e6b9c',
+  'Bottoms Up':'#1a3fb0',        // primary blue
+  'Top Down':'#b0197a',          // the red slot, moved off the house red
+  'Thematic':'#96700a',          // the yellow slot, darkened to be legible
+  'Asset Allocation':'#17803a',  // primary green
+  'Arbitrage+':'#4a4a4a',        // dark grey, as asked
 };
 const SLEEVE_FALLBACK = ['#8a5a2f','#7a3f6a','#4a5a9c','#5f6a2f','#2f6a8a','#6a4a8a'];
 function sleeveColor(sl){
@@ -2604,7 +2708,9 @@ function stackOpts({leftMax, rightLabel, xmin, xmax}){
     plugins:{ legend:{display:false}, tooltip:{...baseTooltip(), itemSort:undefined,
       callbacks:{ label:c=> `${c.dataset.label}: ${c.parsed.y==null?'—':c.parsed.y.toFixed(1)+'%'}` } } },
     scales:{ x:timeX(xmin,xmax),
-      y:{ stacked:true, min:0, max:leftMax, grace:leftMax?undefined:'5%', ticks:{callback:v=>v+'%',color:C.ink3,font:{size:10}}, grid:{color:C.line2}, border:{display:false} },
+      // Gridlines off across the whole deck (Kyser, twice). The axis ticks carry the scale; the
+      // rules were competing with the data for the reader's attention on every panel.
+      y:{ stacked:true, min:0, max:leftMax, grace:leftMax?undefined:'5%', ticks:{callback:v=>v+'%',color:C.ink3,font:{size:10}}, grid:{display:false}, border:{display:false} },
       y1:{ position:'right', display:!!rightLabel, grace:'12%', min:0, ticks:{callback:v=>v+'%',color:C.absl,font:{size:10}}, grid:{drawOnChartArea:false}, border:{display:false},
            title:{display:!!rightLabel,text:rightLabel,color:C.absl,font:{size:10}} } } };
 }
@@ -2614,7 +2720,7 @@ function dualOpts({leftSuffix, rightLabel, rightMin, rightMax, xmin, xmax, noGri
       callbacks:{ label:c=>{ const v=c.parsed.y; if(v==null) return `${c.dataset.label}: —`;
         return c.dataset.yAxisID==='y1' ? `${c.dataset.label}: ${v.toFixed(2)}` : `${c.dataset.label}: ${v.toFixed(1)}${leftSuffix||''}`; } } } },
     scales:{ x:timeX(xmin,xmax),
-      y:{ position:'left', min:0, grace:'8%', ticks:{callback:v=>v+(leftSuffix||''),color:C.ink3,font:{size:10}}, grid:{display:!noGrid, color:C.line2}, border:{display:false} },
+      y:{ position:'left', min:0, grace:'8%', ticks:{callback:v=>v+(leftSuffix||''),color:C.ink3,font:{size:10}}, grid:{display:false}, border:{display:false} },
       y1:{ position:'right', min:rightMin, max:rightMax, grid:{drawOnChartArea:false}, ticks:{color:C.navy,font:{size:10}}, border:{display:false},
            title:{display:!!rightLabel,text:rightLabel,color:C.navy,font:{size:10}} } } };
 }
@@ -2629,7 +2735,7 @@ function lineOpts({suffix, min, max, xmin, xmax, reverse, noGrid, qTicks}){
     ? { callback:v=>'Q'+v, color:C.ink3, font:{size:11, weight:'600'} }
     : { callback:v=>v+(suffix||''), color:C.ink3, font:{size:10} };
   const y = { min, max, reverse:!!reverse, grace:(min==null&&max==null)?'6%':undefined,
-              ticks:yTicks, grid:{display:!noGrid, color:C.line2}, border:{display:false} };
+              ticks:yTicks, grid:{display:false}, border:{display:false} };
   if(qTicks) y.afterBuildTicks = ax => { ax.ticks = [1,2,3,4].map(v=>({value:v})); };
   return { maintainAspectRatio:false, responsive:true, interaction:{mode:'nearest',intersect:false}, ...chartMotion(),
     plugins:{ legend:{display:false}, tooltip:{...baseTooltip(),
@@ -2737,7 +2843,7 @@ function buildViews(){
            cross-sectional snapshot — it is the same sleeve story aggregated to house level.
            Same mx-* ids, same render functions; its metric/date controls live in the card
            header, NOT a top-level .filters row, so the sticky bar stays this tab's own. -->
-      <div class="shead" style="margin-top:6px"><h2>Quartile matrix <em>— house × sleeve</em></h2><div class="ctx" id="mx-ctx"></div></div>
+      <div class="shead" style="margin-top:6px"><h2>Quartile matrix</h2><div class="ctx" id="mx-ctx"></div></div>
       <div class="card">
         <div class="card-h"><div><h3 id="mx-title">Top-half share by fund house and sleeve</h3><div class="sub" id="mx-sub"></div></div>
           <div style="display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap">
@@ -2783,7 +2889,7 @@ function buildViews(){
            only hard-wired to Aditya and with no peer context. Its one unique feature, the
            dashed quality-score line on a right-hand axis, was GRAFTED onto am-rank, so nothing
            was lost. Panel ids are otherwise untouched. -->
-      <div class="shead"><h2><span id="am-house"></span> <em>— one house in full, then the industry cross-section</em></h2><div class="ctx" id="am-ctx"></div></div>
+      <div class="shead"><h2><span id="am-house"></span></h2><div class="ctx" id="am-ctx"></div></div>
       <div class="kpis" id="am-kpis"></div>
       <div class="card">
         <div class="card-h"><div><h3>AMC-level quartile distribution</h3><div class="sub" id="am-stack-sub"></div></div>
@@ -2803,7 +2909,7 @@ function buildViews(){
         <div class="chartbox tall"><canvas id="am-rank"></canvas></div>
         <div id="am-rank-method"></div>
       </div>
-      <div class="shead" style="margin-top:6px"><h2>Industry cross-section <em>— every house on the chosen date</em></h2></div>
+      <div class="shead" style="margin-top:6px"><h2>Industry cross-section</h2></div>
       <div class="kpis" id="cp-kpis"></div>
       <div class="card">
         <div class="card-h"><div><h3 id="cp-bar-title">%AUM by quartile across the houses</h3><div class="sub" id="cp-bar-sub"></div></div>
@@ -2930,7 +3036,7 @@ function buildViews(){
       <button class="btn btn-dark" id="pm-exp">${icoDown()} Export CSV</button>
     </div>
     <div class="content">
-      <div class="shead"><h2>Peer mapping <em>— Value Research exact-peer set</em></h2><div class="ctx" id="pm-count"></div></div>
+      <div class="shead"><h2>Peer mapping</h2><div class="ctx" id="pm-count"></div></div>
       <div class="card" style="padding-top:20px">
         <div class="scroll-tall"><table class="rt" id="pm-table"><thead><tr>
           <th style="width:42%">Scheme</th><th style="width:22%">Category</th><th style="width:24%">Benchmark</th><th style="width:12%">AMFI</th>
@@ -3117,8 +3223,10 @@ function renderSleeveBar(){
   S.charts.slBar=new Chart(ctx,{type:'bar',data:{labels:rows.map(r=>r.fh),datasets:[{ data:rows.map(r=>r.topShare*100),
     // the selected house's bar carries ITS OWN colour (Kyser 2026-09-02), everyone else greys out
     backgroundColor:rows.map(r=>r.fh===S.sleeve.fh?houseColor(r.fh):C.peer), borderRadius:4, borderSkipped:false }]},
-    options:{ maintainAspectRatio:false, responsive:true, plugins:{legend:{display:false}, tooltip:{callbacks:{label:c=>'Q1+Q2: '+c.parsed.y.toFixed(1)+'%'}}},
-      scales:{ x:{grid:{display:false},ticks:{color:C.ink3,font:{size:10},maxRotation:55,minRotation:55}}, y:{grace:'8%',ticks:{callback:v=>v+'%',color:C.ink3},grid:{color:C.line2}} } }});
+    options:{ maintainAspectRatio:false, responsive:true, plugins:{legend:{display:false},
+      barValues:{suffix:'%', dp:1, hideZero:true},
+      tooltip:{callbacks:{label:c=>'Q1+Q2: '+c.parsed.y.toFixed(1)+'%'}}},
+      scales:{ x:{grid:{display:false},ticks:{color:C.ink3,font:{size:10},maxRotation:55,minRotation:55}}, y:{grace:'8%',ticks:{callback:v=>v+'%',color:C.ink3},grid:{display:false}} } }});
   document.getElementById('sl-bar-method').innerHTML=methodNote(`Same metric as the league table, drawn as a cross-section so you can see where <b>${S.sleeve.fh}</b> (red) sits on <b>${fmt.date(curDates()[i])}</b>.`);
 }
 function exportSleeve(){
@@ -3179,14 +3287,19 @@ function renderAMC(){
   // rather than merely duplicated (KV 2026-08-13).
   const ctx2=document.getElementById('am-rank').getContext('2d');
   S.charts.amRank?.destroy();
+  // ★ 2026-09-03: the faded peer lines are GONE (Kyser: "the background lines of the rest of the
+  // AMCs need to go"). Fourteen overlapping greys were a thicket behind the two lines the panel
+  // is actually about, and they were also what made the shared tooltip list every house at once.
+  // The peer DATA is not lost: it now feeds the hover panel's percentiles and its two ranked
+  // columns, which is a better use of it than drawing it.
   const dsets=[]; let aTop=null,aQ4=null;
-  housesPresent(null).forEach(f=>{
-    const s=houseSeries(f,null), isA=f===fh;
-    const top=s.byQ['% in Q1'].map((v,i)=>({x:s.dates[i],y:((v||0)+(s.byQ['% in Q2'][i]||0))*100}));
-    if(isA){ aTop=top.map(p=>p.y); aQ4=s.byQ['% in Q4'].map(v=>v==null?null:v*100); }
-    dsets.push({ label:houseLabel(f)+' Q1+Q2', data:top, yAxisID:'y', borderColor:isA?C.green:C.peerLine, borderWidth:isA?2.8:0.8, pointRadius:0, tension:0.3, order:isA?0:3, backgroundColor:'transparent' });
-    if(isA) dsets.push({ label:houseLabel(f)+' Q4', data:s.byQ['% in Q4'].map((v,i)=>({x:s.dates[i],y:v==null?null:v*100})), yAxisID:'y', borderColor:C.red, borderWidth:2.4, pointRadius:0, tension:0.3, order:1, backgroundColor:'transparent' });
-  });
+  const selS=houseSeries(fh,null);
+  aTop=selS.byQ['% in Q1'].map((v,i)=>((v||0)+(selS.byQ['% in Q2'][i]||0))*100);
+  aQ4=selS.byQ['% in Q4'].map(v=>v==null?null:v*100);
+  dsets.push({ label:houseLabel(fh)+' Q1+Q2', yAxisID:'y', order:0, backgroundColor:'transparent',
+    data:selS.dates.map((d,i)=>({x:d,y:aTop[i]})), borderColor:C.green, borderWidth:2.8, pointRadius:0, tension:0.3 });
+  dsets.push({ label:houseLabel(fh)+' Q4', yAxisID:'y', order:1, backgroundColor:'transparent',
+    data:selS.dates.map((d,i)=>({x:d,y:aQ4[i]})), borderColor:C.red, borderWidth:2.4, pointRadius:0, tension:0.3 });
   dsets.push({ label:'Quality score', yAxisID:'y1', data:dates.map((d,i)=>({x:d,y:qualityScore(byQ,i)})),
     borderColor:C.navy, borderWidth:1.6, borderDash:[4,3], pointRadius:0, tension:0.3, order:2, backgroundColor:'transparent' });
   const adDates=houseSeries(fh,null).dates;
@@ -3194,9 +3307,9 @@ function renderAMC(){
   S.charts.amRank=new Chart(ctx2,{type:'line',data:{datasets:dsets},
     options:dualOpts({leftSuffix:'%', rightLabel:'Score 1–4', rightMin:1, rightMax:4, xmin:rxmin, xmax:rxmax})});
   document.getElementById('am-rank-title').textContent=`${houseLabel(fh)} — Q1+Q2 (green) & Q4 (red) over time`;
-  document.getElementById('am-rank-sub').textContent=`Solid = ${houseLabel(fh)}; faded = the other houses in scope; dashed = quality score (right axis)`;
+  document.getElementById('am-rank-sub').textContent=`${houseLabel(fh)} only; dashed = quality score (right axis). Hover for its percentile against every peer.`;
   document.getElementById('am-rank-method').innerHTML=methodNote(
-    `House-wide <b>Q1+Q2 share</b> (green, bold = <b>${houseLabel(fh)}</b>; muted = every other house in scope) and <b>${houseLabel(fh)}'s Q4 share</b> (red) over time, each as a share of the house's whole covered AUM — the same denominator the stacked chart above uses, so the two panels read on one scale. Dashed navy (right axis) = the AUM-weighted <b>quality score</b>, Q1=4 … Q4=1. ${universeLabel()} basis, recomputed live.`);
+    `House-wide <b>Q1+Q2 share</b> (green) and <b>Q4 share</b> (red) for <b>${houseLabel(fh)}</b> over time, each as a share of the house's whole covered AUM — the same denominator the stacked chart above uses, so the two panels read on one scale. Dashed navy (right axis) = the AUM-weighted <b>quality score</b>, Q1=4 … Q4=1. ${universeLabel()} basis, recomputed live.`);
 
   renderAMCSummary();                     // the scheme-by-scheme table (adaptive to every toggle)
   renderComposite();                      // the industry cross-section (KPI row + mix bar)
@@ -5723,7 +5836,13 @@ function renderCompositeBar(){
     + `<span><span class="ldot" style="background:transparent;box-shadow:0 0 0 2.5px ${OUTLINE}"></span>Aditya Birla</span>`;
   // one dataset per selected quartile (ascending → Q1 at the bottom), each in its quartile colour.
   // Aditya gets a maroon box: side rails on every segment + cap on the bottom/top segment only.
-  const ds=sel.map((q,qi)=>({ label:'Q'+q, stack:'q', backgroundColor:QCOL['% in Q'+q], maxBarThickness:66,
+  // Same JEWEL tonality as the stacked area panels (Kyser liked it there and asked for it across
+  // the deck): the QFILL tone rather than the flat QCOL token, on a vertical gradient so a bar
+  // has a surface instead of being a slab of ink. The hues are unchanged -- green / light green
+  // / gold / red -- only the tonality. QCOL still drives the legend dots, the chips and the
+  // table text, so the identity a reader has already learnt does not move.
+  const ds=sel.map((q,qi)=>({ label:'Q'+q, stack:'q', maxBarThickness:66,
+    backgroundColor:c=>gradient(c.chart.ctx, c.chart.chartArea, QFILL['% in Q'+q]||QCOL['% in Q'+q], 0.95, 0.72),
     data:dataByQ[qi],
     borderColor:rows.map(r=> isA(r.fh)?OUTLINE:'rgba(0,0,0,0)'),
     borderWidth:rows.map(r=> isA(r.fh)?{left:OUTLINE_W,right:OUTLINE_W,top:(q===topQ?OUTLINE_W:0),bottom:(q===botQ?OUTLINE_W:0)}:0),
@@ -5732,7 +5851,9 @@ function renderCompositeBar(){
   S.charts.cpBar?.destroy();
   S.charts.cpBar=new Chart(ctx,{type:'bar',data:{labels,datasets:ds},
     options:{ maintainAspectRatio:false, responsive:true, animation:false, interaction:{mode:'index',intersect:false},
-      plugins:{legend:{display:false}, tooltip:{...baseTooltip(), callbacks:{label:c=>`${c.dataset.label}: ${c.parsed.y==null?'—':c.parsed.y.toFixed(1)+'%'}`}}},
+      plugins:{legend:{display:false},
+        barValues:{suffix:'%', dp:1, hideZero:true},
+        tooltip:{...baseTooltip(), callbacks:{label:c=>`${c.dataset.label}: ${c.parsed.y==null?'—':c.parsed.y.toFixed(1)+'%'}`}}},
       // Every house's axis label is written in ITS OWN colour (Kyser 2026-09-02), so the reader
       // can find a house in a 15-bar cross-section without counting across. The selected house
       // is still the loud one -- it keeps the outlined bar AND the bold weight; colour is
@@ -5740,7 +5861,7 @@ function renderCompositeBar(){
       scales:{ x:{ stacked:true, grid:{display:false}, ticks:{ maxRotation:55, minRotation:55,
             color:c=> rows[c.index]?houseColor(rows[c.index].fh):C.ink3,
             font:c=> ({size:10, weight: rows[c.index]&&isA(rows[c.index].fh)?'700':'500'}) } },
-        y:{ stacked:true, min:0, max:100, ticks:{callback:v=>v+'%',color:C.ink3}, grid:{color:C.line2}, border:{display:false} } } }});
+        y:{ stacked:true, min:0, max:100, ticks:{callback:v=>v+'%',color:C.ink3}, grid:{display:false}, border:{display:false} } } }});
   S.charts.cpBarSig=sig;
   document.getElementById('cp-bar-method').innerHTML=methodNote(
     `Stacked histogram: each house's bar shows the ticked quartiles (${selLabel}) as separate <b>colour-coded segments</b> (Q1 dark-green … Q4 red), each = that quartile's share of the house's covered AUM (${basisDesc()}). Y-axis fixed 0–100%; houses held in a <b>fixed order</b> (by the latest ${selLabel}) so playing the timeline shows each house's stack rise or fall in place. Each house's axis label is written in <b>that house's own colour</b>; <b>Aditya Birla</b> is additionally outlined in the ABSL brand maroon and bold, so identity (colour) and selection (weight) stay separable. ${scoreMethodLine()}`);
