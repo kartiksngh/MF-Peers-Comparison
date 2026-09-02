@@ -586,6 +586,13 @@
     color: var(--ink-2); font-weight: 700; white-space: nowrap; position: sticky; top: 0; background: var(--card); z-index:2;
   }
   table.rt th.num, table.rt td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  /* Generic click-to-sort: the sorter adds .sortable + .gs itself, so the affordance styling
+     is shared with the two tables that already sorted through app state. */
+  table.rt th.gs .arr { opacity:.28; font-size:9.5px; margin-left:3px; }
+  table.rt th.gs:hover .arr { opacity:.75; }
+  body.theme-mac table.rt th.sortable:hover { color: var(--ink); }
+  body.theme-mac table.rt th.sortable.sorted { color: var(--ink); }
+  body.theme-mac table.rt th.sortable.sorted .arr { color: var(--ink); opacity:1; }
   table.rt th.sortable { cursor:pointer; user-select:none; }
   table.rt th.sortable:hover { color: var(--absl); }
   table.rt th.sortable .arr { opacity:.45; font-family:'JetBrains Mono',monospace; }
@@ -896,56 +903,85 @@
   /* the paper-grain overlay belongs to the newsprint look */
   body.theme-mac::before { display: none; }
 
-  /* ── masthead: a light glass bar, not a dark slab ─────────────────────────────────────── */
+  /* ── CHROME: masthead + tabs + filter bars ────────────────────────────────────────────────
+     Kyser 2026-09-02 raised two problems with the first cut, and they share one fix.
+
+     (a) COLOUR. The chrome was near-white, so it merged into the white cards and the page had
+         no top edge. The depth ladder now runs DARKEST AT THE TOP -- chrome #e9e9ef < page
+         #f5f5f7 < cards #ffffff -- which is the macOS reading: toolbar recedes, content comes
+         forward. Grey, never black. Every label that sits on the darker ground was darkened
+         WITH it: a #9a9aa0 label is legible on white and is not legible on #e9e9ef (2.3:1),
+         so those move to #5c5c63 (5.5:1). That was Kyser's own objection and it is the whole
+         reason a "just darken the bar" change cannot be done to the bar alone.
+
+     (b) HEIGHT. The frozen stack -- tabs + the global control bar + the view's own filter row
+         -- was eating ~200px, roughly a quarter of the viewport, on every scroll. Padding,
+         control height, label size and the gaps between them are all tightened below. The
+         masthead is not sticky but shrinks too, because it owns the whole first screen.
+     The sticky offsets are computed by a ResizeObserver into --tabs-h / --gctrl-h, so the
+     stack re-measures itself and nothing has to be kept in sync by hand. */
+  body.theme-mac {
+    --chrome:      #e9e9ef;
+    --chrome-soft: rgba(233,233,239,.86);
+    --chrome-line: #dadae0;
+    --chrome-lbl:  #5c5c63;      /* labels ON the chrome -- darker than --ink-4 on purpose */
+  }
   body.theme-mac .masthead {
-    background: rgba(255,255,255,.78);
+    background: var(--chrome-soft);
     -webkit-backdrop-filter: saturate(180%) blur(22px);
     backdrop-filter: saturate(180%) blur(22px);
-    color: var(--ink); border-bottom: 1px solid var(--line-2);
-    padding: 24px 40px 20px;
+    color: var(--ink); border-bottom: 1px solid var(--chrome-line);
+    padding: 13px 36px 12px; gap: 18px;
   }
   body.theme-mac .masthead::after { display: none; }
   body.theme-mac .masthead h1 {
-    font-family: var(--sans); font-weight: 700; font-size: 27px;
-    letter-spacing: -0.028em; color: var(--ink);
+    font-family: var(--sans); font-weight: 700; font-size: 21px;
+    letter-spacing: -0.028em; color: var(--ink); line-height: 1.15;
   }
   body.theme-mac .masthead h1 em { font-style: normal; font-weight: 400; color: var(--ink-3); }
-  body.theme-mac .mast-kicker { font-family: var(--sans); font-size: 10.5px; letter-spacing: .14em; }
-  body.theme-mac .mast-sub { color: var(--ink-3); font-size: 13px; margin-top: 7px; }
-  body.theme-mac .mast-meta { font-family: var(--sans); gap: 9px; }
-  body.theme-mac .mast-meta .row .lbl { color: var(--ink-4); letter-spacing: .10em; font-size: 9.5px; }
-  body.theme-mac .mast-meta .row .val { color: var(--ink); font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  body.theme-mac .mast-kicker {
+    font-family: var(--sans); font-size: 9px; letter-spacing: .13em; margin-bottom: 5px;
+  }
+  body.theme-mac .mast-kicker::before { width: 18px; }
+  body.theme-mac .mast-sub {
+    color: var(--ink-3); font-size: 11.5px; margin-top: 4px; max-width: 620px; line-height: 1.4;
+  }
+  body.theme-mac .mast-meta { font-family: var(--sans); gap: 4px; }
+  body.theme-mac .mast-meta .row .lbl {
+    color: var(--chrome-lbl); letter-spacing: .09em; font-size: 8.5px; margin-bottom: 1px;
+  }
+  body.theme-mac .mast-meta .row .val { color: var(--ink); font-size: 11.5px; font-weight: 600; font-variant-numeric: tabular-nums; }
   body.theme-mac .mast-badge {
-    background: rgba(0,0,0,.045); border: 1px solid rgba(0,0,0,.07); color: var(--ink-2);
-    font-family: var(--sans); font-size: 11.5px; font-weight: 500;
+    background: rgba(255,255,255,.75); border: 1px solid rgba(0,0,0,.08); color: var(--ink-2);
+    font-family: var(--sans); font-size: 10.5px; font-weight: 500; padding: 4px 10px;
   }
 
   /* ── tabs: a macOS segmented control ──────────────────────────────────────────────────── */
   body.theme-mac .tabs {
-    background: rgba(255,255,255,.76);
+    background: var(--chrome-soft);
     -webkit-backdrop-filter: saturate(180%) blur(22px);
     backdrop-filter: saturate(180%) blur(22px);
-    border-bottom: 1px solid var(--line-2); padding: 7px 40px; gap: 3px;
+    border-bottom: 1px solid var(--chrome-line); padding: 4px 36px; gap: 2px;
   }
   body.theme-mac .tab {
-    font-family: var(--sans); font-size: 13px; font-weight: 600; letter-spacing: -0.008em;
-    padding: 7px 13px; border-bottom: none; margin-bottom: 0; border-radius: 8px;
-    color: var(--ink-3); transition: background .18s, color .18s, box-shadow .18s;
+    font-family: var(--sans); font-size: 12.5px; font-weight: 600; letter-spacing: -0.008em;
+    padding: 5px 11px; border-bottom: none; margin-bottom: 0; border-radius: 7px;
+    color: var(--chrome-lbl); transition: background .18s, color .18s, box-shadow .18s; gap: 7px;
   }
-  body.theme-mac .tab:hover { background: rgba(0,0,0,.045); color: var(--ink-2); }
+  body.theme-mac .tab:hover { background: rgba(255,255,255,.6); color: var(--ink-2); }
   body.theme-mac .tab.active {
     background: var(--card); color: var(--ink);
-    box-shadow: 0 1px 2px rgba(0,0,0,.07), 0 0 0 1px rgba(0,0,0,.05);
+    box-shadow: 0 1px 2px rgba(0,0,0,.09), 0 0 0 .5px rgba(0,0,0,.06);
   }
-  body.theme-mac .tab .tnum { font-family: var(--sans); font-weight: 600; font-size: 10.5px; }
+  body.theme-mac .tab .tnum { font-family: var(--sans); font-weight: 600; font-size: 9.5px; }
   body.theme-mac .tab.active .tnum { color: var(--absl); }
 
   /* ── filter bars ──────────────────────────────────────────────────────────────────────── */
   body.theme-mac .filters {
-    background: rgba(255,255,255,.82);
+    background: var(--chrome-soft);
     -webkit-backdrop-filter: saturate(180%) blur(22px);
     backdrop-filter: saturate(180%) blur(22px);
-    border-bottom: 1px solid var(--line-2); padding: 13px 40px;
+    border-bottom: 1px solid var(--chrome-line); padding: 5px 36px; gap: 13px;
   }
   body.theme-mac .view > .filters { box-shadow: 0 10px 18px -18px rgba(0,0,0,.5); }
   /* #gctrl carries an INLINE 2px ABSL-red top border (it separated the global bar in the
@@ -957,14 +993,19 @@
     border-bottom: 1px solid var(--line-2) !important;
     margin-bottom: 0 !important;
   }
+  /* Every dimension in the frozen bars is on a diet: the label/control gap, the label size and
+     the control's own padding. Each is small on its own; together they are the difference
+     between a 211px stack and a 150px one, on a page whose whole job is the content below. */
+  body.theme-mac .fg { gap: 2px; }
   body.theme-mac .fg label {
-    font-family: var(--sans); font-size: 10px; letter-spacing: .04em; text-transform: none;
-    font-weight: 600; color: var(--ink-3);
+    font-family: var(--sans); font-size: 9px; letter-spacing: .05em; text-transform: none;
+    font-weight: 600; color: var(--chrome-lbl); line-height: 1.3;
   }
   body.theme-mac .fg select, body.theme-mac .fg input {
-    font-family: var(--sans); font-size: 13px; border-radius: 9px; background: #fff;
-    border: 1px solid var(--line); box-shadow: 0 1px 1.5px rgba(0,0,0,.04); padding: 8px 12px;
+    font-family: var(--sans); font-size: 12.5px; border-radius: 8px; background: #fff;
+    border: 1px solid var(--line); box-shadow: 0 1px 1.5px rgba(0,0,0,.04); padding: 5px 10px;
   }
+  body.theme-mac .chk { padding-bottom: 4px; font-size: 12px; }
   body.theme-mac .fg select:hover, body.theme-mac .fg input:hover { border-color: var(--ink-4); }
   body.theme-mac .fg select:focus, body.theme-mac .fg input:focus {
     border-color: var(--ink-3); box-shadow: 0 0 0 3.5px rgba(0,0,0,.08);
@@ -974,16 +1015,16 @@
     padding: 2px; gap: 2px;
   }
   body.theme-mac .seg button {
-    font-family: var(--sans); font-size: 12px; font-weight: 600; border-right: none;
-    border-radius: 7px; padding: 6px 12px; color: var(--ink-3);
+    font-family: var(--sans); font-size: 11.5px; font-weight: 600; border-right: none;
+    border-radius: 6px; padding: 4px 10px; color: var(--chrome-lbl);
   }
-  body.theme-mac .seg.sm button { padding: 5px 10px; font-size: 11px; }
+  body.theme-mac .seg.sm button { padding: 4px 9px; font-size: 10.5px; }
   body.theme-mac .seg button.active {
     background: #fff; color: var(--ink);
     box-shadow: 0 1px 2px rgba(0,0,0,.10), 0 0 0 .5px rgba(0,0,0,.06);
   }
   body.theme-mac .seg button:not(.active):hover { background: rgba(0,0,0,.04); color: var(--ink-2); }
-  body.theme-mac .btn { border-radius: 9px; font-family: var(--sans); font-weight: 600; letter-spacing: -0.004em; }
+  body.theme-mac .btn { border-radius: 8px; font-family: var(--sans); font-weight: 600; letter-spacing: -0.004em; padding: 6px 13px; font-size: 12px; }
   body.theme-mac .btn-dark { background: var(--ink); box-shadow: 0 1px 2px rgba(0,0,0,.18); }
   body.theme-mac .btn-dark:hover { background: #000; }
   body.theme-mac .chk { font-family: var(--sans); }
@@ -1004,6 +1045,30 @@
     font-family: var(--sans); font-weight: 650; font-size: 16px; letter-spacing: -0.018em;
   }
   body.theme-mac .card-h .sub { font-size: 12px; color: var(--ink-3); }
+
+  /* ── SURFACE LADDER (Kyser 2026-09-02: "varying shades of white ... so the eye can track
+     each part of the dashboard") ────────────────────────────────────────────────────────────
+     The tints are assigned by WHAT A CARD HOLDS, not sprinkled for decoration, so the shade
+     is information: pure white = a chart canvas, off-white = a data table. Side-by-side table
+     cards in the same row take the two different off-whites, which is the case that actually
+     needed separating (Quartile residency next to Category standing read as one slab).
+     `.card--data` is set in script, not by CSS :has(), so the rule does not depend on
+     :has() support in whatever browser the deck is opened in. */
+  body.theme-mac {
+    --srf-data:  #fbfbfd;   /* egg white  -- a card whose subject is a table */
+    --srf-data2: #f7f7fb;   /* cement     -- its neighbour, so a pair does not merge */
+    --srf-thead: #eeeef4;   /* table header band */
+    --srf-zebra: #f5f5f9;   /* alternating rows */
+    --srf-hover: #e7e9f1;
+  }
+  body.theme-mac .card.card--data { background: var(--srf-data); }
+  body.theme-mac .grid-2 > .card.card--data:nth-child(even) { background: var(--srf-data2); }
+  /* Zebra and hover paint the ROW, never the cell. Painting cells would out-specify
+     `tr.hl td` (own-house red) and `tr.qhead td` (quartile group band) and quietly erase two
+     signals that carry meaning; a row background sits BEHIND those cells instead, so they
+     still win. The AMC-summary heat-map cells carry inline styles and are likewise unaffected. */
+  body.theme-mac table.rt tbody tr:nth-child(even) { background: var(--srf-zebra); }
+  body.theme-mac table.rt tbody tr:hover { background: var(--srf-hover); }
 
   /* ── KPI tiles ────────────────────────────────────────────────────────────────────────── */
   body.theme-mac .kpi {
@@ -1028,17 +1093,22 @@
 
   /* ── tables: hairlines, not rules ─────────────────────────────────────────────────────── */
   body.theme-mac table.rt { font-size: 12.5px; }
+  /* The header band is a shade, not white-on-white -- and its type is darkened with it, for
+     the same reason the chrome labels were: #6e6e73 on #eeeef4 is 4.0:1, #4e4e56 is 6.9:1. */
   body.theme-mac table.rt th {
     font-family: var(--sans); font-size: 10.5px; text-transform: none; letter-spacing: -0.002em;
-    font-weight: 600; color: var(--ink-3); border-bottom: 1px solid var(--line);
-    padding: 9px 10px; background: #fff;
+    font-weight: 650; color: #4e4e56; border-bottom: 1px solid var(--line);
+    padding: 8px 10px; background: var(--srf-thead);
   }
   body.theme-mac table.rt td {
     font-family: var(--sans); font-variant-numeric: tabular-nums; color: var(--ink-2);
     border-bottom: 1px solid var(--line-2); padding: 9px 10px;
   }
   body.theme-mac table.rt td.lbl { font-family: var(--sans); }
-  body.theme-mac table.rt tr:hover td { background: #f7f7fa; }
+  /* The base skin hovers the CELL (`table.rt tr:hover td`), which would paint over the row
+     zebra above and cancel it. Cleared to transparent so the row-level hover shows through;
+     `tr.hl td` and `tr.qhead td` still set their own cell background and still win. */
+  body.theme-mac table.rt tr:hover td { background: transparent; }
   body.theme-mac table.rt tr.qhead td {
     background: #f2f2f6; font-family: var(--sans); font-weight: 650; font-size: 12.5px;
     border-bottom: 1px solid var(--line);
@@ -1203,7 +1273,12 @@ const C = {
   q1:'#1f5c3d', q2:'#6fa37c', q3:'#d6a23f', q4:'#c0523e',
   q1t:'rgba(31,92,61,0.82)', q2t:'rgba(111,163,124,0.78)', q3t:'rgba(214,162,63,0.80)', q4t:'rgba(192,82,62,0.82)',
   absl:'#c8392b', navy:'#20436b', gold:'#b3852f', ink:'#16130f', ink3:'#6a5f50', ink4:'#9c8f7a',
-  line:'#d6d6db', line2:'#e9e9ee', peer:'#c7c7cc', peerLine:'rgba(174,174,178,.40)', green:'#1f5c3d', red:'#c0523e'
+  // peerLine = the "every other house" spaghetti behind the selected house. Kyser 2026-09-02:
+  // at .40 alpha, fourteen overlapping peers read as a grey thicket competing with the two
+  // lines the panel is actually about. It is CONTEXT -- the shape of the field, not a series
+  // anyone traces -- so it drops to .13, and the peer stroke thins with it. line2 (the axis
+  // gridlines) softens for the same reason: present when looked for, invisible when not.
+  line:'#d6d6db', line2:'#f0f0f5', peer:'#c7c7cc', peerLine:'rgba(150,150,162,.13)', green:'#1f5c3d', red:'#c0523e'
 };
 // Chart.js reads these hexes directly (it cannot see CSS variables), so the NEUTRALS above were
 // re-cut warm-cream -> Mac grey alongside the surface theme, or every axis, gridline and peer
@@ -1354,6 +1429,33 @@ function gradient(ctx, area, hex, topA=0.42, botA=0.02){
   g.addColorStop(0, `rgba(${r},${gg},${b},${topA})`);
   g.addColorStop(1, `rgba(${r},${gg},${b},${botA})`);
   return g;
+}
+// ── STACKED-BAND STYLE ────────────────────────────────────────────────────────────────────
+// Kyser 2026-09-02: "the colours in the graph look super cheap and lack luxuriousness -- make
+// them better, don't change them, just make it premium." Same four hues, different execution.
+// What read as poster paint was not the palette, it was the WEIGHT: an 0.85 -> 0.55 gradient of
+// fully saturated colour leaves no white anywhere in the picture, and two heavy translucent
+// washes meeting each other muddy into a third colour that is in nobody's palette. Three
+// changes, and not one hue is reassigned:
+//   1. the fill drops to 0.55 -> 0.22, so paper shows through and the colour reads as a TINT
+//      of the hue rather than a slab of it;
+//   2. the BOUNDARY carries the identity instead of the fill -- a 1.6px stroke in the exact
+//      solid hue, so each band is defined by a crisp edge. This is the single biggest move:
+//      an edge is what separates an editorial chart from a stacked-area clip-art;
+//   3. the two loud hues (gold, red) are desaturated ~12% IN THE FILL ONLY.
+// QCOL is deliberately untouched, so the legend, the strokes, the KPI tiles and the table text
+// still carry the exact palette -- the identity a reader has already learnt does not move.
+const QFILL = { '% in Q1':'#255f43', '% in Q2':'#7aa686', '% in Q3':'#cfa759', '% in Q4':'#bd6552' };
+function bandDs(q, data, extra){
+  return Object.assign({
+    label: q.replace('% in ',''), data,
+    // The gradient runs across the WHOLE plot area, not per band, so a wide alpha range makes
+    // whichever band sits lowest the faintest -- and in a quartile stack that is Q1, the band
+    // the panel is most about. Kept deliberately narrow (0.52 -> 0.34) so the airiness comes
+    // from the low alpha rather than from a vertical ramp that encodes position as importance.
+    backgroundColor: c=>gradient(c.chart.ctx, c.chart.chartArea, QFILL[q]||QCOL[q], 0.52, 0.34),
+    borderColor: QCOL[q], borderWidth: 1.6, fill: true, tension: 0.3, pointRadius: 0, stack: 'q'
+  }, extra || {});
 }
 
 //──────────────────────────── DATA LOADING ─────────────────────────────────
@@ -1938,6 +2040,45 @@ const HOUSE_LABEL = {
   Kotak:'Kotak Mahindra', Axis:'Axis', DSP:'DSP', Invesco:'Invesco India', Tata:'Tata',
 };
 function houseLabel(fh){ return HOUSE_LABEL[fh] || fh; }
+// ── PER-AMC COLOUR (Kyser 2026-09-02) ─────────────────────────────────────────────────────
+// Every house gets its own colour, so the heading tells you WHOSE page you are on before you
+// read a word of it. Anchored on each AMC's own brand where there is an obvious one -- Aditya
+// red, ICICI orange, Kotak the blue/red blend Kyser asked for, HDFC navy, Axis maroon -- so the
+// mapping is memorable rather than arbitrary.
+//
+// Keys are the RAW house prefixes, the same keys HOUSE_LABEL is keyed on and that every cube
+// and filter joins on. Never key this on the display label: "Aditya" is the join key and
+// "Aditya Birla Sun Life" is only what gets printed.
+//
+// Two rules the fallback exists to keep. A house missing from the map must still get (a) a
+// colour, never black -- the whole point is that the heading is never colourless -- and (b) the
+// SAME colour on every render and in every panel, so the hash is over the key and nothing else.
+// A random or index-based pick would make a house change colour when the scope widened.
+const HOUSE_COLOR = {
+  Aditya:'#c8392b', ICICI:'#e07b26', Kotak:'#7b3fa0', HDFC:'#12508c', SBI:'#2f6fb5',
+  Axis:'#8c1f3d',   Nippon:'#0f7d84', UTI:'#1f7a4d',  DSP:'#a03a63',  Mirae:'#4b6cb7',
+  Tata:'#5c6bc0',   Franklin:'#0a7a5c', Invesco:'#7a5c1f', Bandhan:'#a34a1f', Canara:'#3f7d3a',
+  Motilal:'#8a6d1f', Quant:'#5a4fcf', HSBC:'#9b1b30', LIC:'#1a5f8c', Baroda:'#b0527d',
+  Edelweiss:'#2f7f6f', PPFAS:'#6a4a9c', Sundaram:'#c0651f', JM:'#4a6a8a', Bank:'#3d6b8c',
+  Union:'#7a4a8c', Mahindra:'#2f7a6a', WhiteOak:'#5f5f9c', '360':'#8a5a2f', Groww:'#2f8a5a',
+  Navi:'#4a5fa8', Bajaj:'#1f6f8a', HeliosMF:'#a05a2f', ITI:'#6a7a2f', NJ:'#8a3f6a',
+  TRUSTMF:'#3f6a8a', JioBlackRock:'#2f5f9c', Zerodha:'#c05a2f', Samco:'#7a3f5a', Taurus:'#5a7a3f',
+  Shriram:'#8a5f2f', Quantum:'#3f7a8a', Old:'#6a5f3f', The:'#5f4a7a',
+};
+const HOUSE_FALLBACK = ['#3d6b8c','#7a5c9e','#2f7d6b','#9c5a2f','#8a4a6a',
+                        '#4a7a3f','#8a6a2f','#5a5f9c','#2f6f7d','#9c4a4a'];
+function houseColor(fh){
+  if(!fh) return null;
+  if(HOUSE_COLOR[fh]) return HOUSE_COLOR[fh];
+  let h=0; for(let i=0;i<fh.length;i++) h=(h*31+fh.charCodeAt(i))>>>0;   // stable across renders
+  return HOUSE_FALLBACK[h % HOUSE_FALLBACK.length];
+}
+// rgba() of a house colour, for the soft chip behind its name
+function houseTint(fh, a){
+  const c=houseColor(fh); if(!c) return 'transparent';
+  const n=parseInt(c.slice(1),16);
+  return `rgba(${(n>>16)&255},${(n>>8)&255},${n&255},${a})`;
+}
 function dateOptions(dates, sel){ return dates.map((d,i)=>`<option value="${i}" ${i===sel?'selected':''}>${fmt.date(d)}</option>`).join(''); }
 // ── METHODOLOGY NOTES AS POPUPS (Kyser 2026-08-13) ──────────────────────────────────────
 // The notes are the reproducibility contract and are deliberately long, but inline they were
@@ -1992,6 +2133,128 @@ function segWire(id, cb){
   });
 }
 function setSeg(id,val){ document.querySelectorAll(`#${id} button`).forEach(b=>b.classList.toggle('active', b.dataset.v===val)); }
+
+//════════════════════════════════════════════════════════════════════════════
+//  CLICK-TO-SORT ON EVERY TABLE  (Kyser 2026-09-02)
+//════════════════════════════════════════════════════════════════════════════
+// Two tables already sorted through APP STATE -- the AMC league table
+// (S.league.sortKey/sortDir) and the peer grid -- because their sort has to survive a
+// re-render and drive which rows are even built. Those own their own `th.sortable` handlers
+// and are left strictly alone here. Every OTHER table.rt is made sortable at the DOM level,
+// so a panel added later gets the behaviour for free instead of each render function growing
+// its own sort state. The trade is that a DOM sort resets when its panel re-renders; that is
+// the right trade for ~12 read-only tables and the wrong one for the two above.
+//
+// THREE RULES THAT KEEP A SORTED TABLE HONEST:
+//  1. Rows sort WITHIN SEGMENTS. A quartile group header (tr.qhead) or any row carrying a
+//     colspan cell is a boundary that never moves -- sorting a "Q1 · 12 schemes · 34% of AMC"
+//     band into the middle of the rows it labels turns a correct table into a false one.
+//  2. Missing values ("—") always sort LAST, in BOTH directions. Missing is not "worst":
+//     floating a blank to the top of an ascending sort would rank an unrated fund best.
+//  3. The column type is decided from the WHOLE COLUMN, not cell by cell. "HDFC Top 100 Fund"
+//     contains a number; a per-cell test would call the scheme column numeric and sort funds
+//     by whatever digits happen to appear in their names.
+const GS_DATE_ISO = /^\d{4}-\d{2}-\d{2}$/;
+const GS_DATE_TXT = /^\d{1,2}\s+[A-Za-z]{3,}\s+\d{4}$/;
+function gsBlank(s){ const t=s.trim(); return !t || t==='—' || t==='-' || t==='n/a'; }
+// Is this cell a NUMBER-SHAPED token? The whole cell must be the value -- "₹29,944 cr",
+// "24 / 33", "+8.87 pp", "98.0%", "Q3" -- and nothing else.
+function gsNumericCell(s){
+  const t=s.trim();
+  if(/^Q[1-4]$/.test(t) || GS_DATE_ISO.test(t) || GS_DATE_TXT.test(t)) return true;
+  const c=t.replace(/[₹,%\s]/g,'').replace(/−/g,'-');
+  return /^[+-]?\d*\.?\d+(pp|cr|bp|x)?$/i.test(c) || /^\d+\/\d+$/.test(c);
+}
+function gsNum(s){
+  const t=s.trim();
+  const q=/^Q([1-4])$/.exec(t); if(q) return +q[1];
+  if(GS_DATE_ISO.test(t) || GS_DATE_TXT.test(t)){ const d=Date.parse(t); if(!isNaN(d)) return d; }
+  const m=/[+-]?\d*\.?\d+/.exec(t.replace(/,/g,'').replace(/−/g,'-'));
+  return m ? parseFloat(m[0]) : null;
+}
+// The rows a sort may reorder, grouped into the contiguous runs between boundary rows.
+function gsRuns(tb){
+  const runs=[]; let cur=[];
+  Array.from(tb.rows).forEach(tr=>{
+    if(tr.classList.contains('qhead') || tr.querySelector('td[colspan]')){ if(cur.length){runs.push(cur);cur=[];} }
+    else cur.push(tr);
+  });
+  if(cur.length) runs.push(cur);
+  return runs;
+}
+function gsCellText(tr, ci){ const td=tr.cells[ci]; return td ? (td.textContent||'') : ''; }
+function gsColIsNumeric(tb, ci){
+  const cells=[].concat(...gsRuns(tb)).map(tr=>gsCellText(tr,ci)).filter(s=>!gsBlank(s));
+  if(!cells.length) return false;
+  return cells.filter(gsNumericCell).length >= 0.6*cells.length;
+}
+function gsSort(tbl, ci, dir, numeric){
+  const tb=tbl.tBodies[0]; if(!tb) return;
+  gsRuns(tb).forEach(run=>{
+    const marker=run[0].previousSibling;
+    const keyed=run.map((tr,i)=>{
+      const raw=gsCellText(tr,ci);
+      return { tr, i, v: gsBlank(raw) ? null : (numeric ? gsNum(raw) : raw.trim().toLowerCase()) };
+    });
+    keyed.sort((A,B)=>{
+      if(A.v==null && B.v==null) return A.i-B.i;
+      if(A.v==null) return 1;                    // blanks last, before the direction flip
+      if(B.v==null) return -1;
+      let r = numeric ? (A.v-B.v)
+                      : String(A.v).localeCompare(String(B.v), undefined, {numeric:true, sensitivity:'base'});
+      if(dir==='desc') r=-r;                     // the raw comparators are ASCENDING
+      return r || (A.i-B.i);                     // stable: original order breaks ties
+    });
+    let ref=marker;
+    keyed.forEach(o=>{ if(ref) ref.after(o.tr); else tb.insertBefore(o.tr, tb.firstChild); ref=o.tr; });
+  });
+}
+function gsAttach(tbl){
+  if(tbl.dataset.gsort) return;
+  // a table that already sorts through app state keeps its own handlers
+  if(tbl.querySelector('th.sortable')) { tbl.dataset.gsort='own'; return; }
+  const head=tbl.tHead;
+  if(!head || head.rows.length!==1) { tbl.dataset.gsort='nohead'; return; }   // stacked headers: skip
+  const ths=Array.from(head.rows[0].cells);
+  // A colspan in the header breaks the header-index -> cell-index mapping, and a sorter that
+  // reads the wrong column is worse than none.
+  if(!ths.length || ths.some(th=>th.colSpan>1)) { tbl.dataset.gsort='colspan'; return; }
+  const tb=tbl.tBodies[0];
+  if(!tb || [].concat(...gsRuns(tb)).length < 3) { tbl.dataset.gsort='short'; return; }
+  tbl.dataset.gsort='1';
+  const card=tbl.closest('.card'); if(card) card.classList.add('card--data');
+  ths.forEach((th,ci)=>{
+    th.classList.add('sortable','gs');
+    if(!th.querySelector('.arr')) th.insertAdjacentHTML('beforeend',' <span class="arr">⇅</span>');
+    if(!th.title) th.title='Click to sort';
+    th.addEventListener('click', ()=>{
+      const numeric=gsColIsNumeric(tbl, ci);
+      const same=tbl.dataset.gsCol===String(ci);
+      // First click sorts a number column BIGGEST-FIRST (largest AUM, best return) and a text
+      // column A-Z, which is what each is usually being scanned for.
+      const dir = same ? (tbl.dataset.gsDir==='desc' ? 'asc' : 'desc') : (numeric ? 'desc' : 'asc');
+      tbl.dataset.gsCol=String(ci); tbl.dataset.gsDir=dir;
+      ths.forEach(h=>{ h.classList.remove('sorted'); const a=h.querySelector('.arr'); if(a) a.textContent='⇅'; });
+      th.classList.add('sorted');
+      const a=th.querySelector('.arr'); if(a) a.textContent = dir==='asc' ? '↑' : '↓';
+      gsSort(tbl, ci, dir, numeric);
+    });
+  });
+}
+function gsScan(root){ (root||document).querySelectorAll('table.rt').forEach(gsAttach); }
+// Panels rebuild their own innerHTML constantly, so rather than editing a dozen render
+// functions the observer picks up any table that appears. Re-entry is impossible: gsAttach
+// marks a table on first sight, and the nodes this code adds (an .arr span, reordered <tr>s)
+// are not table.rt and never re-trigger it.
+const gsObserver = new MutationObserver(ms=>{
+  for(const m of ms) for(const n of m.addedNodes){
+    if(n.nodeType!==1) continue;
+    if(n.matches && n.matches('table.rt')) gsAttach(n);
+    if(n.querySelectorAll) n.querySelectorAll('table.rt').forEach(gsAttach);
+  }
+});
+function gsBoot(){ gsScan(); gsObserver.observe(document.body, {childList:true, subtree:true}); }
+if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', gsBoot); else gsBoot();
 function downloadCSV(content, filename){
   const blob=new Blob([content],{type:'text/csv;charset=utf-8;'});
   const url=URL.createObjectURL(blob); const a=document.createElement('a');
@@ -2451,7 +2714,7 @@ function buildViews(){
            only hard-wired to Aditya and with no peer context. Its one unique feature, the
            dashed quality-score line on a right-hand axis, was GRAFTED onto am-rank, so nothing
            was lost. Panel ids are otherwise untouched. -->
-      <div class="shead"><h2>AMC roll-up <em>— one house in full, then the industry cross-section</em></h2><div class="ctx" id="am-ctx"></div></div>
+      <div class="shead"><h2><span id="am-house"></span> <em>— one house in full, then the industry cross-section</em></h2><div class="ctx" id="am-ctx"></div></div>
       <div class="kpis" id="am-kpis"></div>
       <div class="card">
         <div class="card-h"><div><h3>AMC-level quartile distribution</h3><div class="sub" id="am-stack-sub"></div></div>
@@ -2701,7 +2964,8 @@ function renderSleeve(){
 
   const A=sleeveAt(byQ,li), score=qualityScore(byQ,li);
   const covWarn = (A.cov!=null && A.cov<0.999);
-  document.getElementById('sl-title').innerHTML=`${houseLabel(fh)} · ${br}`;
+  const _slt=document.getElementById('sl-title');
+  _slt.innerHTML=`<span style="color:${houseColor(fh)}">${houseLabel(fh)}</span> · ${br}`;
   document.getElementById('sl-ctx').innerHTML=`${basisDesc()}<br>Snapshot ${fmt.date(dates[li])}`;
   document.getElementById('sl-kpis').innerHTML=`
     <div class="kpi qc q-q12"><div class="k-lbl">Q1+Q2 within sleeve</div><div class="k-val">${fmt.pct(A.top)}</div><div class="k-sub">of the sleeve's <b>rated</b> AUM</div></div>
@@ -2719,8 +2983,7 @@ function renderSleeve(){
   const {xmin,xmax}=xBounds(dates, ...series, weight);
   const ctx=document.getElementById('sl-stack').getContext('2d');
   S.charts.slStack?.destroy();
-  const areaDs=QORDER.map((q,qi)=>({ label:q.replace('% in ',''), data:series[qi].map((y,i)=>({x:dates[i],y})),
-    backgroundColor:c=>gradient(c.chart.ctx,c.chart.chartArea,QCOL[q],0.85,0.55), borderColor:QCOL[q], borderWidth:0.6, fill:true, tension:0.3, pointRadius:0, yAxisID:'y', stack:'q' }));
+  const areaDs=QORDER.map((q,qi)=>bandDs(q, series[qi].map((y,i)=>({x:dates[i],y})), {yAxisID:'y'}));
   const weightDs={ label:'Sleeve weight', data:weight.map((v,i)=>({x:dates[i],y:v==null?null:v*100})),
     borderColor:C.absl, borderWidth:2.2, borderDash:[5,3], fill:false, tension:0.3, pointRadius:0, yAxisID:'y1' };
   S.charts.slStack=new Chart(ctx,{type:'line',data:{datasets:[...areaDs,weightDs]},
@@ -2774,7 +3037,8 @@ function renderSleeveBar(){
   const ctx=document.getElementById('sl-bar').getContext('2d');
   S.charts.slBar?.destroy();
   S.charts.slBar=new Chart(ctx,{type:'bar',data:{labels:rows.map(r=>r.fh),datasets:[{ data:rows.map(r=>r.topShare*100),
-    backgroundColor:rows.map(r=>r.fh===S.sleeve.fh?C.absl:C.peer), borderRadius:4, borderSkipped:false }]},
+    // the selected house's bar carries ITS OWN colour (Kyser 2026-09-02), everyone else greys out
+    backgroundColor:rows.map(r=>r.fh===S.sleeve.fh?houseColor(r.fh):C.peer), borderRadius:4, borderSkipped:false }]},
     options:{ maintainAspectRatio:false, responsive:true, plugins:{legend:{display:false}, tooltip:{callbacks:{label:c=>'Q1+Q2: '+c.parsed.y.toFixed(1)+'%'}}},
       scales:{ x:{grid:{display:false},ticks:{color:C.ink3,font:{size:10},maxRotation:55,minRotation:55}}, y:{grace:'8%',ticks:{callback:v=>v+'%',color:C.ink3},grid:{color:C.line2}} } }});
   document.getElementById('sl-bar-method').innerHTML=methodNote(`Same metric as the league table, drawn as a cross-section so you can see where <b>${S.sleeve.fh}</b> (red) sits on <b>${fmt.date(curDates()[i])}</b>.`);
@@ -2827,8 +3091,7 @@ function renderAMC(){
   const {xmin,xmax}=xBounds(dates, ...series);
   const ctx=document.getElementById('am-stack').getContext('2d');
   S.charts.amStack?.destroy();
-  const ds=QORDER.map((q,qi)=>({ label:q.replace('% in ',''), data:series[qi].map((y,i)=>({x:dates[i],y})),
-    backgroundColor:c=>gradient(c.chart.ctx,c.chart.chartArea,QCOL[q],0.85,0.55), borderColor:QCOL[q], borderWidth:0.6, fill:true, tension:0.3, pointRadius:0, stack:'q' }));
+  const ds=QORDER.map((q,qi)=>bandDs(q, series[qi].map((y,i)=>({x:dates[i],y}))));
   S.charts.amStack=new Chart(ctx,{type:'line',data:{datasets:ds},options:stackOpts({xmin,xmax})});
   document.getElementById('am-stack-method').innerHTML=methodNote(`${scoreMethodLine()} Aggregated by <b>AUM weight</b> across all sleeves of <b>${houseLabel(fh)}</b>.`);
 
@@ -2843,7 +3106,7 @@ function renderAMC(){
     const s=houseSeries(f,null), isA=f===fh;
     const top=s.byQ['% in Q1'].map((v,i)=>({x:s.dates[i],y:((v||0)+(s.byQ['% in Q2'][i]||0))*100}));
     if(isA){ aTop=top.map(p=>p.y); aQ4=s.byQ['% in Q4'].map(v=>v==null?null:v*100); }
-    dsets.push({ label:houseLabel(f)+' Q1+Q2', data:top, yAxisID:'y', borderColor:isA?C.green:C.peerLine, borderWidth:isA?2.8:1, pointRadius:0, tension:0.3, order:isA?0:3, backgroundColor:'transparent' });
+    dsets.push({ label:houseLabel(f)+' Q1+Q2', data:top, yAxisID:'y', borderColor:isA?C.green:C.peerLine, borderWidth:isA?2.8:0.8, pointRadius:0, tension:0.3, order:isA?0:3, backgroundColor:'transparent' });
     if(isA) dsets.push({ label:houseLabel(f)+' Q4', data:s.byQ['% in Q4'].map((v,i)=>({x:s.dates[i],y:v==null?null:v*100})), yAxisID:'y', borderColor:C.red, borderWidth:2.4, pointRadius:0, tension:0.3, order:1, backgroundColor:'transparent' });
   });
   dsets.push({ label:'Quality score', yAxisID:'y1', data:dates.map((d,i)=>({x:d,y:qualityScore(byQ,i)})),
@@ -2883,6 +3146,8 @@ function renderAMCHouseKPIs(){
   //     Q1+Q2 of house AUM  =  Rated  x  Q1+Q2 of rated AUM
   // — so the reader can move between the two rather than wondering which is wrong.
   const A=sleeveAt(byQ,i), covWarn=(A.cov!=null && A.cov<0.999);
+  const _amh=document.getElementById('am-house');
+  if(_amh){ _amh.textContent=houseLabel(fh); _amh.style.color=houseColor(fh)||''; }
   document.getElementById('am-ctx').innerHTML=`${basisDesc()}<br>Snapshot ${fmt.date(dates[i])}`;
   document.getElementById('am-kpis').innerHTML=`
     <div class="kpi qc q-q1"><div class="k-lbl">Q1 share</div><div class="k-val">${fmt.pct(q1)}</div><div class="k-sub">top quartile, of all house AUM</div></div>
@@ -3327,8 +3592,10 @@ function renderScheme(){
 function lastNonNull(a){ if(!a) return null; for(let i=a.length-1;i>=0;i--) if(a[i]!=null) return a[i]; return null; }
 function renderSchemeBody(){
   const D=S.data, {fh,cat,sl,name,month}=S.scheme, vr=S.universe==='vr';
-  document.getElementById('sc-title').textContent=name||'(no scheme)';
-  document.getElementById('sc-ctx').innerHTML=`<span class="tag">${houseLabel(fh)}</span> ${cat!=='(all)'?`<span class="tag">${cat}</span>`:''} ${sl!=='(all)'?`<span class="tag">${sl}</span>`:''} <span class="tag">${basisDesc()}</span>`;
+  const _sct=document.getElementById('sc-title');
+  _sct.textContent=name||'(no scheme)';
+  _sct.style.color=houseColor(fh)||'';                       // the heading carries the house
+  document.getElementById('sc-ctx').innerHTML=`<span class="tag tag-house" style="color:${houseColor(fh)};background:${houseTint(fh,0.10)}">${houseLabel(fh)}</span> ${cat!=='(all)'?`<span class="tag">${cat}</span>`:''} ${sl!=='(all)'?`<span class="tag">${sl}</span>`:''} <span class="tag">${basisDesc()}</span>`;
 
   // ── score / quartile history (selected scheme)
   const ctx=document.getElementById('sc-score').getContext('2d');
@@ -5390,13 +5657,17 @@ function renderCompositeBar(){
   S.charts.cpBar=new Chart(ctx,{type:'bar',data:{labels,datasets:ds},
     options:{ maintainAspectRatio:false, responsive:true, animation:false, interaction:{mode:'index',intersect:false},
       plugins:{legend:{display:false}, tooltip:{...baseTooltip(), callbacks:{label:c=>`${c.dataset.label}: ${c.parsed.y==null?'—':c.parsed.y.toFixed(1)+'%'}`}}},
+      // Every house's axis label is written in ITS OWN colour (Kyser 2026-09-02), so the reader
+      // can find a house in a 15-bar cross-section without counting across. The selected house
+      // is still the loud one -- it keeps the outlined bar AND the bold weight; colour is
+      // identity here, weight is selection, and the two signals stay separable.
       scales:{ x:{ stacked:true, grid:{display:false}, ticks:{ maxRotation:55, minRotation:55,
-            color:c=> rows[c.index]&&isA(rows[c.index].fh)?OUTLINE:C.ink3,
-            font:c=> ({size:10, weight: rows[c.index]&&isA(rows[c.index].fh)?'700':'400'}) } },
+            color:c=> rows[c.index]?houseColor(rows[c.index].fh):C.ink3,
+            font:c=> ({size:10, weight: rows[c.index]&&isA(rows[c.index].fh)?'700':'500'}) } },
         y:{ stacked:true, min:0, max:100, ticks:{callback:v=>v+'%',color:C.ink3}, grid:{color:C.line2}, border:{display:false} } } }});
   S.charts.cpBarSig=sig;
   document.getElementById('cp-bar-method').innerHTML=methodNote(
-    `Stacked histogram: each house's bar shows the ticked quartiles (${selLabel}) as separate <b>colour-coded segments</b> (Q1 dark-green … Q4 red), each = that quartile's share of the house's covered AUM (${basisDesc()}). Y-axis fixed 0–100%; houses held in a <b>fixed order</b> (by the latest ${selLabel}) so playing the timeline shows each house's stack rise or fall in place. <b>Aditya Birla</b> outlined in the ABSL brand maroon &amp; bold on the axis. ${scoreMethodLine()}`);
+    `Stacked histogram: each house's bar shows the ticked quartiles (${selLabel}) as separate <b>colour-coded segments</b> (Q1 dark-green … Q4 red), each = that quartile's share of the house's covered AUM (${basisDesc()}). Y-axis fixed 0–100%; houses held in a <b>fixed order</b> (by the latest ${selLabel}) so playing the timeline shows each house's stack rise or fall in place. Each house's axis label is written in <b>that house's own colour</b>; <b>Aditya Birla</b> is additionally outlined in the ABSL brand maroon and bold, so identity (colour) and selection (weight) stay separable. ${scoreMethodLine()}`);
 }
 // renderCompositeTrend() was DELETED on 2026-08-13. It drew Aditya's Q1+Q2 / Q4 / quality-score
 // lines in a card (cp-trend) that sat two panels above am-rank, which draws the SAME two lines
