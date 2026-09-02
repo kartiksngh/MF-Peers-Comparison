@@ -745,6 +745,16 @@
   table.rt.pgrid tr:hover td.pg-frz { background: var(--paper-2); }
   table.rt.pgrid tr.hl td.pg-frz { background: var(--absl-bg); }
   table.rt.pgrid td { padding: 8px 10px; }
+  /* ── the grid's numbers step DOWN a size (Kyser 2026-09-03) ───────────────────────────────
+     Measured before changing anything (scratchpad/measure_tables.js, computed styles over every
+     body cell): Quartile residency, Schemes by quartile, Category standing AND this grid were
+     ALL already 11px/400 data against 9px/600 headers. So the grid was not using a bigger font
+     than its neighbours -- what differs is DENSITY. Those tables carry 3-135 numeric cells; this
+     one carries 321 across 25 columns, and at that width 11px numbers against 9px headers stop
+     reading as a table and start reading as a wall. Dropping the DATA to 10px restores the
+     header-to-data step at grid density. Headers stay 9px (set explicitly, so they do not
+     inherit this), and the label column comes with it so a row reads as one object. */
+  body.theme-mac table.rt.pgrid td { font-size: 10px; }
   /* The pinned BENCHMARK row. It is a reference line, not a competitor in the ranking, so it is
      styled as one: a tinted band with a rule under it, italic scheme name, and never the hover
      highlight the fund rows get (hovering it invites the reader to compare it as a peer, which is
@@ -979,7 +989,13 @@
     -webkit-backdrop-filter: saturate(180%) blur(22px);
     backdrop-filter: saturate(180%) blur(22px);
     color: var(--ink); border-bottom: 1px solid var(--chrome-line);
-    padding: 9px 34px 8px; gap: 16px;
+    padding: 9px 34px 10px; gap: 16px;
+    /* Kyser 2026-09-03: the masthead and the tab strip were two chrome bars flush against each
+       other, so they read as one block and the tabs looked like a sub-header of the title. The
+       page ground now shows between them. It costs nothing when scrolled -- the masthead scrolls
+       away and the tab strip sticks to the top on its own, which is the point: the gap says
+       these are separate objects. */
+    margin-bottom: 11px;
   }
   body.theme-mac .masthead::after { display: none; }
   body.theme-mac .masthead h1 {
@@ -1013,38 +1029,54 @@
     font-family: var(--sans); font-size: 10px; font-weight: 500; padding: 4px 10px;
   }
 
-  /* ── tabs: a macOS segmented control ──────────────────────────────────────────────────── */
+  /* ── TABS ARE NAVIGATION, NOT PARAMETERS (Kyser 2026-09-03) ───────────────────────────────
+     "AMC rollup, scheme details are tabs not the parameter toggles - they need to be distinct
+     and of different color... not very shiny - subtle and rich."
+     He is right, and the old styling is why: a tab was 12px/600 with a white-when-active pill,
+     and a segmented toggle below it is 11px/600 with a white-when-active pill. One pixel of
+     type and an identical selection treatment -- so the eye had no reason to read them as two
+     different KINDS of control. Three changes, each doing one job:
+       1. SHAPE. Tabs are now top-rounded and flat-bottomed, sitting ON the bar's bottom edge
+          like file-folder tabs. Nothing else in the deck has that shape, so "this is a
+          section" is legible before any text is read.
+       2. SIZE. 13.5px against the toggles' 11px, with real padding -- a clear step up in the
+          hierarchy rather than a tie.
+       3. HUE. A muted, mid-dark tone per section (indigo / teal / ochre / plum): pale tint of
+          its own hue when resting, the full tone with white type when selected. Low chroma is
+          what keeps it "subtle and rich" instead of shiny -- these are dyed paper, not buttons.
+     Measured (scratchpad/tab_palette.py), because both STATES have to be readable, not just
+     the pretty one: resting deep-on-tint 5.62-7.88:1, selected white-on-deep 6.72-9.74:1.
+     Minimum dE00 between the four tones is 20.8 (unmistakable), and every one is >=24 from the
+     ABSL red so the single red on the page keeps meaning "Aditya Birla" and nothing else. */
   body.theme-mac .tabs {
     background: var(--chrome-soft);
     -webkit-backdrop-filter: saturate(180%) blur(22px);
     backdrop-filter: saturate(180%) blur(22px);
-    border-bottom: 1px solid var(--chrome-line); padding: 3px 34px; gap: 2px;
+    border-bottom: 1px solid var(--chrome-line); padding: 6px 34px 0; gap: 4px;
   }
   body.theme-mac .tab {
-    font-family: var(--sans); font-size: 12px; font-weight: 600; letter-spacing: -0.008em;
-    padding: 4px 10px; border-bottom: none; margin-bottom: 0; border-radius: 7px;
-    color: var(--chrome-lbl); transition: background .18s, color .18s, box-shadow .18s; gap: 7px;
+    font-family: var(--sans); font-size: 13.5px; font-weight: 600; letter-spacing: -0.012em;
+    padding: 7px 16px 8px; margin-bottom: 0; gap: 7px;
+    border: 1px solid transparent; border-bottom: none; border-radius: 9px 9px 0 0;
+    transition: background .18s, color .18s, border-color .18s;
   }
-  body.theme-mac .tab:hover { background: rgba(255,255,255,.6); color: var(--ink-2); }
-  body.theme-mac .tab.active {
-    background: var(--card); color: var(--ink);
-    box-shadow: 0 1px 2px rgba(0,0,0,.09), 0 0 0 .5px rgba(0,0,0,.06);
-  }
-  /* ── A SHADE PER TAB (Kyser 2026-09-03) ────────────────────────────────────────────────
-     The 01/02/03/04 numerals are gone; each tab instead carries its own shade of grey, running
-     dark to light left to right. It gives the four a fixed visual order and a landmark you can
-     aim for without reading, which is what the numerals were doing less elegantly. The ACTIVE
-     tab is still pure white with a shadow, so selection reads as "lifted off the bar" and is
-     never confused with one tab merely being a lighter grey than its neighbour. */
-  body.theme-mac .tab[data-view="amc"]     { background: #dcdce4; }
-  body.theme-mac .tab[data-view="scheme"]  { background: #e3e3ea; }
-  body.theme-mac .tab[data-view="sleeve"]  { background: #eaeaf0; }
-  body.theme-mac .tab[data-view="mapping"] { background: #f1f1f5; }
-  body.theme-mac .tab:hover { background: #fff; color: var(--ink-2); }
-  body.theme-mac .tab.active {
-    background: #fff; color: var(--ink);
-    box-shadow: 0 1px 2px rgba(0,0,0,.10), 0 0 0 .5px rgba(0,0,0,.07);
-  }
+  /* resting: the section's hue at low strength, so the bar reads as four labelled sections */
+  body.theme-mac .tab[data-view="amc"]     { background:#e5e9f1; color:#33496b; border-color:#d2d9e6; }
+  body.theme-mac .tab[data-view="scheme"]  { background:#e2edea; color:#2b5d55; border-color:#cfe0db; }
+  body.theme-mac .tab[data-view="sleeve"]  { background:#f1eade; color:#785526; border-color:#e4d8c4; }
+  body.theme-mac .tab[data-view="mapping"] { background:#efe4ec; color:#5d3853; border-color:#e0d0db; }
+  body.theme-mac .tab:hover { filter: brightness(0.972); }
+  /* selected: the same hue at full strength. Inverting tint<->tone is a far stronger signal
+     than the old "one of these is white", and it cannot be confused with a neighbouring tab
+     simply being a paler shade -- which was the weakness of the grey ladder this replaces. */
+  body.theme-mac .tab.active[data-view="amc"]     { background:#33496b; border-color:#33496b; }
+  body.theme-mac .tab.active[data-view="scheme"]  { background:#2b5d55; border-color:#2b5d55; }
+  body.theme-mac .tab.active[data-view="sleeve"]  { background:#785526; border-color:#785526; }
+  body.theme-mac .tab.active[data-view="mapping"] { background:#5d3853; border-color:#5d3853; }
+  /* Equal specificity to the resting rules above (3 classes + 1 element), so SOURCE ORDER is
+     what makes this win the colour. It must stay below them. Weight stays 600 in both states
+     on purpose: bolding the active tab reflows the whole row by a few px on every switch. */
+  body.theme-mac .tab.active { color:#fff; box-shadow: 0 -1px 2px rgba(0,0,0,.05); }
 
   /* ── filter bars ──────────────────────────────────────────────────────────────────────── */
   body.theme-mac .filters {
@@ -1402,7 +1434,11 @@ const S = {
   mode:'ls',                                        // investment mode: 'ls' lumpsum | 's3' 3-year SIP book | 's5' 5-year SIP book
   sleeve:{ fh:'Aditya', br:null, mode:'within', rankDate:null, smooth:0 },
   amc:{ fh:'Aditya', rankDate:null },
-  scheme:{ fh:'Aditya', cat:'(all)', sl:'(all)', name:null, month:null, peerDate:null, smooth:0 },
+  // smooth:3 — the quartile-history chart opens on the 3-month trailing mean, not Raw (Kyser
+  // 2026-09-03). A raw monthly quartile is a step function that snaps between Q1 and Q4 on a
+  // single rank crossing, so the first thing the panel showed was its own noise; the 3m mean
+  // opens on the trend and the raw steps stay drawn faintly behind it, so nothing is hidden.
+  scheme:{ fh:'Aditya', cat:'(all)', sl:'(all)', name:null, month:null, peerDate:null, smooth:3 },
   matrix:{ metric:'tophalf', date:null },
   composite:{ date:null, qsel:[1,2] },
   league:{ date:null, sortKey:'top', sortDir:-1 },
@@ -4153,6 +4189,11 @@ function renderSchemeBody(){
   // Smoothing (Kyser 2026-09-02): 0 = raw. When on, the raw series stays on the chart as a faint
   // ghost UNDER the smoothed line, so the summary never conceals the observations behind it.
   const sm = S.scheme.smooth|0;
+  // Drive the segmented control FROM the state on every render. The markup ships one button
+  // carrying class="active", and when the default moved from Raw to 3m the chart smoothed while
+  // the buttons still said "Raw" — the panel contradicting itself, caught by the probe. A
+  // hard-coded active class is a second copy of the state; this makes the buttons a view of it.
+  setSeg('sc-smooth', String(sm));
   const smoothSets = dss => smoothSeries(dss, sm);
   const smNote = sm ? ` · ${sm}-month trailing mean (raw steps kept faint behind)` : '';
   // The subtitle led with the word "Raw". With a smoother on that is the one thing the line is
@@ -6057,11 +6098,49 @@ function matrixValue(fh,br,i,metric){
   if(metric==='q4') return (byQ['% in Q4']?.[i]||0)/w;
   return ((byQ['% in Q1']?.[i]||0)+(byQ['% in Q2']?.[i]||0))/w;
 }
+// ── the matrix heat ramp, moved onto the deck's jewel band ───────────────────────────────────
+// Kyser 2026-09-03: "the colour scheme of the quartile matrix - its same old, not updated to the
+// rich new theme colors." Two faults, and the palette was only one of them:
+//   1. The stops were the RETIRED canonical tokens (#c0523e / #d6a23f / #1f5c3d) while every
+//      band chart on the deck had already moved to the jewel set. A matrix cell reading "green"
+//      and a Q1 band reading "green" were two DIFFERENT greens encoding the same idea, which is
+//      worse than either choice alone. Now vermilion -> gold -> jade -> deep jade: the same four
+//      QFILL tones the bands use, so one green means one thing everywhere.
+//   2. It interpolated in GAMMA-ENCODED sRGB. The midpoint of two sRGB values is darker and
+//      less saturated than the colour halfway between them, which is exactly where the muddy
+//      olive band between the red and the green came from -- and is the same bug already fixed
+//      in the AMC summary ramp. Mixing in LINEAR light keeps the middle as clean as the ends.
+// Also now four stops rather than three, so the upper half has the light jade to travel through
+// instead of stretching one green across half the scale.
+// Stops chosen by sweeping the WHOLE 0..1 ramp and maximising the worst cell's text contrast,
+// not by picking four colours that look right at the ends. Endpoints are deeper and the middle
+// jade lighter than the band tokens, which is what buys the legibility AND reads richer.
+const HEAT_STOPS = [[212,72,58],[238,178,52],[104,193,148],[10,86,56]];   // Q4 -> Q3 -> Q2 -> Q1
 function heatColor(t){
-  const stops=[[192,82,62],[214,162,63],[31,92,61]];
-  const seg=t<0.5?0:1, lt=t<0.5?t/0.5:(t-0.5)/0.5, a=stops[seg], b=stops[seg+1];
-  return `rgba(${Math.round(a[0]+(b[0]-a[0])*lt)},${Math.round(a[1]+(b[1]-a[1])*lt)},${Math.round(a[2]+(b[2]-a[2])*lt)},0.92)`;
+  const x = Math.max(0, Math.min(1, t)) * (HEAT_STOPS.length - 1);
+  const i = Math.min(HEAT_STOPS.length - 2, Math.floor(x)), f = x - i;
+  const a = HEAT_STOPS[i], b = HEAT_STOPS[i + 1];
+  const c = [0, 1, 2].map(k => _l2s(_s2l(a[k]) + (_s2l(b[k]) - _s2l(a[k])) * f));
+  return `rgb(${c[0]},${c[1]},${c[2]})`;
 }
+// Ink = whichever of white/dark actually MEASURES better on this exact cell, computed per cell.
+// Not a luminance threshold, and emphatically not the old rule (t>0.32 && t<0.7 -> dark ink),
+// which was hand-tuned to the retired three-stop ramp: any threshold has a band where it picks
+// the worse of the two, and a threshold tied to t goes silently wrong the moment stops move.
+// Measured over the full ramp: worst cell is 4.21:1 with this rule. The ramp+rule it replaces
+// bottomed out at 2.98:1 -- so the numbers in this matrix were genuinely hard to read before.
+// 4.21 is the ceiling for a CONTINUOUS ramp with two ink colours: a light-to-dark scale must
+// cross a mid-luminance band where neither white nor black reaches 4.5, and the only ways past
+// that are a discontinuous palette or an outline on the type. Not worth either here.
+function heatInk(bg){
+  const m = /(\d+),\s*(\d+),\s*(\d+)/.exec(bg); if(!m) return C.ink;
+  const L = 0.2126 * _s2l(+m[1]) + 0.7152 * _s2l(+m[2]) + 0.0722 * _s2l(+m[3]);
+  const cW = 1.05 / (L + 0.05);                       // white on this cell
+  const cI = (L + 0.05) / (_INK_LUM + 0.05);          // the deck's ink on this cell
+  return cW >= cI ? '#ffffff' : C.ink;
+}
+const _INK_LUM = (function(){ const n = parseInt(C.ink.slice(1), 16);
+  return 0.2126*_s2l((n>>16)&255) + 0.7152*_s2l((n>>8)&255) + 0.0722*_s2l(n&255); })();
 function renderMatrixGrid(){
   const {metric,date:i}=S.matrix, brs=sleevesPresent(), fhs=housesPresent(null).sort(fhSort);
   const isScore=metric==='score', q4=metric==='q4';
@@ -6080,7 +6159,7 @@ function renderMatrixGrid(){
   const disp=v=> v==null?'·' : isScore?v.toFixed(2):(v*100).toFixed(0)+'%';
   let html='<table class="rt"><thead><tr><th>Fund House</th>'; brsShown.forEach(b=>html+=`<th class="num">${b}</th>`); html+='</tr></thead><tbody>';
   fhs.forEach(fh=>{ const cls=fh==='Aditya'?'hl':''; html+=`<tr class="${cls}"><td class="lbl">${houseLabel(fh)}</td>`;
-    brsShown.forEach(br=>{ const v=cells[fh+'|'+br]; const t=norm(v); const bg=v==null?'transparent':heatColor(t); const col=v==null?C.ink4:(t>0.32&&t<0.7?'#3b2f15':'#fff');
+    brsShown.forEach(br=>{ const v=cells[fh+'|'+br]; const t=norm(v); const bg=v==null?'transparent':heatColor(t); const col=v==null?C.ink4:heatInk(bg);
       html+=`<td class="num" style="background:${bg};color:${col};font-weight:600">${disp(v)}</td>`; }); html+='</tr>'; });
   html+='</tbody></table>';
   document.getElementById('mx-grid').innerHTML=html;
