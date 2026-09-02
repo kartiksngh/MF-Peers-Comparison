@@ -282,6 +282,7 @@
     --q2:         #6fa37c;
     --q3:         #d6a23f;
     --q4:         #c0523e;
+    --q12:        #1d4e89;   /* Q1+Q2 = the top-half bucket (Kyser 2026-09-02) */
     --q1-t:       rgba(31,92,61,0.85);
     --q2-t:       rgba(111,163,124,0.80);
     --q3-t:       rgba(214,162,63,0.80);
@@ -590,6 +591,29 @@
   table.rt tr.qc2 td.lbl { color: var(--q2); font-weight: 700; }
   table.rt tr.qc3 td.lbl { color: var(--q3); font-weight: 700; }
   table.rt tr.qc4 td.lbl { color: var(--q4); font-weight: 700; }
+
+  /* QUARTILE IDENTITY ON THE KPI TILES (Kyser 2026-09-02). The table rows above already colour
+     scheme names by quartile; the tiles did not -- they were classed by JUDGEMENT (good / warn /
+     accent), so "Q1+Q2 share" rendered in the ABSL red and read as a warning when it is simply the
+     top-half bucket, and "Current quartile" rendered EVERY quartile in that same accent, so a Q2
+     fund showed red. Colour must report WHICH quartile and leave the verdict to the reader.
+     Both the field name and the number wear the colour, and the label takes the value's face so
+     the pair reads as one object. Size hierarchy is kept: matching the label to the value's
+     30px would destroy the scan order. */
+  .kpi.qc .k-lbl { font-family: 'Fraunces', Georgia, serif; text-transform: none;
+                   letter-spacing: .01em; font-size: 12px; font-weight: 600; }
+  .kpi.qc.q-q1  .k-lbl, .kpi.qc.q-q1  .k-val { color: var(--q1);  }
+  .kpi.qc.q-q2  .k-lbl, .kpi.qc.q-q2  .k-val { color: var(--q2);  }
+  .kpi.qc.q-q3  .k-lbl, .kpi.qc.q-q3  .k-val { color: var(--q3);  }
+  .kpi.qc.q-q4  .k-lbl, .kpi.qc.q-q4  .k-val { color: var(--q4);  }
+  .kpi.qc.q-q12 .k-lbl, .kpi.qc.q-q12 .k-val { color: var(--q12); }
+  .kpi.qc.q-q1::before  { background: var(--q1);  }
+  .kpi.qc.q-q2::before  { background: var(--q2);  }
+  .kpi.qc.q-q3::before  { background: var(--q3);  }
+  .kpi.qc.q-q4::before  { background: var(--q4);  }
+  .kpi.qc.q-q12::before { background: var(--q12); }
+  .qt-q1 { color: var(--q1); } .qt-q2 { color: var(--q2); }
+  .qt-q3 { color: var(--q3); } .qt-q4 { color: var(--q4); } .qt-q12 { color: var(--q12); }
   table.rt tr.qc0 td.lbl { color: var(--ink-3); font-weight: 600; }
   table.rt tr.qhead.qh1 td { color: var(--q1); }
   table.rt tr.qhead.qh2 td { color: var(--q2); }
@@ -930,6 +954,12 @@ const C = {
   absl:'#c8392b', navy:'#20436b', gold:'#b3852f', ink:'#16130f', ink3:'#6a5f50', ink4:'#9c8f7a',
   line:'#ddd1b8', line2:'#ebe1cc', peer:'#c9bca3', peerLine:'rgba(201,188,163,.38)', green:'#1f5c3d', red:'#c0523e'
 };
+// Quartile -> tile class (Kyser 2026-09-02). Empty string when the quartile is unknown, so the
+// tile keeps its neutral rail rather than borrowing a colour it has not earned.
+const qCls = q => (q===1||q==='1'||q==='q1') ? 'q-q1'
+               : (q===2||q==='2'||q==='q2') ? 'q-q2'
+               : (q===3||q==='3'||q==='q3') ? 'q-q3'
+               : (q===4||q==='4'||q==='q4') ? 'q-q4' : '';
 const QORDER = ['% in Q1','% in Q2','% in Q3','% in Q4'];
 const QCOL   = { '% in Q1':C.q1, '% in Q2':C.q2, '% in Q3':C.q3, '% in Q4':C.q4 };
 const SCOREW = { '% in Q1':4, '% in Q2':3, '% in Q3':2, '% in Q4':1 };
@@ -2369,11 +2399,11 @@ function renderSleeve(){
   document.getElementById('sl-title').innerHTML=`${houseLabel(fh)} · ${br}`;
   document.getElementById('sl-ctx').innerHTML=`${basisDesc()}<br>Snapshot ${fmt.date(dates[li])}`;
   document.getElementById('sl-kpis').innerHTML=`
-    <div class="kpi good"><div class="k-lbl">Q1+Q2 within sleeve</div><div class="k-val good">${fmt.pct(A.top)}</div><div class="k-sub">of the sleeve's <b>rated</b> AUM</div></div>
+    <div class="kpi qc q-q12"><div class="k-lbl">Q1+Q2 within sleeve</div><div class="k-val">${fmt.pct(A.top)}</div><div class="k-sub">of the sleeve's <b>rated</b> AUM</div></div>
     <div class="kpi accent"><div class="k-lbl">Sleeve weight in AMC</div><div class="k-val accent">${fmt.pct(A.weight)}</div><div class="k-sub">of total ${fh} AUM</div></div>
     <div class="kpi${covWarn?' warn':''}"><div class="k-lbl">Rated</div><div class="k-val${covWarn?' warn':''}">${fmt.pct(A.cov)}</div><div class="k-sub">${covWarn?'of sleeve AUM carries a quartile':'the whole sleeve is scored'}</div></div>
     <div class="kpi"><div class="k-lbl">AUM-wtd quartile score</div><div class="k-val">${fmt.num(score)}</div><div class="k-sub">1 (worst) → 4 (best)</div></div>
-    <div class="kpi warn"><div class="k-lbl">Q4 within sleeve</div><div class="k-val warn">${fmt.pct(A.qq4)}</div><div class="k-sub">bottom-quartile AUM</div></div>`;
+    <div class="kpi qc q-q4"><div class="k-lbl">Q4 within sleeve</div><div class="k-val">${fmt.pct(A.qq4)}</div><div class="k-sub">bottom-quartile AUM</div></div>`;
 
   document.getElementById('sl-c1-title').textContent = mode==='within'?'Quartile distribution within sleeve':'Quartile distribution as % of AMC AUM';
   document.getElementById('sl-c1-sub').textContent = mode==='within'
@@ -2550,11 +2580,11 @@ function renderAMCHouseKPIs(){
   const A=sleeveAt(byQ,i), covWarn=(A.cov!=null && A.cov<0.999);
   document.getElementById('am-ctx').innerHTML=`${basisDesc()}<br>Snapshot ${fmt.date(dates[i])}`;
   document.getElementById('am-kpis').innerHTML=`
-    <div class="kpi good"><div class="k-lbl">Q1 share</div><div class="k-val good">${fmt.pct(q1)}</div><div class="k-sub">top quartile, of all house AUM</div></div>
-    <div class="kpi accent"><div class="k-lbl">Q1+Q2 share</div><div class="k-val accent">${fmt.pct((q1||0)+(q2||0))}</div><div class="k-sub">top half, of <b>all</b> house AUM</div></div>
+    <div class="kpi qc q-q1"><div class="k-lbl">Q1 share</div><div class="k-val">${fmt.pct(q1)}</div><div class="k-sub">top quartile, of all house AUM</div></div>
+    <div class="kpi qc q-q12"><div class="k-lbl">Q1+Q2 share</div><div class="k-val">${fmt.pct((q1||0)+(q2||0))}</div><div class="k-sub">top half, of <b>all</b> house AUM</div></div>
     <div class="kpi${covWarn?' warn':''}"><div class="k-lbl">Rated</div><div class="k-val${covWarn?' warn':''}">${fmt.pct(A.cov)}</div><div class="k-sub">of AUM is ranked · its top half = ${fmt.pct(A.top)}</div></div>
     <div class="kpi"><div class="k-lbl">Quality score</div><div class="k-val">${fmt.num(score)}</div><div class="k-sub">1 → 4, AUM-weighted</div></div>
-    <div class="kpi warn"><div class="k-lbl">Q3+Q4 share</div><div class="k-val warn">${fmt.pct((q3||0)+(q4||0))}</div><div class="k-sub">bottom half, of all house AUM</div></div>`;
+    <div class="kpi qc q-q4"><div class="k-lbl">Q3+Q4 share</div><div class="k-val">${fmt.pct((q3||0)+(q4||0))}</div><div class="k-sub">bottom half, of all house AUM</div></div>`;
 }
 // Everything on this tab that depends on the AS-OF DATE, and nothing else. The timeline
 // scrubber / GIF exporter calls this once per frame, so it deliberately leaves the
@@ -3054,13 +3084,13 @@ function renderSchemeBody(){
   const rowsLast=_cand.find(r=>!r.borrowed)||_cand[0];
   if(vr){ const rec=vrHomeRec(name);
     document.getElementById('sc-kpis').innerHTML=`
-      <div class="kpi accent"><div class="k-lbl">Current quartile</div><div class="k-val accent">${rowsLast&&rowsLast.q?('Q'+rowsLast.q):'—'}</div><div class="k-sub">${basisDesc()}</div></div>
+      <div class="kpi qc ${qCls(rowsLast&&rowsLast.q)}"><div class="k-lbl">Current quartile</div><div class="k-val">${rowsLast&&rowsLast.q?('Q'+rowsLast.q):'—'}</div><div class="k-sub">${basisDesc()}</div></div>
       <div class="kpi"><div class="k-lbl">Basis score</div><div class="k-val">${fmt.num(rowsLast?rowsLast.score:null)}</div><div class="k-sub">on ${fmt.date(curDates()[month])}</div></div>
       <div class="kpi good"><div class="k-lbl">% of ${fh} AUM</div><div class="k-val good">${fmt.pct(rowsLast?rowsLast.a:null)}</div><div class="k-sub">house weight</div></div>
       <div class="kpi"><div class="k-lbl">Scheme AUM</div><div class="k-val">${fmt.cr(rowsLast?rowsLast.cr:null)}</div><div class="k-sub">absolute</div></div>${sipKpiHTML(name,month)}`;
   } else {
     document.getElementById('sc-kpis').innerHTML=`
-      <div class="kpi accent"><div class="k-lbl">Current quartile</div><div class="k-val accent">${rowsLast&&rowsLast.q?('Q'+rowsLast.q):'—'}</div><div class="k-sub">${S.basis} all-peer</div></div>
+      <div class="kpi qc ${qCls(rowsLast&&rowsLast.q)}"><div class="k-lbl">Current quartile</div><div class="k-val">${rowsLast&&rowsLast.q?('Q'+rowsLast.q):'—'}</div><div class="k-sub">${S.basis} all-peer</div></div>
       <div class="kpi good"><div class="k-lbl">% of ${fh} AUM</div><div class="k-val good">${fmt.pct(rowsLast?rowsLast.a:null)}</div><div class="k-sub">house weight</div></div>
       <div class="kpi"><div class="k-lbl">Scheme AUM</div><div class="k-val">${fmt.cr(rowsLast?rowsLast.cr:null)}</div><div class="k-sub">absolute</div></div>
       <div class="kpi"><div class="k-lbl">Sleeve</div><div class="k-val" style="font-size:18px">${rowsLast?rowsLast.sl:'—'}</div><div class="k-sub">breakdown</div></div>${sipKpiHTML(name,month)}`;
@@ -4995,10 +5025,10 @@ function renderCompositeKPIs(){
   document.getElementById('cp-ctx').innerHTML=`${basisDesc()}<br>Snapshot ${fmt.date(curDates()[i])}`;
   const q1=byQ['% in Q1']?.[i],q2=byQ['% in Q2']?.[i],q4=byQ['% in Q4']?.[i];
   document.getElementById('cp-kpis').innerHTML=`
-    <div class="kpi good"><div class="k-lbl">Aditya Q1</div><div class="k-val good">${fmt.pct(q1)}</div><div class="k-sub">top quartile</div></div>
-    <div class="kpi accent"><div class="k-lbl">Aditya Q1+Q2</div><div class="k-val accent">${fmt.pct((q1||0)+(q2||0))}</div><div class="k-sub">top half</div></div>
+    <div class="kpi qc q-q1"><div class="k-lbl">Aditya Q1</div><div class="k-val">${fmt.pct(q1)}</div><div class="k-sub">top quartile</div></div>
+    <div class="kpi qc q-q12"><div class="k-lbl">Aditya Q1+Q2</div><div class="k-val">${fmt.pct((q1||0)+(q2||0))}</div><div class="k-sub">top half</div></div>
     <div class="kpi"><div class="k-lbl">Aditya quality score</div><div class="k-val">${fmt.num(qualityScore(byQ,i))}</div><div class="k-sub">1 → 4</div></div>
-    <div class="kpi warn"><div class="k-lbl">Aditya Q4</div><div class="k-val warn">${fmt.pct(q4)}</div><div class="k-sub">bottom quartile</div></div>`;
+    <div class="kpi qc q-q4"><div class="k-lbl">Aditya Q4</div><div class="k-val">${fmt.pct(q4)}</div><div class="k-sub">bottom quartile</div></div>`;
 }
 // Stacked histogram of ONLY the ticked quartiles, each kept in its own Q-colour (Q1 dark-green
 // … Q4 red — the static-snapshot scheme). Y fixed 0–100%; house order FROZEN by the latest-date
