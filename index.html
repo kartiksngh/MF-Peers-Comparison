@@ -579,6 +579,17 @@
 
   /* Tables */
   .tbl-wrap { overflow-x: auto; }
+  /* ── A CAPPED TABLE (Kyser 2026-09-03) ───────────────────────────────────────────────────
+     "Ranking vs peers" lists every house, so in a two-column row it set the height for BOTH
+     cards -- and the chart beside it was stretched horizontally across empty space just to
+     match a table with 44 rows in it. The cap makes the TABLE scroll inside its own card
+     instead of dictating the row's height. The sticky header (table.rt th is already
+     position:sticky) is what makes an internal scroll usable: the column names stay put while
+     the rows move under them. */
+  .tbl-wrap.scroll-cap { max-height: 316px; overflow-y: auto; overscroll-behavior: contain; }
+  .tbl-wrap.scroll-cap table.rt { font-size: 10px; }
+  .tbl-wrap.scroll-cap table.rt td,
+  .tbl-wrap.scroll-cap table.rt th { padding: 5px 8px; }
   table.rt { width: 100%; border-collapse: collapse; font-size: 12px; }
   table.rt th {
     text-align: left; padding: 11px 10px; border-bottom: 1.5px solid var(--ink);
@@ -1301,8 +1312,21 @@ const C = {
   // lines the panel is actually about. It is CONTEXT -- the shape of the field, not a series
   // anyone traces -- so it drops to .13, and the peer stroke thins with it. line2 (the axis
   // gridlines) softens for the same reason: present when looked for, invisible when not.
-  line:'#ddd7ca', line2:'#f1ede4', peer:'#cfc9bd', peerLine:'rgba(150,144,132,.13)', green:'#1f5c3d', red:'#c0523e'
+  line:'#d6d6db', line2:'#f0f0f5', peer:'#c7c7cc', peerLine:'rgba(150,150,162,.13)', green:'#1f5c3d', red:'#c0523e',
+  // Kyser 2026-09-03: the two REFERENCE lines -- sleeve weight and quality score -- go grey.
+  // They are context for the coloured series, not series in their own right, and drawing them
+  // in the ABSL red and the navy gave them the visual weight of data they are not.
+  grey:'#8e8e94'
 };
+// ── PERCENT AXES STOP AT 100 (Kyser 2026-09-03) ───────────────────────────────────────────
+// A share-of-AUM axis cannot exceed 100%, so a "120%" tick labels a value the scale does not
+// have. The axis still EXTENDS past 100 -- that headroom is what keeps a bar that reaches 100%
+// off the top edge -- but the ticks stop at 100. Extending the scale and labelling the
+// extension are two different things, and only the first one was wanted.
+function pctTicksTo100(ax){
+  if(!ax || !ax.ticks) return;
+  ax.ticks = ax.ticks.filter(t => t.value <= 100.0001);
+}
 // Chart.js reads these hexes directly (it cannot see CSS variables), so the NEUTRALS above were
 // re-cut warm-cream -> Mac grey alongside the surface theme, or every axis, gridline and peer
 // line would still be drawing the old paper palette on top of the new one. The DATA colours --
@@ -2710,9 +2734,9 @@ function stackOpts({leftMax, rightLabel, xmin, xmax}){
     scales:{ x:timeX(xmin,xmax),
       // Gridlines off across the whole deck (Kyser, twice). The axis ticks carry the scale; the
       // rules were competing with the data for the reader's attention on every panel.
-      y:{ stacked:true, min:0, max:leftMax, grace:leftMax?undefined:'5%', ticks:{callback:v=>v+'%',color:C.ink3,font:{size:10}}, grid:{display:false}, border:{display:false} },
-      y1:{ position:'right', display:!!rightLabel, grace:'12%', min:0, ticks:{callback:v=>v+'%',color:C.absl,font:{size:10}}, grid:{drawOnChartArea:false}, border:{display:false},
-           title:{display:!!rightLabel,text:rightLabel,color:C.absl,font:{size:10}} } } };
+      y:{ stacked:true, min:0, max:leftMax, grace:leftMax?undefined:'5%', ticks:{callback:v=>v+'%',color:C.ink3,font:{size:10}}, grid:{display:false}, border:{display:false}, afterBuildTicks:pctTicksTo100 },
+      y1:{ position:'right', display:!!rightLabel, grace:'12%', min:0, ticks:{callback:v=>v+'%',color:C.grey,font:{size:10}}, grid:{drawOnChartArea:false}, border:{display:false},
+           title:{display:!!rightLabel,text:rightLabel,color:C.grey,font:{size:10}} } } };
 }
 function dualOpts({leftSuffix, rightLabel, rightMin, rightMax, xmin, xmax, noGrid}){
   return { maintainAspectRatio:false, responsive:true, interaction:{mode:'index',intersect:false}, ...chartMotion(),
@@ -2720,9 +2744,21 @@ function dualOpts({leftSuffix, rightLabel, rightMin, rightMax, xmin, xmax, noGri
       callbacks:{ label:c=>{ const v=c.parsed.y; if(v==null) return `${c.dataset.label}: —`;
         return c.dataset.yAxisID==='y1' ? `${c.dataset.label}: ${v.toFixed(2)}` : `${c.dataset.label}: ${v.toFixed(1)}${leftSuffix||''}`; } } } },
     scales:{ x:timeX(xmin,xmax),
-      y:{ position:'left', min:0, grace:'8%', ticks:{callback:v=>v+(leftSuffix||''),color:C.ink3,font:{size:10}}, grid:{display:false}, border:{display:false} },
-      y1:{ position:'right', min:rightMin, max:rightMax, grid:{drawOnChartArea:false}, ticks:{color:C.navy,font:{size:10}}, border:{display:false},
-           title:{display:!!rightLabel,text:rightLabel,color:C.navy,font:{size:10}} } } };
+      y:{ position:'left', min:0, grace:'8%', ticks:{callback:v=>v+(leftSuffix||''),color:C.ink3,font:{size:10}}, grid:{display:false}, border:{display:false},
+          afterBuildTicks: leftSuffix==='%' ? pctTicksTo100 : undefined },
+      // The score axis runs 1..4 and only the INTEGERS mean anything -- a tick reading "2.5" on
+      // a 1-to-4 quality score is a value the scale does not have. Chart.js was generating
+      // half-steps, so the ticks are replaced outright (stepSize cannot do it: Chart.js steps
+      // up FROM min, so it would still land on 1, 2, 3, 4 only by luck of the range).
+      y1:{ position:'right', min:rightMin, max:rightMax, grid:{drawOnChartArea:false},
+           ticks:{color:C.grey,font:{size:10}}, border:{display:false},
+           afterBuildTicks: ax => {
+             const lo=Math.ceil(rightMin==null?ax.min:rightMin), hi=Math.floor(rightMax==null?ax.max:rightMax);
+             if(!isFinite(lo) || !isFinite(hi) || hi-lo>12) return;      // leave odd ranges alone
+             const t=[]; for(let v=lo; v<=hi; v++) t.push({value:v});
+             ax.ticks = t;
+           },
+           title:{display:!!rightLabel,text:rightLabel,color:C.grey,font:{size:10}} } } };
 }
 // noGrid  — drop the horizontal rules (Kyser 2026-09-02, on the quartile-history chart).
 // qTicks  — the y-axis is a QUARTILE axis, so label it Q1..Q4 and nothing else. Chart.js was
@@ -2809,7 +2845,7 @@ function buildViews(){
             <span><span class="ldot" style="background:${C.q2}"></span>Q2</span>
             <span><span class="ldot" style="background:${C.q3}"></span>Q3</span>
             <span><span class="ldot" style="background:${C.q4}"></span>Q4</span>
-            <span><span class="lline" style="background:${C.absl}"></span>Sleeve weight (R)</span></div>
+            <span><span class="lline" style="background:${C.grey}"></span>Sleeve weight (R)</span></div>
         </div>
         <div class="chartbox tall"><canvas id="sl-stack"></canvas></div>
         <div id="sl-c1-method"></div>
@@ -2820,7 +2856,7 @@ function buildViews(){
             <div class="ch-right">
               <div class="fg"><label>Smooth (trailing mean)</label>
                 <div class="seg sm" id="sl-smooth"><button data-v="0" class="active">Raw</button><button data-v="3">3m</button><button data-v="6">6m</button><button data-v="12">12m</button></div></div>
-              <div class="legend"><span><span class="lline" style="background:${C.green}"></span>Q1+Q2 %</span><span><span class="lline" style="background:${C.red}"></span>Q4 %</span><span><span class="lline" style="background:${C.navy}"></span>Score (R)</span></div>
+              <div class="legend"><span><span class="lline" style="background:${C.green}"></span>Q1+Q2 %</span><span><span class="lline" style="background:${C.red}"></span>Q4 %</span><span><span class="lline" style="background:${C.grey}"></span>Score (R)</span></div>
             </div>
           </div>
           <div class="chartbox"><canvas id="sl-trend"></canvas></div>
@@ -2830,7 +2866,7 @@ function buildViews(){
           <div class="card-h"><div><h3>Ranking vs peers</h3><div class="sub">Re-rank on any month-end</div></div>
             <div class="fg"><label>As-of date</label><select id="sl-rankdate"></select></div>
           </div>
-          <div class="tbl-wrap" id="sl-rank"></div>
+          <div class="tbl-wrap scroll-cap" id="sl-rank"></div>
           <div id="sl-rank-method"></div>
         </div>
       </div>
@@ -2904,7 +2940,7 @@ function buildViews(){
       </div>
       <div class="card">
         <div class="card-h"><div><h3 id="am-rank-title">Q1+Q2 (green) &amp; Q4 (red) over time</h3><div class="sub" id="am-rank-sub">Solid = the selected house; faded = its peers</div></div>
-          <div class="legend"><span><span class="lline" style="background:${C.green}"></span>Q1+Q2 %</span><span><span class="lline" style="background:${C.red}"></span>Q4 %</span><span><span class="lline" style="background:${C.navy}"></span>Score (R)</span></div>
+          <div class="legend"><span><span class="lline" style="background:${C.green}"></span>Q1+Q2 %</span><span><span class="lline" style="background:${C.red}"></span>Q4 %</span><span><span class="lline" style="background:${C.grey}"></span>Score (R)</span></div>
         </div>
         <div class="chartbox tall"><canvas id="am-rank"></canvas></div>
         <div id="am-rank-method"></div>
@@ -3161,7 +3197,7 @@ function renderSleeve(){
   S.charts.slStack?.destroy();
   const areaDs=QORDER.map((q,qi)=>bandDs(q, series[qi].map((y,i)=>({x:dates[i],y})), {yAxisID:'y'}));
   const weightDs={ label:'Sleeve weight', data:weight.map((v,i)=>({x:dates[i],y:v==null?null:v*100})),
-    borderColor:C.absl, borderWidth:2.2, borderDash:[5,3], fill:false, tension:0.3, pointRadius:0, yAxisID:'y1' };
+    borderColor:C.grey, borderWidth:2.2, borderDash:[5,3], fill:false, tension:0.3, pointRadius:0, yAxisID:'y1' };
   S.charts.slStack=new Chart(ctx,{type:'line',data:{datasets:[...areaDs,weightDs]},
     options:stackOpts({leftMax:mode==='within'?100:undefined, rightLabel:'Sleeve weight %', xmin, xmax})});
   document.getElementById('sl-c1-method').innerHTML=methodNote(
@@ -3185,7 +3221,7 @@ function renderSleeveTrend(){
   const base=[
     { label:'Q1+Q2 %', data:topHalf, borderColor:C.green, borderWidth:2.2, tension:0.3, pointRadius:0, yAxisID:'y', backgroundColor:c=>gradient(c.chart.ctx,c.chart.chartArea,C.green,0.16,0.01), fill:true },
     { label:'Q4 %', data:q4, borderColor:C.red, borderWidth:2.2, tension:0.3, pointRadius:0, yAxisID:'y', fill:false },
-    { label:'Quality score', data:scoreS, borderColor:C.navy, borderWidth:1.6, borderDash:[4,3], tension:0.3, pointRadius:0, yAxisID:'y1', fill:false }
+    { label:'Quality score', data:scoreS, borderColor:C.grey, borderWidth:1.6, borderDash:[4,3], tension:0.3, pointRadius:0, yAxisID:'y1', fill:false }
   ];
   S.charts.slTrend=new Chart(ctx,{type:'line',data:{datasets:smoothSeries(base, sm)},
     options:dualOpts({leftSuffix:'%', rightLabel:'Score 1–4', rightMin:1, rightMax:4, xmin, xmax, noGrid:true})});
@@ -3301,7 +3337,7 @@ function renderAMC(){
   dsets.push({ label:houseLabel(fh)+' Q4', yAxisID:'y', order:1, backgroundColor:'transparent',
     data:selS.dates.map((d,i)=>({x:d,y:aQ4[i]})), borderColor:C.red, borderWidth:2.4, pointRadius:0, tension:0.3 });
   dsets.push({ label:'Quality score', yAxisID:'y1', data:dates.map((d,i)=>({x:d,y:qualityScore(byQ,i)})),
-    borderColor:C.navy, borderWidth:1.6, borderDash:[4,3], pointRadius:0, tension:0.3, order:2, backgroundColor:'transparent' });
+    borderColor:C.grey, borderWidth:1.6, borderDash:[4,3], pointRadius:0, tension:0.3, order:2, backgroundColor:'transparent' });
   const adDates=houseSeries(fh,null).dates;
   const {xmin:rxmin,xmax:rxmax}=xBounds(adDates, aTop, aQ4);
   S.charts.amRank=new Chart(ctx2,{type:'line',data:{datasets:dsets},
