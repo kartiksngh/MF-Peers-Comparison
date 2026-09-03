@@ -898,6 +898,27 @@
     body.mfopen .fg select, body.mfopen .fg input { min-width: 0; width: 100%; }
     body.mfopen .fg { flex: 1 1 100%; min-width: 0; }
 
+    /* ░░ T8b — MOBILE ROUND 2 (Kyser 2026-09-03 ~20:25) ░░
+       (1) the page must NEVER scroll sideways: every card grid is one column on a phone, and the
+           content column CLIPS paint (clip, not hidden — hidden would make it a scroll container and
+           break position:sticky on iOS). (2) tables and charts EXTEND to the right inside their card:
+           the card and every .tbl-wrap scroll sideways; the table keeps natural column widths and
+           cells do not wrap. (3) uniform stacking: KPI tiles 2-up with an odd last tile full-width;
+           card-header rows wrap so a control never leaves the screen. */
+    .content { overflow-x: clip; }
+    .grid-2, .grid-2.even { grid-template-columns: 1fr; gap: 14px; }
+    /* two Scheme-Detail grids carry an INLINE grid-template-columns (1.5fr 1fr); inline beats any
+       stylesheet rule, so this is the one honest !important: phone width only, inside this query. */
+    .grid-2.sc-split { grid-template-columns: 1fr !important; }
+    .kpis, .kpis.k4 { grid-template-columns: 1fr 1fr; gap: 10px; }
+    .kpis .kpi:last-child:nth-child(odd) { grid-column: 1 / -1; }
+    .card { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .tbl-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; max-width: 100%; }
+    .tbl-wrap table, .card > table, table.rt { width: max-content; min-width: 100%; }
+    table.rt th, table.rt td { white-space: nowrap; }
+    .card-h, .shead { flex-wrap: wrap; gap: 8px 14px; }
+    .card-h .ctx, .shead .ctx { text-align: left; }
+
     /* ░░ T8 — CHART ASPECT ░░
        A .chartbox is a FIXED pixel height (380 / 470 / 300) sized for a ~700px-wide desktop
        column. On a phone the column is ~324px wide, so the box becomes taller than it is wide
