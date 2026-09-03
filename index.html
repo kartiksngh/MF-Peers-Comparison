@@ -399,6 +399,11 @@
   .tab.active { color: var(--ink); border-bottom-color: var(--absl); }
   .tab.active .tnum { color: var(--absl); opacity:1; }
 
+  /* T8 mobile context bar — DISPLAY:NONE here is the desktop guarantee. Every rule that
+     gives it size, position or behaviour lives inside the max-width:720px query below, so at
+     laptop width this element has no layout, no click target and no effect on the cascade. */
+  #mfbar { display: none; }
+
   /* ░░ FILTER BAR ░░ */
   .filters {
     padding: 16px 44px; display: flex; align-items: flex-end; gap: 20px; flex-wrap: wrap;
@@ -848,6 +853,59 @@
     .tabs, .filters, .content { padding-left: 18px; padding-right: 18px; }
     .masthead h1 { font-size: 30px; }
     .kpis, .kpis.k4 { grid-template-columns: 1fr 1fr; }
+
+    /* ░░ T8 — PHONE HEADER (Kyser 2026-09-03, from screenshots) ░░
+       The pinned stack was taking 41–50% of the viewport because every .fg wraps to its own
+       line at this width. His constraints: the freeze STAYS, and the desktop does not change.
+       So the freeze is kept and what is FROZEN shrinks to two rows — the tab strip and the
+       context bar below — while the controls collapse behind a Filters button and expand
+       inline when asked for. Closed header is ~92px instead of ~850–1180px. */
+    .tab { padding: 11px 13px 9px; font-size: 14px; }
+    .tab .tnum { display: none; }
+
+    #mfbar {
+      display: flex; align-items: center; gap: 10px;
+      padding: 7px 18px; background: var(--paper-2);
+      border-bottom: 1px solid var(--line);
+      position: sticky; top: var(--tabs-h, 47px); z-index: 59;
+      box-shadow: 0 8px 16px -14px rgba(26,20,12,.45);
+    }
+    /* the summary must never wrap the bar to two lines — that would undo the whole fix */
+    #mfbar .mf-sum {
+      flex: 1 1 auto; min-width: 0; font-size: 11px; line-height: 1.35; color: var(--ink-2);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    #mfbar .mf-btn {
+      flex: 0 0 auto; appearance: none; cursor: pointer; white-space: nowrap;
+      font-family: 'Inter', sans-serif; font-size: 12px; font-weight: 600; letter-spacing: .01em;
+      padding: 7px 15px; border-radius: 999px;
+      border: 1px solid var(--absl); background: var(--card); color: var(--absl);
+    }
+    body.mfopen #mfbar .mf-btn { background: var(--absl); color: #fff; }
+
+    /* CLOSED: the controls leave the layout entirely (so --gctrl-h resolves to 0 and the
+       view filter row's sticky offset stays correct). OPEN: they lay out as ordinary blocks
+       and scroll with the page — the bar above stays pinned, so Done is always reachable. */
+    body:not(.mfopen) #gctrl,
+    body:not(.mfopen) .view > .filters { display: none; }
+    body.mfopen #gctrl,
+    body.mfopen .view > .filters {
+      position: static; box-shadow: none; row-gap: 14px; padding-top: 12px; padding-bottom: 14px;
+    }
+    /* the 9-button basis strip is the single worst offender — let it scroll sideways
+       instead of wrapping onto three rows */
+    body.mfopen #gctrl .seg { overflow-x: auto; max-width: 100%; }
+    body.mfopen .fg select, body.mfopen .fg input { min-width: 0; width: 100%; }
+    body.mfopen .fg { flex: 1 1 100%; min-width: 0; }
+
+    /* ░░ T8 — CHART ASPECT ░░
+       A .chartbox is a FIXED pixel height (380 / 470 / 300) sized for a ~700px-wide desktop
+       column. On a phone the column is ~324px wide, so the box becomes taller than it is wide
+       and Chart.js squeezes the plot into a narrow vertical strip — exactly the "squeezed and
+       get very tall" he reported. The column MEASURED 302px wide at 390px viewport, so every height below is under 302. */
+    .chartbox { height: 240px; }
+    .chartbox.tall { height: 285px; }
+    .chartbox.short { height: 195px; }
   }
 
   /* ░░ TIMELINE SCRUBBER + ANIMATED-GIF EXPORT (snapshot-in-time views) ░░ */
@@ -1317,6 +1375,14 @@
   <button class="tab" data-view="mapping">Peer Mapping &amp; Data</button>
 </nav>
 
+<!-- T8 (Kyser 2026-09-03): the phone-only context bar. It is display:none above 720px, so on a
+     laptop this element is inert and the header is exactly what it was. On a phone it is the
+     second and last frozen row: what you are looking at, plus the way back to the controls. -->
+<div id="mfbar">
+  <div class="mf-sum" id="mf-sum">All filters</div>
+  <button type="button" class="mf-btn" id="mf-toggle" aria-expanded="false" aria-controls="gctrl">Filters</button>
+</div>
+
 <div class="filters" id="gctrl" style="border-top:2px solid var(--absl);border-bottom:1px solid var(--line);margin-bottom:2px">
   <div class="fg"><label>Peer universe</label>
     <div class="seg" id="gc-universe"><button data-v="all" class="active">All Peers (MFI)</button><button data-v="vr">Exact Peers (VR)</button></div></div>
@@ -1494,6 +1560,31 @@ const S = {
   else window.addEventListener('resize', set);
   set();
 })();
+// T8 (Kyser 2026-09-03) — the phone header's collapse toggle.
+// Runs on every device, but #mfbar is display:none above 720px, so on a laptop the button is
+// unclickable, body.mfopen is never set, and every rule keyed to it sits inside the media
+// query. That is the whole desktop-safety argument: one hidden element, zero shared rules.
+// The summary is MIRRORED (not moved) from #gc-summary, so the existing control code keeps
+// its one and only write target and cannot drift from what the bar shows.
+(function(){
+  const btn=document.getElementById('mf-toggle'), out=document.getElementById('mf-sum'),
+        src=document.getElementById('gc-summary');
+  if(!btn || !out) return;
+  const mirror=()=>{
+    const t=((src && src.textContent) || '').trim();
+    out.textContent = (t && t !== '—') ? t : 'All filters';
+  };
+  btn.addEventListener('click', ()=>{
+    const open=document.body.classList.toggle('mfopen');
+    btn.textContent = open ? 'Done' : 'Filters';
+    btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+  });
+  if(src && window.MutationObserver){
+    new MutationObserver(mirror).observe(src, {childList:true, characterData:true, subtree:true});
+  }
+  mirror();
+})();
+
 // ── COMPOSITE → AMC MERGE (2026-08-11): the Composite tab's panels moved INSIDE AMC Roll-up,
 // so the two tabs' as-of dates collapsed into ONE. S.amc.rankDate is the single source of
 // truth; S.composite.date survives as a read/write ALIAS of it, so every existing reader and
