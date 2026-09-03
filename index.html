@@ -1032,6 +1032,19 @@
     color: var(--ink); font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums;
   }
   body.theme-mac .mast-facts .sep { color: var(--ink-4); font-size: 11px; }
+  /* The export button. Deliberately quiet -- it sits in the masthead next to the as-of badge and
+     must not compete with the page title; it reads as a control, not a call to action. */
+  .mast-xls {
+    margin-top: 8px; display: inline-flex; align-items: center; gap: 6px;
+    font-family: var(--sans); font-size: 11px; font-weight: 600; letter-spacing: -0.005em;
+    padding: 5px 11px; border-radius: 7px; cursor: pointer;
+    background: #33496b; color: #fff; border: 1px solid #33496b;
+    transition: background .15s ease, opacity .15s ease;
+  }
+  .mast-xls:hover { background: #26374f; }
+  .mast-xls[disabled] { opacity: .55; cursor: progress; }
+  .mast-xls.ok { background: #0f8a2e; border-color: #0f8a2e; }
+  .mast-xls.bad { background: #c0392b; border-color: #c0392b; }
   body.theme-mac .mast-badge {
     background: rgba(255,255,255,.75); border: 1px solid rgba(0,0,0,.08); color: var(--ink-2);
     font-family: var(--sans); font-size: 10px; font-weight: 500; padding: 4px 10px;
@@ -1273,6 +1286,16 @@
       <span class="sep">·</span>
       <span class="val" id="mb-mode" title="Investment mode">Lumpsum</span>
     </div>
+    <!-- Kyser 2026-09-03: "a universal excel working file with analytics for the selected AMC at
+         point in time". The per-tab "Export CSV" buttons dump ONE table as text; this is the
+         whole AMC roll-up as a workbook whose numbers are FORMULAS you can click into. It lives
+         in the masthead rather than on a tab because it is not a property of any one panel --
+         it exports the house you have selected, on the date you have selected, in the universe
+         and window you have selected. -->
+    <button class="mast-xls" id="mb-xls" title="Build a traceable Excel workbook for the selected fund house, on the selected date">
+      <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path fill="currentColor" d="M8 1v7.6l2.3-2.3 1 1L7.5 11 3.7 7.3l1-1L7 8.6V1h1zM2 12h11v1H2v-1z"/></svg>
+      <span id="mb-xls-t">Export report to Excel</span>
+    </button>
   </div>
 </header>
 
@@ -6708,6 +6731,737 @@ function downloadBlob(blob,name){ const url=URL.createObjectURL(blob); const a=d
 // ── kick off ──
 loadData();
 
+
+/* ============================================================================================
+   _xlsx_engine.js — "Export report to Excel" for the Peer Performance Monitor.
+
+   WHY THIS EXISTS IN THE BROWSER AT ALL
+   build_amc_workbook.py already produces this workbook, and it is the verified reference (its
+   quartiles agreed with the site on all 890 cross-section rows when EVALUATED as real Excel
+   formulas). But the live deck is a static GitHub Pages site: a button there cannot run Python.
+   So the workbook is generated client-side, from the very data the page is already showing.
+
+   WHAT IT PRODUCES — the same 7 sheets and 2 native charts as the Python builder:
+     Read me · 1_Raw · 2_Quartile · 3_Sleeve · 4_AMC · 5_SchemeDetail · 6_Check
+   Everything downstream of the raw inputs is written as a FORMULA you can click into, so the
+   reader can audit the chain raw -> rank -> quartile -> sleeve -> AMC rather than trust a dump.
+
+   WHY THE OOXML IS HAND-BUILT RATHER THAN VENDORED
+   SheetJS/ExcelJS community builds are ~900 KB and neither writes native charts. The parts here
+   are instead lifted VERBATIM from what xlsxwriter emitted for this exact workbook (unzipped and
+   read, not guessed), so the XML Excel receives is XML Excel already accepts. That removes the
+   one real risk of hand-rolled OOXML — the silent "we found a problem with some content" repair
+   prompt — and costs ~15 KB instead of 900.
+
+   THE ONE TRICK WORTH KNOWING
+   Formula cells are written with <f> and NO cached <v>. workbook.xml carries
+   calcPr/@fullCalcOnLoad="1", so Excel computes every value the moment the file opens. That is
+   why this file never has to implement Excel's semantics — it only has to state them.
+   ============================================================================================ */
+(function () {
+  'use strict';
+
+  /* ---------------------------------------------------------------- CRC32 (for the ZIP) ---- */
+  var CRCT = (function () {
+    var t = new Uint32Array(256), n, k, c;
+    for (n = 0; n < 256; n++) { c = n; for (k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1); t[n] = c >>> 0; }
+    return t;
+  })();
+  function crc32(b) { var c = -1, i; for (i = 0; i < b.length; i++) c = (c >>> 8) ^ CRCT[(c ^ b[i]) & 0xFF]; return (c ^ -1) >>> 0; }
+
+  var ENC = new TextEncoder();
+
+  /* ------------------------------------------------------------------------------ ZIP ------ */
+  /* Deflate through CompressionStream where the browser has it (Chrome/Edge/Safari 16.4+), and
+     fall back to STORED entries otherwise. Both are valid ZIP, so the export can never fail for
+     want of compression — it just gets bigger. */
+  function deflateRaw(bytes) {
+    if (typeof CompressionStream === 'undefined') return Promise.resolve(null);
+    try {
+      var cs = new CompressionStream('deflate-raw');
+      return new Response(new Blob([bytes]).stream().pipeThrough(cs)).arrayBuffer()
+        .then(function (ab) { return new Uint8Array(ab); })
+        .catch(function () { return null; });
+    } catch (e) { return Promise.resolve(null); }
+  }
+
+  function dosTime(d) {
+    return { t: ((d.getHours() << 11) | (d.getMinutes() << 5) | (d.getSeconds() >> 1)) & 0xFFFF,
+             d: (((d.getFullYear() - 1980) << 9) | ((d.getMonth() + 1) << 5) | d.getDate()) & 0xFFFF };
+  }
+
+  function W() { this.a = []; }
+  W.prototype.u16 = function (v) { this.a.push(v & 0xFF, (v >>> 8) & 0xFF); return this; };
+  W.prototype.u32 = function (v) { this.a.push(v & 0xFF, (v >>> 8) & 0xFF, (v >>> 16) & 0xFF, (v >>> 24) & 0xFF); return this; };
+  W.prototype.raw = function (b) { for (var i = 0; i < b.length; i++) this.a.push(b[i]); return this; };
+  W.prototype.bytes = function () { return new Uint8Array(this.a); };
+
+  function zip(files) {
+    var stamp = dosTime(new Date());
+    return Promise.all(files.map(function (f) {
+      var raw = (typeof f.data === 'string') ? ENC.encode(f.data) : f.data;
+      return deflateRaw(raw).then(function (def) {
+        var useDef = def && def.length < raw.length;
+        return { name: ENC.encode(f.name), raw: raw, body: useDef ? def : raw,
+                 method: useDef ? 8 : 0, crc: crc32(raw) };
+      });
+    })).then(function (entries) {
+      var local = new W(), central = new W(), offset = 0;
+      entries.forEach(function (e) {
+        var h = new W();
+        h.u32(0x04034b50).u16(20).u16(0).u16(e.method).u16(stamp.t).u16(stamp.d)
+         .u32(e.crc).u32(e.body.length).u32(e.raw.length).u16(e.name.length).u16(0).raw(e.name);
+        var hb = h.bytes();
+        local.raw(hb).raw(e.body);
+        central.u32(0x02014b50).u16(20).u16(20).u16(0).u16(e.method).u16(stamp.t).u16(stamp.d)
+               .u32(e.crc).u32(e.body.length).u32(e.raw.length).u16(e.name.length)
+               .u16(0).u16(0).u16(0).u16(0).u32(0).u32(offset).raw(e.name);
+        offset += hb.length + e.body.length;
+      });
+      var lb = local.bytes(), cb = central.bytes();
+      var end = new W();
+      end.u32(0x06054b50).u16(0).u16(0).u16(entries.length).u16(entries.length)
+         .u32(cb.length).u32(lb.length).u16(0);
+      var eb = end.bytes(), out = new Uint8Array(lb.length + cb.length + eb.length);
+      out.set(lb, 0); out.set(cb, lb.length); out.set(eb, lb.length + cb.length);
+      return out;
+    });
+  }
+
+  /* ------------------------------------------------------------------------------ XML ------ */
+  function esc(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;').replace(/'/g, '&apos;')
+                    /* control chars are illegal in XML 1.0 and would make Excel reject the part */
+                    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '');
+  }
+  function colName(i) { var s = ''; i++; while (i > 0) { var m = (i - 1) % 26; s = String.fromCharCode(65 + m) + s; i = (i - m - 1) / 26; } return s; }
+  function ref(r, c) { return colName(c) + (r + 1); }
+
+  /* --------------------------------------------------------------------------- Sheet ------- */
+  function Sheet(name) {
+    this.name = name; this.rows = {}; this.cols = []; this.freeze = null;
+    this.hideGrid = false; this.rowH = {}; this.cf = null; this.drawingId = null;
+  }
+  Sheet.prototype._set = function (r, c, cell) { (this.rows[r] || (this.rows[r] = {}))[c] = cell; };
+  Sheet.prototype.str = function (r, c, v, s) {
+    if (v === null || v === undefined || v === '') return;
+    this._set(r, c, { t: 's', v: String(v), s: s | 0 });
+  };
+  Sheet.prototype.num = function (r, c, v, s) {
+    if (v === null || v === undefined || v === '' || !isFinite(v)) return;   // blank, never NaN
+    this._set(r, c, { t: 'n', v: +v, s: s | 0 });
+  };
+  Sheet.prototype.f = function (r, c, formula, s) { this._set(r, c, { t: 'f', v: formula, s: s | 0 }); };
+  Sheet.prototype.width = function (c0, c1, w) { this.cols.push({ a: c0, b: c1, w: w }); };
+
+  Sheet.prototype.xml = function () {
+    var o = ['<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',
+      '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"',
+      ' xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'];
+    o.push('<sheetViews><sheetView workbookViewId="0"',
+           this.hideGrid ? ' showGridLines="0"' : '',
+           this.freeze ? '>' : '/>');
+    if (this.freeze) {
+      var fr = this.freeze, cell = ref(fr.r, fr.c);
+      o.push('<pane xSplit="' + fr.c + '" ySplit="' + fr.r + '" topLeftCell="' + cell +
+             '" activePane="bottomRight" state="frozen"/>',
+             '<selection pane="bottomRight" activeCell="' + cell + '" sqref="' + cell + '"/>',
+             '</sheetView>');
+    }
+    o.push('</sheetViews>');
+    if (this.cols.length) {
+      o.push('<cols>');
+      this.cols.forEach(function (c) {
+        o.push('<col min="' + (c.a + 1) + '" max="' + (c.b + 1) + '" width="' + c.w + '" customWidth="1"/>');
+      });
+      o.push('</cols>');
+    }
+    o.push('<sheetData>');
+    var self = this;
+    Object.keys(this.rows).map(Number).sort(function (a, b) { return a - b; }).forEach(function (r) {
+      var row = self.rows[r], h = self.rowH[r];
+      o.push('<row r="' + (r + 1) + '"' + (h ? ' ht="' + h + '" customHeight="1"' : '') + '>');
+      Object.keys(row).map(Number).sort(function (a, b) { return a - b; }).forEach(function (c) {
+        var x = row[c], R = ref(r, c), s = x.s ? ' s="' + x.s + '"' : '';
+        if (x.t === 's') {
+          o.push('<c r="' + R + '"' + s + ' t="inlineStr"><is><t xml:space="preserve">' + esc(x.v) + '</t></is></c>');
+        } else if (x.t === 'f') {
+          /* no <v>: fullCalcOnLoad makes Excel evaluate every formula when the file opens */
+          o.push('<c r="' + R + '"' + s + '><f>' + esc(x.v) + '</f></c>');
+        } else {
+          o.push('<c r="' + R + '"' + s + '><v>' + x.v + '</v></c>');
+        }
+      });
+      o.push('</row>');
+    });
+    o.push('</sheetData>');
+    if (this.cf) {
+      o.push('<conditionalFormatting sqref="' + this.cf.sqref + '">',
+             '<cfRule type="containsText" dxfId="0" priority="1" operator="containsText" text="' + esc(this.cf.text) + '">',
+             '<formula>NOT(ISERROR(SEARCH("' + esc(this.cf.text) + '",' + this.cf.first + ')))</formula>',
+             '</cfRule></conditionalFormatting>');
+    }
+    /* the drawing rel MUST come after sheetData/conditionalFormatting — element order is fixed
+       by the schema, and Excel rejects the part outright if it is wrong */
+    if (this.drawingId) o.push('<drawing r:id="rId1"/>');
+    o.push('</worksheet>');
+    return o.join('');
+  };
+
+  /* ------------------------------------------------------- styles (13 xfs, theme-free) ----- */
+  /* Same 13 cell formats the Python builder defines, in the same order, so the style indices
+     below read identically to its F["..."] names. Deliberately theme-free: xlsxwriter's version
+     referenced theme1.xml for <color theme="1"/>, and carrying a 7 KB theme part just to say
+     "black" is not worth it — the colours are stated as explicit RGB instead. */
+  var S_DEF = 0, S_H1 = 1, S_LBL = 2, S_TXT = 3, S_H2 = 4, S_WRAP = 5, S_HDR = 6,
+      S_CR = 7, S_PCT2 = 8, S_NUM = 9, S_INT = 10, S_PCT = 11, S_BIG = 12;
+
+  var STYLES = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+    '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
+    '<numFmts count="4"><numFmt numFmtId="164" formatCode="#,##0"/><numFmt numFmtId="165" formatCode="0.00%"/>' +
+    '<numFmt numFmtId="166" formatCode="#,##0.00"/><numFmt numFmtId="167" formatCode="0.0%"/></numFmts>' +
+    '<fonts count="8">' +
+    '<font><sz val="11"/><color rgb="FF000000"/><name val="Calibri"/><family val="2"/></font>' +
+    '<font><b/><sz val="15"/><color rgb="FF1D1C1A"/><name val="Calibri"/><family val="2"/></font>' +
+    '<font><sz val="10"/><color rgb="FF6D685F"/><name val="Calibri"/><family val="2"/></font>' +
+    '<font><sz val="10"/><color rgb="FF000000"/><name val="Calibri"/><family val="2"/></font>' +
+    '<font><b/><sz val="11"/><color rgb="FF33496B"/><name val="Calibri"/><family val="2"/></font>' +
+    '<font><sz val="10"/><color rgb="FF3A3A3A"/><name val="Calibri"/><family val="2"/></font>' +
+    '<font><b/><sz val="9"/><color rgb="FF33496B"/><name val="Calibri"/><family val="2"/></font>' +
+    '<font><b/><sz val="20"/><color rgb="FF33496B"/><name val="Calibri"/><family val="2"/></font>' +
+    '</fonts>' +
+    '<fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill>' +
+    '<fill><patternFill patternType="solid"><fgColor rgb="FFE5E9F1"/><bgColor indexed="64"/></patternFill></fill></fills>' +
+    '<borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border>' +
+    '<border><left/><right/><top/><bottom style="thin"><color rgb="FFC8CCD6"/></bottom><diagonal/></border></borders>' +
+    '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>' +
+    '<cellXfs count="13">' +
+    '<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>' +
+    '<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/>' +
+    '<xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1"/>' +
+    '<xf numFmtId="0" fontId="3" fillId="0" borderId="0" xfId="0" applyFont="1"/>' +
+    '<xf numFmtId="0" fontId="4" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1"/>' +
+    '<xf numFmtId="0" fontId="5" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf>' +
+    '<xf numFmtId="0" fontId="6" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment wrapText="1"/></xf>' +
+    '<xf numFmtId="164" fontId="3" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1"/>' +
+    '<xf numFmtId="165" fontId="3" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1"/>' +
+    '<xf numFmtId="166" fontId="3" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1"/>' +
+    '<xf numFmtId="1" fontId="3" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1"/>' +
+    '<xf numFmtId="167" fontId="3" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1"/>' +
+    '<xf numFmtId="0" fontId="7" fillId="0" borderId="0" xfId="0" applyFont="1"/>' +
+    '</cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>' +
+    '<dxfs count="1"><dxf><font><b/><color rgb="FFC0392B"/></font></dxf></dxfs>' +
+    '<tableStyles count="0" defaultTableStyle="TableStyleMedium9" defaultPivotStyle="PivotStyleLight16"/></styleSheet>';
+
+  /* ----------------------------------------------------------------------- chart parts ----- */
+  var CHART_NS = '<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"' +
+    ' xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"' +
+    ' xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><c:lang val="en-US"/>';
+  var CHART_TAIL = '<c:plotVisOnly val="1"/></c:chart><c:printSettings><c:headerFooter/>' +
+    '<c:pageMargins b="0.75" l="0.7" r="0.7" t="0.75" header="0.3" footer="0.3"/><c:pageSetup/>' +
+    '</c:printSettings></c:chartSpace>';
+  function chartTitle(t) {
+    return '<c:title><c:tx><c:rich><a:bodyPr/><a:lstStyle/><a:p><a:pPr><a:defRPr/></a:pPr>' +
+           '<a:r><a:rPr lang="en-US"/><a:t>' + esc(t) + '</a:t></a:r></a:p></c:rich></c:tx><c:layout/></c:title>';
+  }
+  /* Series carry only <c:f> — no strCache/numCache. The caches are an optimisation for readers
+     that will not calculate; Excel refills them on open because of fullCalcOnLoad. */
+  function ser(idx, nameRef, catRef, valRef, colour) {
+    return '<c:ser><c:idx val="' + idx + '"/><c:order val="' + idx + '"/>' +
+      '<c:tx><c:strRef><c:f>' + nameRef + '</c:f></c:strRef></c:tx>' +
+      '<c:spPr><a:solidFill><a:srgbClr val="' + colour + '"/></a:solidFill><a:ln><a:noFill/></a:ln></c:spPr>' +
+      '<c:cat><c:strRef><c:f>' + catRef + '</c:f></c:strRef></c:cat>' +
+      '<c:val><c:numRef><c:f>' + valRef + '</c:f></c:numRef></c:val></c:ser>';
+  }
+  function stackedChart(first, last) {
+    var cats = "'3_Sleeve'!$A$" + first + ':$A$' + last, s = '', i,
+        cols = ['0A5638', '68C194', 'EEB234', 'D4483A'], L = ['B', 'C', 'D', 'E'];
+    for (i = 0; i < 4; i++) {
+      s += ser(i, "'3_Sleeve'!$" + L[i] + '$' + (first - 1),
+               cats, "'3_Sleeve'!$" + L[i] + '$' + first + ':$' + L[i] + '$' + last, cols[i]);
+    }
+    return CHART_NS + '<c:chart>' + chartTitle('Quartile mix by sleeve (share of rated AUM)') +
+      '<c:plotArea><c:layout/><c:barChart><c:barDir val="col"/><c:grouping val="percentStacked"/>' +
+      s + '<c:overlap val="100"/><c:axId val="50010001"/><c:axId val="50010002"/></c:barChart>' +
+      '<c:catAx><c:axId val="50010001"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:axPos val="b"/>' +
+      '<c:tickLblPos val="nextTo"/><c:crossAx val="50010002"/><c:crosses val="autoZero"/><c:auto val="1"/>' +
+      '<c:lblAlgn val="ctr"/><c:lblOffset val="100"/></c:catAx>' +
+      '<c:valAx><c:axId val="50010002"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:axPos val="l"/>' +
+      '<c:numFmt formatCode="0%" sourceLinked="1"/><c:tickLblPos val="nextTo"/><c:crossAx val="50010001"/>' +
+      '<c:crosses val="autoZero"/><c:crossBetween val="between"/></c:valAx></c:plotArea>' +
+      '<c:legend><c:legendPos val="b"/><c:layout/></c:legend>' + CHART_TAIL;
+  }
+  function topHalfChart(first, last) {
+    return CHART_NS + '<c:chart>' + chartTitle('Top-half share by sleeve') +
+      '<c:plotArea><c:layout/><c:barChart><c:barDir val="bar"/><c:grouping val="clustered"/>' +
+      '<c:ser><c:idx val="0"/><c:order val="0"/><c:tx><c:v>Q1+Q2 within sleeve</c:v></c:tx>' +
+      '<c:spPr><a:solidFill><a:srgbClr val="33496B"/></a:solidFill><a:ln><a:noFill/></a:ln></c:spPr>' +
+      "<c:cat><c:strRef><c:f>'3_Sleeve'!$A$" + first + ':$A$' + last + '</c:f></c:strRef></c:cat>' +
+      "<c:val><c:numRef><c:f>'3_Sleeve'!$I$" + first + ':$I$' + last + '</c:f></c:numRef></c:val></c:ser>' +
+      '<c:axId val="50020001"/><c:axId val="50020002"/></c:barChart>' +
+      '<c:catAx><c:axId val="50020001"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:axPos val="l"/>' +
+      '<c:tickLblPos val="nextTo"/><c:crossAx val="50020002"/><c:crosses val="autoZero"/><c:auto val="1"/>' +
+      '<c:lblAlgn val="ctr"/><c:lblOffset val="100"/></c:catAx>' +
+      '<c:valAx><c:axId val="50020002"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:axPos val="b"/>' +
+      '<c:numFmt formatCode="0%" sourceLinked="0"/><c:tickLblPos val="nextTo"/><c:crossAx val="50020001"/>' +
+      '<c:crosses val="autoZero"/><c:crossBetween val="between"/></c:valAx></c:plotArea>' + CHART_TAIL;
+  }
+  function drawingXml(anchorRow) {
+    function frame(id, name, relId, c0, c1) {
+      return '<xdr:twoCellAnchor><xdr:from><xdr:col>' + c0 + '</xdr:col><xdr:colOff>0</xdr:colOff>' +
+        '<xdr:row>' + anchorRow + '</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:from>' +
+        '<xdr:to><xdr:col>' + c1 + '</xdr:col><xdr:colOff>476250</xdr:colOff>' +
+        '<xdr:row>' + (anchorRow + 17) + '</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:to>' +
+        '<xdr:graphicFrame macro=""><xdr:nvGraphicFramePr><xdr:cNvPr id="' + id + '" name="' + name + '"/>' +
+        '<xdr:cNvGraphicFramePr/></xdr:nvGraphicFramePr><xdr:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/></xdr:xfrm>' +
+        '<a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/chart">' +
+        '<c:chart xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"' +
+        ' xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:id="' + relId + '"/>' +
+        '</a:graphicData></a:graphic></xdr:graphicFrame><xdr:clientData/></xdr:twoCellAnchor>';
+    }
+    return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+      '<xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing"' +
+      ' xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">' +
+      frame(2, 'Chart 1', 'rId1', 0, 8) + frame(3, 'Chart 2', 'rId2', 12, 23) + '</xdr:wsDr>';
+  }
+
+  /* ------------------------------------------------------------------- package assembly ---- */
+  function pack(sheets, charts) {
+    var files = [], i, names = [];
+    sheets.forEach(function (s, i) { names.push(s.name); });
+
+    var ct = ['<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',
+      '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">',
+      '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>',
+      '<Default Extension="xml" ContentType="application/xml"/>',
+      '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>',
+      '<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>'];
+    sheets.forEach(function (s, i) {
+      ct.push('<Override PartName="/xl/worksheets/sheet' + (i + 1) + '.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>');
+    });
+    if (charts) {
+      ct.push('<Override PartName="/xl/drawings/drawing1.xml" ContentType="application/vnd.openxmlformats-officedocument.drawing+xml"/>');
+      ct.push('<Override PartName="/xl/charts/chart1.xml" ContentType="application/vnd.openxmlformats-officedocument.drawingml.chart+xml"/>');
+      ct.push('<Override PartName="/xl/charts/chart2.xml" ContentType="application/vnd.openxmlformats-officedocument.drawingml.chart+xml"/>');
+    }
+    ct.push('</Types>');
+    files.push({ name: '[Content_Types].xml', data: ct.join('') });
+
+    files.push({ name: '_rels/.rels', data: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+      '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+      '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>' +
+      '</Relationships>' });
+
+    var wb = ['<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',
+      '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"',
+      ' xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>'];
+    sheets.forEach(function (s, i) {
+      wb.push('<sheet name="' + esc(s.name) + '" sheetId="' + (i + 1) + '" r:id="rId' + (i + 1) + '"/>');
+    });
+    /* fullCalcOnLoad is what makes the whole formula-only design work */
+    wb.push('</sheets><calcPr calcId="124519" fullCalcOnLoad="1"/></workbook>');
+    files.push({ name: 'xl/workbook.xml', data: wb.join('') });
+
+    var rel = ['<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',
+      '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'];
+    sheets.forEach(function (s, i) {
+      rel.push('<Relationship Id="rId' + (i + 1) + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet' + (i + 1) + '.xml"/>');
+    });
+    rel.push('<Relationship Id="rId' + (sheets.length + 1) + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>');
+    rel.push('</Relationships>');
+    files.push({ name: 'xl/_rels/workbook.xml.rels', data: rel.join('') });
+    files.push({ name: 'xl/styles.xml', data: STYLES });
+
+    sheets.forEach(function (s, i) {
+      files.push({ name: 'xl/worksheets/sheet' + (i + 1) + '.xml', data: s.xml() });
+      if (s.drawingId) {
+        files.push({ name: 'xl/worksheets/_rels/sheet' + (i + 1) + '.xml.rels',
+          data: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+            '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+            '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing" Target="../drawings/drawing1.xml"/>' +
+            '</Relationships>' });
+      }
+    });
+    if (charts) {
+      files.push({ name: 'xl/drawings/drawing1.xml', data: charts.drawing });
+      files.push({ name: 'xl/drawings/_rels/drawing1.xml.rels',
+        data: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+          '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+          '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/chart" Target="../charts/chart1.xml"/>' +
+          '<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/chart" Target="../charts/chart2.xml"/>' +
+          '</Relationships>' });
+      files.push({ name: 'xl/charts/chart1.xml', data: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' + charts.c1 });
+      files.push({ name: 'xl/charts/chart2.xml', data: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' + charts.c2 });
+    }
+    return zip(files);
+  }
+
+  /* =========================================================================================
+     THE WORKBOOK — a faithful port of build_amc_workbook.py.
+     Formulas below are byte-for-byte the Python's, including the two ISBLANK guards whose
+     absence was the worst bug found in that builder (see the comments at their call sites).
+     ========================================================================================= */
+
+  var WINDOWS = {
+    '1 Month': ['aq1m', 'q1m', '1 Month'], '3 Month': ['aq3m', 'q3m', '3 Month'],
+    '6 Month': ['aq6m', 'q6m', '6 Month'], '9 Month': ['aq9m', 'q9m', '9 Month'],
+    '1 Year':  ['aq1y', 'q1y', '1 Year'],  '2 Year': ['aq24m', 'q24m', '2 Year'],
+    '3 Year':  ['aq3y', 'q3y', '3 Year']
+  };
+  var SCOREW = { 1: 4, 2: 3, 3: 2, 4: 1 };
+
+  function at(arr, i) {
+    if (!arr) return null;
+    var v = arr[i];
+    return (v === undefined || v === '' || (typeof v === 'number' && !isFinite(v))) ? null : v;
+  }
+  /* The page decodes the quartile digit-strings into arrays at boot (_decDigits), but an offline
+     deck can still hold the raw string. Accept both rather than assume one. */
+  function qAt(rec, field, i) {
+    var q = rec[field];
+    if (q == null) return null;
+    if (typeof q === 'string') { var ch = q.charAt(i); return (ch === '' || ch === '-') ? null : +ch; }
+    return at(q, i);
+  }
+  /* returns.json series are {f, v:"a,b,,c"} packed, or already-unpacked arrays. */
+  function serieAt(rec, i) {
+    if (rec == null) return null;
+    if (Array.isArray(rec)) return at(rec, i);
+    var f = +(rec.f || 0), raw = rec.v;
+    var vals = Array.isArray(raw) ? raw : String(raw == null ? '' : raw).split(',');
+    var j = i - f;
+    if (j < 0 || j >= vals.length) return null;
+    var v = vals[j];
+    if (v === '' || v === null || v === undefined) return null;
+    v = +v;
+    return isFinite(v) ? v : null;
+  }
+
+  function buildRows(data, rets, house, universe, window, dateWant) {
+    var W = WINDOWS[window];
+    if (!W) throw new Error('unsupported return window: ' + window);
+    var vr = (universe === 'vr');
+    var src = vr ? data.vr : data.allpeer;
+    var dates = vr ? data.months : data.aum_dates;
+    var qfield = vr ? W[1] : W[0], bucket = vr ? 'vr' : 'all', retKey = W[2];
+    if (!src || !src.length) throw new Error('no schemes in the ' + universe + ' universe');
+
+    var di = (dateWant && dates.indexOf(dateWant) >= 0) ? dates.indexOf(dateWant) : dates.length - 1;
+    var actual = dates[di];
+    var lump = ((rets && rets.lump) || {})[bucket] || {};
+
+    var houseCats = {};
+    src.forEach(function (r) { if (r.h === house && r.c) houseCats[r.c] = 1; });
+    if (!Object.keys(houseCats).length) throw new Error('house "' + house + '" has no schemes in this universe');
+
+    var rows = [];
+    src.forEach(function (r, orig) {
+      if (!houseCats[r.c]) return;
+      rows.push({
+        orig: orig, scheme: r.s, house: r.h || '', cat: r.c || '',
+        sleeve: r.sl || '(unclassified)',
+        aum_cr: at(r.cr, di), pct: at(r.a, di),
+        ret: serieAt((lump[r.s] || {})[retKey], di),
+        pub_q: qAt(r, qfield, di)
+      });
+    });
+    /* payload order IS the engine's tie-break convention — sorting here would change quartiles
+       on tied returns, so rows keep their original index order. */
+    return { rows: rows, dates: dates, di: di, actual: actual };
+  }
+
+  function build(opts) {
+    var data = opts.data, rets = opts.returns, house = opts.house,
+        universe = opts.universe, window_ = opts.window;
+    var R = buildRows(data, rets, house, universe, window_, opts.date);
+    var rows = R.rows, actual = R.actual, di = R.di;
+    var label = (universe === 'vr') ? 'Exact Peers (VR)' : 'All Peers (MFI)';
+    var mine = rows.filter(function (r) { return r.house === house; });
+    var sleeves = Object.keys(mine.reduce(function (a, r) { a[r.sleeve] = 1; return a; }, {})).sort();
+    var nrow = rows.length, last = nrow + 1;
+
+    /* ---------------------------------------------------------------- Read me ------------- */
+    var ws = new Sheet('Read me');
+    ws.hideGrid = true; ws.width(0, 0, 22); ws.width(1, 1, 104);
+    ws.str(0, 0, 'AMC Roll-up — traceable workbook', S_H1);
+    var cats = {}; rows.forEach(function (r) { cats[r.cat] = 1; });
+    var meta = [
+      ['Fund house', house], ['As-of date', actual], ['Peer universe', label],
+      ['Return window', window_], ['Schemes (this house)', mine.length],
+      ['Schemes (full cross-section)', nrow], ['Categories covered', Object.keys(cats).length],
+      ['Built', new Date().toISOString().slice(0, 16).replace('T', ' ')],
+      ['Source', 'the live deck’s own peer_data.json + returns.json, in your browser']
+    ];
+    var r = 2, i;
+    meta.forEach(function (kv) {
+      ws.str(r, 0, kv[0], S_LBL);
+      if (typeof kv[1] === 'number') ws.num(r, 1, kv[1], S_INT); else ws.str(r, 1, kv[1], S_TXT);
+      r++;
+    });
+    r++;
+    ws.str(r, 0, 'How to read it', S_H2); r++;
+    [['1_Raw', 'One row per scheme, for EVERY category this house competes in. Columns: category, sleeve, AUM (cr), % of this house’s AUM, and the window return. Nothing here is derived — these are the inputs.'],
+     ['2_Quartile', 'Rebuilds the quartile from the return, in formulas: rank within category, then the bucket sizes, then the quartile. Column N compares the result against the quartile the website publishes.'],
+     ['3_Sleeve', 'SUMIFS over 2_Quartile: for each sleeve, the % of house AUM sitting in Q1/Q2/Q3/Q4, the rated total, Q1+Q2, coverage and the quality score.'],
+     ['4_AMC', 'The same sums across every sleeve — the AMC Roll-up headline numbers.'],
+     ['5_SchemeDetail', 'This house’s schemes only, with rank, quartile, percentile and AUM.'],
+     ['6_Check', 'The workbook against the website, cell by cell. If this sheet is not clean, trust the website and tell Claude — do not use the numbers.']
+    ].forEach(function (kv) { ws.str(r, 0, kv[0], S_LBL); ws.str(r, 1, kv[1], S_WRAP); ws.rowH[r] = 30; r++; });
+    r++;
+    ws.str(r, 0, 'Definitions', S_H2); r++;
+    [['Quartile', 'The scheme’s category is sorted by this window’s return, best first. n schemes split as base,extra = divmod(n,4), with the REMAINDER GOING TO THE TOP buckets — so n=10 gives sizes 3,3,2,2, not 2,2,3,3. Ties keep their original order (a stable sort), which is why 2_Quartile ranks with COUNTIFS on an index column and not with RANK().'],
+     ['% of house AUM', 'Each scheme’s AUM as a share of its OWN fund house’s total AUM. A house’s shares therefore never move when another house is added or removed.'],
+     ['Rated AUM', 'The share of the sleeve’s AUM that actually carries a quartile on this date. A scheme too young for the window has no quartile and is excluded from the denominator.'],
+     ['Q1+Q2 within sleeve', '(Q1 + Q2) divided by RATED AUM — not by the whole sleeve. Unrated AUM is excluded, never counted as a failure. Coverage is shown next to it: a sleeve that is 95% unrated can print 100% here, and the coverage column is what stops that misleading.'],
+     ['Quality score', 'AUM-weighted mean quartile over rated AUM, scoring Q1=4, Q2=3, Q3=2, Q4=1. So 4.00 is every rated rupee in Q1; 1.00 is every rated rupee in Q4.']
+    ].forEach(function (kv) { ws.str(r, 0, kv[0], S_LBL); ws.str(r, 1, kv[1], S_WRAP); ws.rowH[r] = 44; r++; });
+    r++;
+    ws.str(r, 0, 'Floor', S_H2); r++;
+    ws.str(r, 1, '"Raw" here means the deepest inputs the published site holds: per-scheme window returns and per-scheme AUM. It does not reach back to daily NAVs — the site does not carry them (roughly 8,500 daily series live in the MFI store, far past what a workbook can hold). Every step the site DERIVES from those inputs is rebuilt here as a formula you can click into.', S_WRAP);
+    ws.rowH[r] = 58; r += 2;
+    ws.str(r, 0, 'Precision', S_H2); r++;
+    ws.str(r, 1, 'The quartiles here are EXACT: rebuilt from the returns, they agree with the published quartile on every rated scheme. The sleeve and AMC percentages can differ from the website in the third decimal, and that is expected: the per-scheme share of house AUM is published at 4 decimal places, while the site’s own sleeve totals were summed at full precision before being shipped at 6. Adding up 4dp inputs cannot reproduce a 6dp total exactly. Sheet 6_Check allows 0.1pp for exactly this reason and flags anything larger.', S_WRAP);
+    ws.rowH[r] = 72;
+
+    /* ---------------------------------------------------------------- 1_Raw --------------- */
+    var raw = new Sheet('1_Raw');
+    raw.freeze = { r: 1, c: 1 };
+    [['Scheme', 52], ['Fund house', 13], ['Category', 26], ['Sleeve', 17], ['AUM (cr)', 11],
+     ['% of house AUM', 13], ['Return % (' + window_ + ')', 14], ['OrigIdx (tie-break order)', 12],
+     ['Published quartile', 11]].forEach(function (t, c) { raw.str(0, c, t[0], S_HDR); raw.width(c, c, t[1]); });
+    rows.forEach(function (x, k) {
+      var i = k + 1;
+      raw.str(i, 0, x.scheme, S_TXT); raw.str(i, 1, x.house, S_TXT);
+      raw.str(i, 2, x.cat, S_TXT);    raw.str(i, 3, x.sleeve, S_TXT);
+      raw.num(i, 4, x.aum_cr, S_CR);  raw.num(i, 5, x.pct, S_PCT2);
+      raw.num(i, 6, x.ret, S_NUM);    raw.num(i, 7, x.orig, S_INT);
+      raw.num(i, 8, x.pub_q, S_INT);
+    });
+
+    /* ---------------------------------------------------------------- 2_Quartile ---------- */
+    var q = new Sheet('2_Quartile');
+    q.freeze = { r: 1, c: 1 };
+    [['Scheme', 52], ['Category', 26], ['Return %', 11], ['OrigIdx', 9], ['n rated in category', 11],
+     ['Rank (1 = best)', 11], ['base = INT(n/4)', 11], ['extra = MOD(n,4)', 11], ['cut Q1', 9],
+     ['cut Q2', 9], ['cut Q3', 9], ['Quartile (computed)', 11], ['Quartile (website)', 11],
+     ['Agree?', 11]].forEach(function (t, c) { q.str(0, c, t[0], S_HDR); q.width(c, c, t[1]); });
+    var RC = "'1_Raw'!$C$2:$C$" + last, RG = "'1_Raw'!$G$2:$G$" + last, RH = "'1_Raw'!$H$2:$H$" + last;
+    for (i = 1; i <= nrow; i++) {
+      var rr = i + 1;
+      q.f(i, 0, "'1_Raw'!A" + rr, S_TXT);
+      q.f(i, 1, "'1_Raw'!C" + rr, S_TXT);
+      /* ISBLANK, and this one mattered most: a plain ='1_Raw'!G3 on a scheme with no return
+         evaluates to 0, not "". Every downstream guard is written as IF(C="",...), so without
+         this the workbook ranks unrated schemes as if they had returned exactly 0.00%. */
+      q.f(i, 2, 'IF(ISBLANK(\'1_Raw\'!G' + rr + '),"",\'1_Raw\'!G' + rr + ')', S_NUM);
+      q.f(i, 3, "'1_Raw'!H" + rr, S_INT);
+      /* SUMPRODUCT rather than COUNTIFS(...,"<>"): the "<>" not-blank token reads as magic and
+         was the one construct a non-Excel evaluator got wrong when this was validated. */
+      q.f(i, 4, 'SUMPRODUCT((' + RC + '=B' + rr + ')*(' + RG + '<>""))', S_INT);
+      q.f(i, 5, 'IF(C' + rr + '="","",COUNTIFS(' + RC + ',B' + rr + ',' + RG + ',">"&C' + rr + ')+COUNTIFS(' + RC + ',B' + rr + ',' + RG + ',C' + rr + ',' + RH + ',"<="&D' + rr + '))', S_INT);
+      q.f(i, 6, 'INT(E' + rr + '/4)', S_INT);
+      q.f(i, 7, 'MOD(E' + rr + ',4)', S_INT);
+      q.f(i, 8, 'G' + rr + '+IF(H' + rr + '>=1,1,0)', S_INT);
+      q.f(i, 9, 'I' + rr + '+G' + rr + '+IF(H' + rr + '>=2,1,0)', S_INT);
+      q.f(i, 10, 'J' + rr + '+G' + rr + '+IF(H' + rr + '>=3,1,0)', S_INT);
+      q.f(i, 11, 'IF(C' + rr + '="","",IF(F' + rr + '<=I' + rr + ',1,IF(F' + rr + '<=J' + rr + ',2,IF(F' + rr + '<=K' + rr + ',3,4))))', S_INT);
+      /* ISBLANK again: an unrated scheme has no published quartile, and a bare reference would
+         arrive as 0, be compared against the computed "", and report MISMATCH on every one. */
+      q.f(i, 12, 'IF(ISBLANK(\'1_Raw\'!I' + rr + '),"",\'1_Raw\'!I' + rr + ')', S_INT);
+      q.f(i, 13, 'IF(AND(L' + rr + '="",M' + rr + '=""),"not rated",IF(L' + rr + '=M' + rr + ',"OK","MISMATCH"))', S_TXT);
+    }
+    q.cf = { sqref: 'N2:N' + last, text: 'MISMATCH', first: 'N2' };
+
+    var QL = "'2_Quartile'!$L$2:$L$" + last, RB = "'1_Raw'!$B$2:$B$" + last,
+        RD = "'1_Raw'!$D$2:$D$" + last, RF = "'1_Raw'!$F$2:$F$" + last;
+    var hq = String(house).replace(/"/g, '""');   // a house name with a quote would break SUMIFS
+
+    /* ---------------------------------------------------------------- 3_Sleeve ------------ */
+    var sl = new Sheet('3_Sleeve');
+    sl.hideGrid = true;
+    sl.str(0, 0, house + ' — sleeve roll-up on ' + actual, S_H1);
+    sl.str(1, 0, label + ' · ' + window_ + ' · every cell below is a SUMIFS over 2_Quartile', S_LBL);
+    var shdr = ['Sleeve', 'Q1 %AUM', 'Q2 %AUM', 'Q3 %AUM', 'Q4 %AUM', 'Rated AUM', 'Sleeve weight',
+                'Coverage', 'Q1+Q2 within sleeve', 'Q4 within sleeve', 'Quality score'];
+    var swid = [18, 10, 10, 10, 10, 11, 11, 10, 15, 13, 12], top = 4;
+    shdr.forEach(function (t, c) { sl.str(top, c, t, S_HDR); sl.width(c, c, swid[c]); });
+    sleeves.forEach(function (s, k) {
+      var rr = top + k + 2, ii = top + k + 1, qn;
+      sl.str(ii, 0, s, S_TXT);
+      for (qn = 1; qn <= 4; qn++) {
+        sl.f(ii, qn, 'SUMIFS(' + RF + ',' + RB + ',"' + hq + '",' + RD + ',$A' + rr + ',' + QL + ',' + qn + ')', S_PCT2);
+      }
+      sl.f(ii, 5, 'SUM(B' + rr + ':E' + rr + ')', S_PCT2);
+      sl.f(ii, 6, 'SUMIFS(' + RF + ',' + RB + ',"' + hq + '",' + RD + ',$A' + rr + ')', S_PCT2);
+      sl.f(ii, 7, 'IF(G' + rr + '>0,MIN(1,F' + rr + '/G' + rr + '),"")', S_PCT);
+      sl.f(ii, 8, 'IF(F' + rr + '>0,(B' + rr + '+C' + rr + ')/F' + rr + ',"")', S_PCT);
+      sl.f(ii, 9, 'IF(F' + rr + '>0,E' + rr + '/F' + rr + ',"")', S_PCT);
+      sl.f(ii, 10, 'IF(F' + rr + '>0,(' + SCOREW[1] + '*B' + rr + '+' + SCOREW[2] + '*C' + rr + '+' +
+                   SCOREW[3] + '*D' + rr + '+' + SCOREW[4] + '*E' + rr + ')/F' + rr + ',"")', S_NUM);
+    });
+    var sfirst = top + 2, slast = top + sleeves.length + 1;
+    sl.drawingId = 1;
+
+    /* ---------------------------------------------------------------- 4_AMC --------------- */
+    var am = new Sheet('4_AMC');
+    am.hideGrid = true; am.width(0, 0, 26); am.width(1, 1, 16);
+    am.str(0, 0, house + ' — AMC roll-up on ' + actual, S_H1);
+    am.str(1, 0, label + ' · ' + window_ + ' · sums across every sleeve', S_LBL);
+    function colR(L) { return "'3_Sleeve'!$" + L + '$' + sfirst + ':$' + L + '$' + slast; }
+    var lines = [
+      ['Q1 %AUM', 'SUM(' + colR('B') + ')', S_PCT2],
+      ['Q2 %AUM', 'SUM(' + colR('C') + ')', S_PCT2],
+      ['Q3 %AUM', 'SUM(' + colR('D') + ')', S_PCT2],
+      ['Q4 %AUM', 'SUM(' + colR('E') + ')', S_PCT2],
+      ['Rated AUM (of house)', 'SUM(B4:B7)', S_PCT2],
+      ['House AUM covered', 'SUM(' + colR('G') + ')', S_PCT2],
+      ['Coverage', 'IF(B9>0,MIN(1,B8/B9),"")', S_PCT],
+      ['Q1+Q2 (house)', 'IF(B8>0,(B4+B5)/B8,"")', S_PCT],
+      ['Q4 (house)', 'IF(B8>0,B7/B8,"")', S_PCT],
+      ['Quality score (house)', 'IF(B8>0,(' + SCOREW[1] + '*B4+' + SCOREW[2] + '*B5+' +
+        SCOREW[3] + '*B6+' + SCOREW[4] + '*B7)/B8,"")', S_NUM]
+    ];
+    var ar = 3;
+    lines.forEach(function (L) { am.str(ar, 0, L[0], S_LBL); am.f(ar, 1, L[1], L[2]); ar++; });
+    am.str(ar + 1, 0, 'Q1+Q2 (house)', S_LBL);
+    am.f(ar + 1, 1, 'B11', S_BIG);
+
+    /* ---------------------------------------------------------------- 5_SchemeDetail ------ */
+    var sd = new Sheet('5_SchemeDetail');
+    sd.freeze = { r: 1, c: 1 };
+    [['Scheme', 54], ['Category', 26], ['Sleeve', 17], ['AUM (cr)', 11], ['% of house AUM', 13],
+     ['Return %', 11], ['Rank in category', 11], ['n in category', 11],
+     ['Percentile (1 = best)', 12], ['Quartile', 9]].forEach(function (t, c) {
+      sd.str(0, c, t[0], S_HDR); sd.width(c, c, t[1]);
+    });
+    var sdr = 1;
+    rows.forEach(function (x, k) {
+      if (x.house !== house) return;
+      var qrow = k + 2;                       // this scheme's row on 2_Quartile
+      sd.str(sdr, 0, x.scheme, S_TXT); sd.str(sdr, 1, x.cat, S_TXT); sd.str(sdr, 2, x.sleeve, S_TXT);
+      sd.num(sdr, 3, x.aum_cr, S_CR);  sd.num(sdr, 4, x.pct, S_PCT2);
+      sd.f(sdr, 5, "IF(ISBLANK('1_Raw'!G" + qrow + "),\"\",'1_Raw'!G" + qrow + ')', S_NUM);
+      sd.f(sdr, 6, "'2_Quartile'!F" + qrow, S_INT);
+      sd.f(sdr, 7, "'2_Quartile'!E" + qrow, S_INT);
+      sd.f(sdr, 8, 'IF(OR(H' + (sdr + 1) + '="",H' + (sdr + 1) + '=0,G' + (sdr + 1) + '=""),"",G' + (sdr + 1) + '/H' + (sdr + 1) + ')', S_PCT);
+      sd.f(sdr, 9, "'2_Quartile'!L" + qrow, S_INT);
+      sdr++;
+    });
+
+    /* ---------------------------------------------------------------- 6_Check ------------- */
+    /* The site's own published sleeve numbers, so the workbook can be graded against the page
+       it was exported from rather than against itself. */
+    var pub = {};
+    (data.sleeve || []).forEach(function (rec) {
+      if (rec.fh !== house || rec.rw !== window_) return;
+      (pub[rec.br] || (pub[rec.br] = {}))[rec.qt] = rec.v || [];
+    });
+    var ck = new Sheet('6_Check');
+    ck.hideGrid = true; ck.width(0, 0, 24); ck.width(1, 3, 15); ck.width(4, 4, 46);
+    ck.str(0, 0, 'Workbook vs website', S_H1);
+    ck.str(1, 0, 'Same house, same date, same window. A clean sheet means every number in here was rebuilt, not copied.', S_LBL);
+    ['Sleeve', 'Workbook Q1+Q2', 'Website Q1+Q2', 'Gap (pp)', 'Verdict'].forEach(function (t, c) {
+      ck.str(3, c, t, S_HDR);
+    });
+    var cr = 4, anyPub = false;
+    sleeves.forEach(function (s, k) {
+      var srow = top + k + 2;
+      ck.str(cr, 0, s, S_TXT);
+      ck.f(cr, 1, "'3_Sleeve'!I" + srow, S_PCT);
+      var pv = pub[s] && pub[s]['Q1+Q2'] ? at(pub[s]['Q1+Q2'], di) : null;
+      if (pv != null) { anyPub = true; ck.num(cr, 2, pv / 100.0, S_PCT); }
+      ck.f(cr, 3, 'IF(OR(B' + (cr + 1) + '="",C' + (cr + 1) + '=""),"",(B' + (cr + 1) + '-C' + (cr + 1) + ')*100)', S_NUM);
+      ck.f(cr, 4, 'IF(D' + (cr + 1) + '="","website value not in this payload",IF(ABS(D' + (cr + 1) + ')<=0.1,"OK (within 4dp transport rounding)","CHECK — gap over 0.1pp"))', S_TXT);
+      cr++;
+    });
+    cr++;
+    ck.str(cr, 0, 'Quartile rebuild', S_H2); cr++;
+    ck.str(cr, 0, 'Rows that disagree', S_LBL);
+    ck.f(cr, 1, "COUNTIF('2_Quartile'!N2:N" + last + ',"MISMATCH")', S_INT);
+    ck.f(cr, 4, 'IF(B' + (cr + 1) + '=0,"OK — every rated scheme’s quartile was rebuilt exactly","CHECK — see the red cells on 2_Quartile")', S_TXT);
+    cr++;
+    ck.str(cr, 0, 'Rated schemes', S_LBL);
+    ck.f(cr, 1, "COUNTIF('2_Quartile'!N2:N" + last + ',"OK")', S_INT);
+    ck.str(cr, 4, 'The denominator above — if this is 0 the check above passed vacuously.', S_WRAP);
+    cr++;
+    ck.str(cr, 0, 'Not rated', S_LBL);
+    ck.f(cr, 1, "COUNTIF('2_Quartile'!N2:N" + last + ',"not rated")', S_INT);
+    ck.str(cr, 4, 'Schemes too young for this window. They carry no quartile on the site either.', S_WRAP);
+    if (!anyPub) {
+      cr += 2;
+      ck.str(cr, 0, 'Note', S_H2);
+      ck.str(cr, 4, 'The website’s own sleeve series for this house/window was not in the loaded payload, so the top table could only fill the workbook side. The quartile rebuild check below it is unaffected.', S_WRAP);
+    }
+
+    var sheets = [ws, raw, q, sl, am, sd, ck];
+    var charts = { c1: stackedChart(sfirst, slast), c2: topHalfChart(sfirst, slast),
+                   drawing: drawingXml(slast + 3) };
+    return pack(sheets, charts).then(function (bytes) {
+      return { bytes: bytes, actual: actual, nrows: nrow, nmine: mine.length,
+               nsleeves: sleeves.length };
+    });
+  }
+
+  window.PeerXLSX = { build: build, _WINDOWS: WINDOWS };
+})();
+
+
+/* ── "Export report to Excel" ────────────────────────────────────────────────────────────────
+   The workbook is built from the SAME payload the page is rendering, so what you export is
+   what you are looking at -- there is no second data path to drift. returns.json is a lazy
+   block (the Return-profile panel is usually what pulls it), so the handler waits for it
+   rather than exporting a workbook with an empty Return column. */
+(function(){
+  var btn = document.getElementById('mb-xls');
+  if (!btn || !window.PeerXLSX) return;
+  var lbl = document.getElementById('mb-xls-t');
+  function say(t, cls){ if(lbl) lbl.textContent = t; btn.className = 'mast-xls' + (cls ? ' ' + cls : ''); }
+  function reset(){ setTimeout(function(){ btn.disabled = false; say('Export report to Excel', ''); }, 2600); }
+
+  btn.onclick = function(){
+    if (btn.disabled) return;
+    btn.disabled = true;
+    try {
+      var uni  = S.universe;
+      var win  = (uni === 'vr') ? (RWOF[S.basis] || '1 Year') : (S.window || '1 Year');
+      var fh   = (S.amc && S.amc.fh) || 'Aditya';
+      var date = (S.amc && S.amc.rankDate) || null;
+      if (!PeerXLSX._WINDOWS[win]) {
+        say('No workbook for ' + win, 'bad'); reset(); return;
+      }
+      say('Loading returns…', '');
+      var wait = (typeof returnsSrc === 'function' && returnsSrc()) ? Promise.resolve()
+               : (typeof fetchReturns === 'function' ? (fetchReturns() || Promise.resolve()) : Promise.resolve());
+      wait.then(function(){
+        say('Building…', '');
+        return PeerXLSX.build({
+          data: S.data, returns: (typeof returnsSrc === 'function' ? returnsSrc() : null),
+          house: fh, universe: uni, window: win, date: date
+        });
+      }).then(function(res){
+        var name = 'AMC Roll-up - ' + (typeof houseLabel === 'function' ? houseLabel(fh) : fh)
+                 + ' - ' + res.actual + ' - ' + win.replace(/\s+/g, '') + '.xlsx';
+        var blob = new Blob([res.bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        var url  = URL.createObjectURL(blob);
+        var a    = document.createElement('a');
+        a.href = url; a.download = name; document.body.appendChild(a); a.click();
+        document.body.removeChild(a);
+        setTimeout(function(){ URL.revokeObjectURL(url); }, 4000);
+        say(res.nmine + ' schemes · ' + res.actual, 'ok');
+        reset();
+      }).catch(function(e){
+        say('Export failed', 'bad');
+        try { console.error('[xlsx]', e); } catch(_){}
+        reset();
+      });
+    } catch(e) {
+      say('Export failed', 'bad');
+      try { console.error('[xlsx]', e); } catch(_){}
+      reset();
+    }
+  };
+})();
 </script>
 </body>
 </html>
