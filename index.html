@@ -6294,7 +6294,7 @@ function pgMethod(M){
     `<br><br><b>Identity columns.</b> <b>#</b> = the member's true rank inside the category on this window, from the engine's per-date descending stable sort — the SAME sort that assigns the quartiles, so rank and quartile can never disagree; it follows the investment mode (${modeLabel()}), exactly as the quartile chip does. “—” means the member is not rated on this window (it lacks the full history), “···” means the rank data is still downloading. <b>Qtl</b> = that member's quartile in this table. <b>Cat AUM%</b> = its AUM ÷ the category total of <b>${fmt.cr(M.crCat)}</b> across the <b>${M.nAll}</b> members with reported AUM (rated or not), so the column sums to ~100%. <b>AMC%</b> = its share of its OWN fund house's AUM.`+
     (M.scored?` <b>Score</b> = its ${basisDesc()} score and <b>vs avg</b> the gap to the category mean of ${fmt.num(M.avg)} that day.`:'')+
     `<br><br><b>The two analytics blocks.</b> <b>LUMPSUM</b> always reads lumpsum-ranked data and <b>SIP</b> always reads the ${SIPCONVLBL} SIP convention — they do not follow the mode toggle, because seeing both at once is the point of the grid. Both books buy on the same day, so the convention never changes; in Lumpsum mode the SIP block falls back to the <b>3-year</b> book and the header says so.`+
-    `<br><b>Return.</b> Lumpsum = the window's point-to-point calendar return.${dispRule} SIP = ₹100 invested on the <b>${convWord}</b> of each of the ${M.nInst} months in the window (${inv} in total). <b>Windows under a year lead with the TOTAL GAIN and carry the XIRR underneath; a year and longer lead with the XIRR p.a. and carry the gain underneath</b> — annualizing a few weeks of a single installment into a "per annum" number would be misleading. The XIRR is solved in the browser by bisection from the shipped gain and the age in days of every installment, the same solve the Return-profile panel runs. Sorting the column is unaffected by which one is the headline: for a fixed installment grid the XIRR is monotone in the gain, so both orderings are identical.`+
+    `<br><b>Return.</b> Lumpsum = the window's point-to-point calendar return.${dispRule} SIP = ₹100 invested on the <b>${convWord}</b> of each of the ${M.nInst} months in the window (${inv} in total). <b>Gain</b> = (final value of the book ÷ total money invested − 1) × 100. It is the profit as a percentage of the money you actually put in, and it is <b>not</b> a per-year rate. <b>XIRR</b> is the per-year rate, and it counts the date of every instalment, so the two answer different questions and are not comparable to each other. <b>Windows under a year lead with the TOTAL GAIN and carry the XIRR underneath; a year and longer lead with the XIRR p.a. and carry the gain underneath</b> — annualizing a few weeks of a single installment into a "per annum" number would be misleading. The XIRR is solved in the browser by bisection from the shipped gain and the age in days of every installment, the same solve the Return-profile panel runs. Sorting the column is unaffected by which one is the headline: for a fixed installment grid the XIRR is monotone in the gain, so both orderings are identical.`+
     (M.bench.has
       ? `<br><b>The pinned benchmark row and the <i>vs bmk</i> columns.</b> The first row of the table is <b>${M.bench.name||'the category benchmark'}</b>, Value Research's designated index for <b>${M.pcat}</b> — the same series the Return-profile card above compares against, on the same window and the same as-of, so the two cannot disagree. It is a ROW rather than a column because it is ONE series for the whole cohort: as a column it would repeat the identical number down every line. It is never sorted and never ranked. <b>vs bmk</b> beside each Return column is that fund minus the benchmark, in percentage points, and both sides carry the IDENTICAL transform — lumpsum annualizes from 1Y up, SIP differences XIRRs from 1Y up and total GAINS below — so an annualized figure is never subtracted from a cumulative one. Under a SIP book whose window is shorter than the book, the benchmark's <b>rate</b> is withheld (its own opening weight is not shipped, and guessing it would print a number nobody can reproduce) while its <b>gain</b> is still shown; the Return-profile card blanks the identical cell on the identical test.`
       : `<br><b>No benchmark row here.</b> A benchmark belongs to a Value Research CATEGORY, and the members of an <b>MFI all-peer</b> category have different VR homes — or none — so there is no single index they all measure against. The benchmark row and the two <i>vs bmk</i> columns are therefore ABSENT rather than dashed out, because a dash down every row of the grid reads as a data outage instead of as "this comparison does not exist here". Switch the universe to <b>Exact Peers (VR)</b> to get them. (The Category-standing card above still shows the SELECTED fund's alpha against ITS OWN VR home benchmark under either universe — that one is a single fund, so it is well defined.)`)+
@@ -6399,7 +6399,7 @@ function renderMatrixGrid(){
   const norm=v=> v==null?null : isScore?(v-1)/3 : q4?(mx>mn?1-(v-mn)/(mx-mn):0.5) : (mx>mn?(v-mn)/(mx-mn):0.5);
   const disp=v=> v==null?'·' : isScore?v.toFixed(2):(v*100).toFixed(0)+'%';
   let html='<table class="rt"><thead><tr><th>Fund House</th>'; brsShown.forEach(b=>html+=`<th class="num">${b}</th>`); html+='</tr></thead><tbody>';
-  fhs.forEach(fh=>{ const cls=fh==='Aditya'?'hl':''; html+=`<tr class="${cls}"><td class="lbl">${houseLabel(fh)}</td>`;
+  fhs.forEach(fh=>{ const cls=fh===S.amc.fh?'hl':''; html+=`<tr class="${cls}"><td class="lbl">${houseLabel(fh)}</td>`;
     brsShown.forEach(br=>{ const v=cells[fh+'|'+br]; const t=norm(v); const bg=v==null?'transparent':heatColor(t); const col=v==null?C.ink4:heatInk(bg);
       html+=`<td class="num" style="background:${bg};color:${col};font-weight:600">${disp(v)}</td>`; }); html+='</tr>'; });
   html+='</tbody></table>';
@@ -6474,14 +6474,19 @@ function renderComposite(){
 // now on the as-of path; the only things left out are the three time-series charts, which plot
 // the whole history and have no as-of to be wrong about.
 function renderCompositeKPIs(){
-  const i=S.composite.date, {byQ}=houseSeries('Aditya',null);
+  // Kyser 2026-09-04: "in industry wide cross section it still shows aditya when I have selected
+  // Invesco." These four cards asked for 'Aditya' by name and ignored the Fund House selector,
+  // while the league table in the SAME tab reads S.amc.fh -- so one screen showed two houses at
+  // once. The house now comes from the selector, and the labels name whichever house that is.
+  const fh=S.amc.fh, HL=houseLabel(fh);
+  const i=S.composite.date, {byQ}=houseSeries(fh,null);
   document.getElementById('cp-ctx').innerHTML=`${basisDesc()}<br>Snapshot ${fmt.date(curDates()[i])}`;
   const q1=byQ['% in Q1']?.[i],q2=byQ['% in Q2']?.[i],q4=byQ['% in Q4']?.[i];
   document.getElementById('cp-kpis').innerHTML=`
-    <div class="kpi qc q-q1"><div class="k-lbl">Aditya Q1</div><div class="k-val">${fmt.pct(q1)}</div><div class="k-sub">top quartile</div></div>
-    <div class="kpi qc q-q12"><div class="k-lbl">Aditya Q1+Q2</div><div class="k-val">${fmt.pct((q1||0)+(q2||0))}</div><div class="k-sub">top half</div></div>
-    <div class="kpi mc m-ret"><div class="k-lbl">Aditya AUM-wtd quartile</div><div class="k-val">${fmt.num(qualityScore(byQ,i))}</div><div class="k-sub">Q1=4 … Q4=1</div></div>
-    <div class="kpi qc q-q4"><div class="k-lbl">Aditya Q4</div><div class="k-val">${fmt.pct(q4)}</div><div class="k-sub">bottom quartile</div></div>`;
+    <div class="kpi qc q-q1"><div class="k-lbl">${HL} Q1</div><div class="k-val">${fmt.pct(q1)}</div><div class="k-sub">top quartile</div></div>
+    <div class="kpi qc q-q12"><div class="k-lbl">${HL} Q1+Q2</div><div class="k-val">${fmt.pct((q1||0)+(q2||0))}</div><div class="k-sub">top half</div></div>
+    <div class="kpi mc m-ret"><div class="k-lbl">${HL} AUM-wtd quartile</div><div class="k-val">${fmt.num(qualityScore(byQ,i))}</div><div class="k-sub">Q1=4 … Q4=1</div></div>
+    <div class="kpi qc q-q4"><div class="k-lbl">${HL} Q4</div><div class="k-val">${fmt.pct(q4)}</div><div class="k-sub">bottom quartile</div></div>`;
 }
 // Stacked histogram of ONLY the ticked quartiles, each kept in its own Q-colour (Q1 dark-green
 // … Q4 red — the static-snapshot scheme). Y fixed 0–100%; house order FROZEN by the latest-date
@@ -6499,11 +6504,17 @@ function renderCompositeBar(){
     .filter(r=> r.ref!=null || sumSel(r.byQ,i)!=null)
     .sort((a,b)=> (b.ref==null?-1:b.ref)-(a.ref==null?-1:a.ref));
   const selLabel=sel.map(q=>'Q'+q).join('+');
-  const isA=fh=>fh==='Aditya', botQ=sel[0], topQ=sel[sel.length-1], labels=rows.map(r=>houseLabel(r.fh));
+  // the outlined bar is the SELECTED house, not a fixed one (same fix as the cards above)
+  const selFh=S.amc.fh;
+  const isA=fh=>fh===selFh, botQ=sel[0], topQ=sel[sel.length-1], labels=rows.map(r=>houseLabel(r.fh));
   document.getElementById('cp-bar-sub').textContent=`${selLabel} share of each house's covered AUM · stacked by quartile · fixed 0–100% axis · ordered by latest ${selLabel} · ${fmt.date(curDates()[i])}`;
   const dataByQ=sel.map(q=> rows.map(r=>share(r.byQ,q,i)));
   // fast path: shape unchanged → just swap the data arrays and repaint (no chart rebuild)
-  const sig=[S.universe,S.basis,S.w,S.reward,sel.join(''),labels.join('|')].join('~');
+  // ~ THE SIGNATURE MUST CARRY THE HOUSE ~
+  // This chart repaints on a fast path whenever the signature is unchanged. The house was not in
+  // it, so selecting a new house repainted the same bars and left the outline on the old house.
+  // The visible half of the fix above does nothing without this line.
+  const sig=[S.universe,S.basis,S.w,S.reward,sel.join(''),labels.join('|'),selFh].join('~');
   if(S.charts.cpBar && S.charts.cpBarSig===sig){
     dataByQ.forEach((d,qi)=>{ S.charts.cpBar.data.datasets[qi].data=d; });
     S.charts.cpBar.update('none');
@@ -6512,7 +6523,7 @@ function renderCompositeBar(){
   // (re)build — shape changed (universe / basis / weight / quartile pick / order)
   const lg=document.getElementById('cp-bar-legend');
   if(lg) lg.innerHTML = sel.map(q=>`<span><span class="ldot" style="background:${QCOL['% in Q'+q]}"></span>Q${q}</span>`).join('')
-    + `<span><span class="ldot" style="background:transparent;box-shadow:0 0 0 2.5px ${OUTLINE}"></span>Aditya Birla</span>`;
+    + `<span><span class="ldot" style="background:transparent;box-shadow:0 0 0 2.5px ${OUTLINE}"></span>${houseLabel(selFh)}</span>`;
   // one dataset per selected quartile (ascending → Q1 at the bottom), each in its quartile colour.
   // Aditya gets a maroon box: side rails on every segment + cap on the bottom/top segment only.
   // Same JEWEL tonality as the stacked area panels (Kyser liked it there and asked for it across
