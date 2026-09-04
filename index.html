@@ -2054,7 +2054,11 @@ function fetchStanding(){
   if (!(S.data && S.data.meta && S.data.meta.has_standing)) return null;
   STD_PROMISE = fetch('standing.json')
     .then(r => { if(!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
-    .then(res => { S.data.standing = unpackStanding(res); dataLanded(); try{ if(S.data) renderSchemeBody(); }catch(e){} })
+    .then(res => { S.data.standing = unpackStanding(res); dataLanded();
+      // repaint whatever tab is open, not only Scheme Detail: the AMC Roll-up KPI card, league
+      // table and trend chart now read these ranks too, and would otherwise sit on their loading
+      // state until the next toggle. dataLanded() bumped the epoch, so the signature has moved.
+      try{ if(S.data){ if(typeof _DIRTY!=='undefined'){ _DIRTY.add(S.view); renderIfDirty(S.view); } renderSchemeBody(); } }catch(e){} })
     .catch(() => { STD_PROMISE = null; });
   return STD_PROMISE;
 }
@@ -3875,18 +3879,18 @@ function renderAMC(){
     data:selS.dates.map((d,i)=>({x:d,y:aTop[i]})), borderColor:C.green, borderWidth:2.8, pointRadius:0, tension:0.3 });
   dsets.push({ label:houseLabel(fh)+' Q4', yAxisID:'y', order:1, backgroundColor:'transparent',
     data:selS.dates.map((d,i)=>({x:d,y:aQ4[i]})), borderColor:C.red, borderWidth:2.4, pointRadius:0, tension:0.3 });
-  dsets.push({ label:'AUM-weighted quartile', yAxisID:'y1', data:dates.map((d,i)=>({x:d,y:qualityScore(byQ,i)})),
-    borderColor:C.quartile, borderWidth:1.8, pointRadius:0, tension:0.3, order:2, backgroundColor:'transparent' });
+  dsets.push({ label:'AUM-weighted %ile', yAxisID:'y1', data:dates.map((d,j)=>({x:d,y:housePctAt(fh,j).v})),
+    borderColor:C.quartile, borderWidth:1.8, pointRadius:0, tension:0.3, order:2, backgroundColor:'transparent', spanGaps:true });
   const adDates=houseSeries(fh,null).dates;
   const {xmin:rxmin,xmax:rxmax}=xBounds(adDates, aTop, aQ4);
   S.charts.amRank=new Chart(ctx2,{type:'line',data:{datasets:dsets},
-    options:dualOpts({leftSuffix:'%', rightLabel:'AUM-weighted quartile (Q1=4 … Q4=1)', rightMin:1, rightMax:4, xmin:rxmin, xmax:rxmax})});
+    options:dualOpts({leftSuffix:'%', rightLabel:'AUM-weighted percentile (0–100)', rightMin:0, rightMax:100, xmin:rxmin, xmax:rxmax})});
   document.getElementById('am-rank-title').textContent=`${houseLabel(fh)} — Q1+Q2 (green) & Q4 (red) over time`;
   // Kyser 2026-09-04: the old subtitle ("<house> only; dashed = quality score (right axis).
   // Hover for its percentile against every peer.") is deleted as redundant -- the title already
   // names the house, the legend already names all three lines, and the line is no longer dashed.
   document.getElementById('am-rank-method').innerHTML=methodNote(
-    `House-wide <b>Q1+Q2 share</b> (green) and <b>Q4 share</b> (red) for <b>${houseLabel(fh)}</b> over time, each as a share of the house's whole covered AUM — the same denominator the stacked chart above uses, so the two panels read on one scale. The blue line (right axis) is the <b>AUM-weighted quartile</b> — every rated rupee scored Q1=4, Q2=3, Q3=2, Q4=1, then averaged by AUM. ${universeLabel()} basis, recomputed live.`);
+    `House-wide <b>Q1+Q2 share</b> (green) and <b>Q4 share</b> (red) for <b>${houseLabel(fh)}</b> over time, each as a share of the house's whole covered AUM — the same denominator the stacked chart above uses, so the two panels read on one scale. The blue line (right axis) is the <b>AUM-weighted percentile</b> — each rated fund's rank inside its category (convention (rank−0.5)÷n, so a category's average is 50 whatever its size), AUM-weighted across the house; 100 ≈ top of the peer group. ${universeLabel()} basis, recomputed live.`);
 
   renderAMCSummary();                     // the scheme-by-scheme table (adaptive to every toggle)
   renderComposite();                      // the industry cross-section (KPI row + mix bar)
@@ -4315,20 +4319,22 @@ function renderAMCTable(){
   // about the numbers changed — only where the table lives.
   const i=S.amc.rankDate, rows=leagueData(i);
   const k=S.league.sortKey, dir=S.league.sortDir;
-  rows.sort((a,b)=> (a[k]-b[k])*dir);   // dir=-1 => descending
+  rows.sort((a,b)=>{ let av=a[k], bv=b[k];        // nulls (e.g. a house with no rated AUM yet) sort LAST
+    if(av==null && bv==null) return 0; if(av==null) return 1; if(bv==null) return -1;
+    return (av-bv)*dir; });                       // dir=-1 => descending
   rows.forEach((r,idx)=>r.rank=idx+1); const n=rows.length;
-  const cols=[['q1','Q1'],['top','Q1+Q2'],['q4','Q4'],['score','AUM-wtd quartile'],['cov','Scored %'],['cr','Covered AUM']];
+  const cols=[['q1','Q1'],['top','Q1+Q2'],['q4','Q4'],['pctile','AUM-wtd %ile'],['cov','Scored %'],['cr','Covered AUM']];
   let html='<table class="rt"><thead><tr><th>#</th><th>Fund House</th>';
   cols.forEach(([key,lbl])=> html+=`<th class="num lg-sort" data-k="${key}" style="cursor:pointer">${lbl}${k===key?(dir<0?' ▾':' ▴'):''}</th>`);
   html+='</tr></thead><tbody>';
   rows.forEach(r=>{ const cls=r.fh===S.amc.fh?'hl':''; const pc=r.rank===1?'r1':r.rank<=Math.ceil(n/4)?'up':r.rank>n-Math.ceil(n/4)?'dn':'';
-    html+=`<tr class="${cls}"><td><span class="pill ${pc}">${r.rank}</span></td><td class="lbl">${houseLabel(r.fh)}</td><td class="num">${fmt.pct(r.q1)}</td><td class="num">${fmt.pct(r.top)}</td><td class="num">${fmt.pct(r.q4)}</td><td class="num">${fmt.num(r.score)}</td><td class="num">${fmt.pct(r.cov)}</td><td class="num">${fmt.cr(r.cr)}</td></tr>`; });
+    html+=`<tr class="${cls}"><td><span class="pill ${pc}">${r.rank}</span></td><td class="lbl">${houseLabel(r.fh)}</td><td class="num">${fmt.pct(r.q1)}</td><td class="num">${fmt.pct(r.top)}</td><td class="num">${fmt.pct(r.q4)}</td><td class="num">${r.pctile==null?'—':fmt.num(r.pctile,1)}</td><td class="num">${fmt.pct(r.cov)}</td><td class="num">${fmt.cr(r.cr)}</td></tr>`; });
   html+='</tbody></table>';
   document.getElementById('am-table').innerHTML=html;
   document.querySelectorAll('#am-table .lg-sort').forEach(th=> th.onclick=()=>{ const key=th.dataset.k;
     if(S.league.sortKey===key) S.league.sortDir*=-1; else { S.league.sortKey=key; S.league.sortDir=-1; } renderAMCTable(); });
   document.getElementById('am-table-method').innerHTML=methodNote(
-    `The <b>${n}</b> fund houses in scope (${scopeLabel()}) on <b>${fmt.date(curDates()[i])}</b> (${basisDesc()}). Q1 / Q1+Q2 / Q4 are AUM shares of the house; <b>AUM-weighted quartile</b> = every rated rupee scored Q1=4, Q2=3, Q3=2, Q4=1, averaged by AUM. <b>Scored %</b> = share of the house's covered AUM that actually has a quartile on this basis — below 100% when funds are too new for the window (e.g. sub-3-year NFOs on the 3Y basis). <b>Covered AUM</b> = the absolute Rs cr that is scored. Click a numeric header to re-sort. The selected house's row is highlighted.`);
+    `The <b>${n}</b> fund houses in scope (${scopeLabel()}) on <b>${fmt.date(curDates()[i])}</b> (${basisDesc()}). Q1 / Q1+Q2 / Q4 are AUM shares of the house; <b>AUM-weighted %ile</b> = each rated fund's percentile inside its own category (its rank among peers, on the SAME engine ranks the Scheme-Detail standing card uses; convention (rank−0.5)÷n, so the average of a random category is exactly 50 regardless of how many funds it holds), then AUM-weighted across the house; 100 ≈ top of the peer group. The 1–4 quality score is kept in the Excel export. <b>Scored %</b> = share of the house's covered AUM that actually has a quartile on this basis — below 100% when funds are too new for the window (e.g. sub-3-year NFOs on the 3Y basis). <b>Covered AUM</b> = the absolute Rs cr that is scored. Click a numeric header to re-sort. The selected house's row is highlighted.`);
 }
 function exportAMC(){
   const fh=S.amc.fh, {dates,byQ}=houseSeries(fh,null);
@@ -4594,6 +4600,63 @@ function pgStandingAt(R, universe, key, rw, i){
 function standingAt(universe, key, rw, i){
   return pgStandingAt(standingSrc(), universe, key, rw, i);
 }
+// Member -> 1-based rank (1 = best) within a category at date i, honouring the universe / mode /
+// basis toggles. LIFTED OUT of computeStanding so the per-scheme standing card and the house-level
+// AUM percentile rank through ONE implementation and can never disagree. Returns a Map, or null
+// when the rank source for the current mode has not landed yet.
+function buildCategoryRanks(members, cat, i){
+  const vr=S.universe==='vr', rw=RWOF[S.basis];
+  const ranks=new Map();
+  if(!rw){                                   // scored basis (Composite / 3Y+reward): no single window
+    if(S.mode!=='ls' && !sipData()) return null;
+    const scored=[];
+    members.forEach((m,idx)=>{ const sc=vr?vrScoreAt(m,i):allScoreAt(m,i); if(sc!=null) scored.push({m,sc,idx}); });
+    scored.sort((a,b)=> b.sc-a.sc || a.idx-b.idx);   // same stable desc sort the engine uses
+    scored.forEach((e,k)=> ranks.set(e.m, k+1));
+  } else {                                   // raw window: engine-shipped ranks (standing.json / SIP)
+    if(!standingSrc()) return null;
+    members.forEach(m=>{ const rk=standingAt(vr?'vr':'all', vr?(cat+'|'+m.s):m.s, rw, i); if(rk!=null) ranks.set(m,rk); });
+  }
+  return ranks;
+}
+
+// ── AUM-WEIGHTED PERCENTILE (Kyser 2026-09-04) ──────────────────────────────────────────────
+// House percentile at date i = the AUM-weighted average, over the house's DISTINCT rated schemes,
+// of each scheme's category percentile (rank-0.5)/n. High = better. Memoised per date, keyed on
+// the global signature, so the trend chart's 154 per-date calls build each category's rank map
+// once. A VR scheme is weighted ONCE via its HOME record (never double-counted through a widened
+// set), but ranking uses ALL peers in a category including borrowed ones -- exactly as
+// computeStanding does. Triggers the lazy rank fetch and reports `loading` so the UI can wait.
+let _PCTMEMO={sig:null, byI:new Map()};
+function aumPctByHouse(i){
+  if(RWOF[S.basis] && !standingSrc()) fetchStanding();   // raw window needs the shipped ranks
+  const sig=_globalSig();
+  if(_PCTMEMO.sig!==sig) _PCTMEMO={sig, byI:new Map()};
+  if(_PCTMEMO.byI.has(i)) return _PCTMEMO.byI.get(i);
+  const vr=S.universe==='vr', pool=(vr?S.data.vr:S.data.allpeer)||[];
+  const byCat=new Map();
+  pool.forEach(m=>{ if(BADCAT(m.c)) return; let a=byCat.get(m.c); if(!a){a=[];byCat.set(m.c,a);} a.push(m); });
+  const rankMaps=new Map(); let loading=false;
+  byCat.forEach((members,cat)=>{ const rk=buildCategoryRanks(members,cat,i);
+    if(rk===null){ loading=true; return; } rankMaps.set(cat,{ranks:rk, n:rk.size}); });
+  const acc=new Map(), seen=new Set();
+  const record=(m)=>{ if(seen.has(m.s)) return; const rm=rankMaps.get(m.c); if(!rm||!rm.n) return;
+    const rk=rm.ranks.get(m); if(rk==null) return;                 // unrated: excluded both sides
+    const aum=m.cr?m.cr[i]:null; if(aum==null||aum<=0) return;      // no AUM: cannot weight
+    seen.add(m.s);
+    const pct=100*(rm.n - rk + 0.5)/rm.n;
+    const a=acc.get(m.h)||{num:0,den:0}; a.num+=pct*aum; a.den+=aum; acc.set(m.h,a); };
+  if(vr){ const homeByName=new Map();
+    pool.forEach(m=>{ if(!homeByName.has(m.s)) homeByName.set(m.s, vrHomeRec(m.s)||m); });
+    homeByName.forEach(record);
+  } else pool.forEach(record);
+  const out=new Map(); acc.forEach((v,fh)=>{ if(v.den>0) out.set(fh, v.num/v.den); });
+  const res={pct:out, loading};
+  _PCTMEMO.byI.set(i,res);
+  return res;
+}
+function housePctAt(fh,i){ const r=aumPctByHouse(i); return { v:(r.pct.has(fh)?r.pct.get(fh):null), loading:r.loading }; }
+
 // All the numbers behind the standing card, for scheme `name` at as-of index i.
 // Returns {state:'ok', ...} or a non-ok state: 'nocat' (no mapped category),
 // 'stdloading' / 'siploading' (data still in flight), 'unrated' (no rank at this date).
@@ -4606,19 +4669,12 @@ function computeStanding(name, i){
   // for VR that INCLUDES memberships borrowed into a widened set (they are real peers there)
   const members=(vr?S.data.vr:S.data.allpeer).filter(r=>r.c===cat);
   const rw=RWOF[S.basis];                       // null on Composite / 3Y+reward (no single window)
-  const ranks=new Map();                        // membership row -> 1-based rank (rated members only)
+  // ranks now come from the SHARED helper (see buildCategoryRanks) so this card and the house-level
+  // AUM percentile can never rank the same fund differently.
+  const ranks=buildCategoryRanks(members, cat, i);
+  if(ranks===null) return {state: (S.mode==='ls') ? 'stdloading' : 'siploading'};
   let qdigit=null;                              // the scheme's own quartile digit here, when it has one
-  if(!rw){
-    // scored basis: rank by the shared scoring helper, same stable desc sort as rebucket()
-    if(S.mode!=='ls' && !sipData()) return {state:'siploading'};
-    const scored=[];
-    members.forEach((m,idx)=>{ const sc=vr?vrScoreAt(m,i):allScoreAt(m,i); if(sc!=null) scored.push({m,sc,idx}); });
-    scored.sort((a,b)=> b.sc-a.sc || a.idx-b.idx);
-    scored.forEach((e,k)=> ranks.set(e.m, k+1));
-  } else {
-    // raw window: the engine-shipped rank series (lumpsum standing.json or the SIP file's block)
-    if(!standingSrc()) return {state: S.mode==='ls' ? 'stdloading' : 'siploading'};
-    members.forEach(m=>{ const rk=standingAt(vr?'vr':'all', vr?(cat+'|'+m.s):m.s, rw, i); if(rk!=null) ranks.set(m,rk); });
+  if(rw){
     // Does the scheme ALSO carry a quartile digit here? Usually yes — ranks and quartiles come
     // from the same per-date sort. But `standing` recomputes its own returns, so it can cover a
     // VR category that the SCORING path dropped (e.g. Conglomerate Fund, whose funds lack the
@@ -6485,7 +6541,7 @@ function renderCompositeKPIs(){
   document.getElementById('cp-kpis').innerHTML=`
     <div class="kpi qc q-q1"><div class="k-lbl">${HL} Q1</div><div class="k-val">${fmt.pct(q1)}</div><div class="k-sub">top quartile</div></div>
     <div class="kpi qc q-q12"><div class="k-lbl">${HL} Q1+Q2</div><div class="k-val">${fmt.pct((q1||0)+(q2||0))}</div><div class="k-sub">top half</div></div>
-    <div class="kpi mc m-ret"><div class="k-lbl">${HL} AUM-wtd quartile</div><div class="k-val">${fmt.num(qualityScore(byQ,i))}</div><div class="k-sub">Q1=4 … Q4=1</div></div>
+    <div class="kpi mc m-ret"><div class="k-lbl">${HL} AUM-wtd %ile</div><div class="k-val">${(()=>{const p=housePctAt(fh,i); return p.v==null?(p.loading?'…':'—'):fmt.num(p.v,1);})()}</div><div class="k-sub">0–100, higher = better</div></div>
     <div class="kpi qc q-q4"><div class="k-lbl">${HL} Q4</div><div class="k-val">${fmt.pct(q4)}</div><div class="k-sub">bottom quartile</div></div>`;
 }
 // Stacked histogram of ONLY the ticked quartiles, each kept in its own Q-colour (Q1 dark-green
@@ -6584,15 +6640,17 @@ function leagueData(i){
     const q1=byQ['% in Q1']?.[i]||0,q2=byQ['% in Q2']?.[i]||0,q3=byQ['% in Q3']?.[i]||0,q4=byQ['% in Q4']?.[i]||0;
     // coverage = SCORED %AUM (sum of the four quartile bands). On 3Y this is < 100% for houses
     // with sub-3-year NFOs (no 3Y quartile yet) — NOT the total covered weight.
-    return { fh, q1, top:q1+q2, q4, score:qualityScore(byQ,i)||0, cov:q1+q2+q3+q4, cr:crmap[fh]||0 }; });
+    const pr=housePctAt(fh,i);
+    return { fh, q1, top:q1+q2, q4, score:qualityScore(byQ,i)||0, pctile:(pr.v==null?null:pr.v),
+             cov:q1+q2+q3+q4, cr:crmap[fh]||0 }; });
 }
 // (renderLeague / renderLeagueTable retired 2026-09-02 — the League Table tab merged into AMC
 //  Roll-up, where renderAMCTable() now renders the identical full table from the same
 //  leagueData(). exportLeague below survives, driven by the AMC tab's as-of date.)
 function exportLeague(){
   const i=S.amc.rankDate, rows=leagueData(i);
-  let csv='Rank,Fund House,Q1,Q1+Q2,Q4,AUM-weighted quartile,Scored %,Covered AUM cr,Basis,Date\n';
-  rows.sort((a,b)=>b.top-a.top).forEach((r,idx)=>{ csv+=[idx+1,r.fh,r.q1,r.top,r.q4,r.score,r.cov,Math.round(r.cr),`"${basisDesc()}"`,curDates()[i]].join(',')+'\n'; });
+  let csv='Rank,Fund House,Q1,Q1+Q2,Q4,AUM-weighted %ile,AUM-weighted quartile,Scored %,Covered AUM cr,Basis,Date\n';
+  rows.sort((a,b)=>b.top-a.top).forEach((r,idx)=>{ csv+=[idx+1,r.fh,r.q1,r.top,r.q4,(r.pctile==null?'':r.pctile.toFixed(2)),r.score,r.cov,Math.round(r.cr),`"${basisDesc()}"`,curDates()[i]].join(',')+'\n'; });
   downloadCSV(csv,`league_${S.universe}_${curDates()[i]}.csv`);
 }
 
