@@ -1512,6 +1512,13 @@ const C = {
   // anyone traces -- so it drops to .13, and the peer stroke thins with it. line2 (the axis
   // gridlines) softens for the same reason: present when looked for, invisible when not.
   line:'#d6d6db', line2:'#f0f0f5', peer:'#c7c7cc', peerLine:'rgba(150,150,162,.13)', green:'#1f5c3d', red:'#c0523e',
+  // quartile = the AUM-weighted-quartile reference line (right axis). Kyser 2026-09-04: it must
+  // read as a REFERENCE, not a third headline series -- "it shouldnt be as bright as green and red
+  // which are main plots". A muted blue sits away from the green/red quartile language entirely,
+  // so it cannot be misread as another quartile share, and at this lightness it recedes behind
+  // both. Solid, not dashed: he asked for a line, and a dash pattern on a 154-point monthly series
+  // shimmers more than it distinguishes.
+  quartile:'#7ea6c9',
   // Kyser 2026-09-03: the two REFERENCE lines -- sleeve weight and quality score -- go grey.
   // They are context for the coloured series, not series in their own right, and drawing them
   // in the ABSL red and the navy gave them the visual weight of data they are not.
@@ -3015,6 +3022,19 @@ function msToInput(ms){
   return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`;
 }
 function cropActive(){ return S.xr.from!=null || S.xr.to!=null; }
+const MONTH_ABBR = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+// One definition of "big enough to subdivide the year". 900px is the deck's own desktop breakpoint,
+// so the axis changes at the same width the layout does rather than at a second, invented one.
+const WIDE_Q = (typeof window!=='undefined' && window.matchMedia)
+  ? window.matchMedia('(min-width: 900px)') : null;
+function wideViewport(){ return WIDE_Q ? WIDE_Q.matches : true; }
+// Rotating a phone, or dragging a desktop window narrow, must re-tick the axes -- otherwise the
+// chart keeps whichever density it was BUILT with and the rule silently stops applying.
+if(WIDE_Q){
+  const _reTick = () => { try { if(typeof renderAll==='function') renderAll(); } catch(e){} };
+  if(WIDE_Q.addEventListener) WIDE_Q.addEventListener('change', _reTick);
+  else if(WIDE_Q.addListener) WIDE_Q.addListener(_reTick);
+}
 function timeX(xmin,xmax){
   // Learn the natural extent from whatever the charts ask for, so the date pickers can bound
   // themselves to real data without this function needing to know the payload's shape.
@@ -3024,11 +3044,28 @@ function timeX(xmin,xmax){
   // A fixed yearly unit is right for the full ~13-year span and wrong for a cropped one: crop
   // to six months and 'year' yields one tick or none. Under a crop, let Chart.js pick the unit
   // for the span it was actually handed.
-  return { type:'time', time: cropActive()? {} : {unit:'year'},
+  // ~ MONTH LABELS ON DESKTOP ONLY (Kyser 2026-09-04) ~
+  // "when site is open on desktop, the chart plot is big and we can write Jan/Feb/Mar etc to
+  // indicate month between years in the charts.. but not on mobile."
+  // A wide chart has room to subdivide the year; a phone does not, and the same tick density that
+  // reads cleanly at 1400px becomes an unreadable smear at 380px. So the unit is chosen from the
+  // VIEWPORT, not hard-coded. January still prints as the YEAR, so the year gridline the eye uses
+  // to navigate never disappears -- the months are added between those anchors, not instead of
+  // them. autoSkip then thins the months to whatever actually fits, which is why this degrades
+  // gracefully: wide screen shows more months, a cropped range shows more still.
+  const wide = wideViewport();
+  const monthly = !cropActive() && wide;
+  const tickCfg = {color:C.ink3, font:{size:10}, autoSkip:true, maxRotation:0,
+                   maxTicksLimit: monthly ? 26 : 12};
+  if(monthly) tickCfg.callback = (val) => {
+    const d = new Date(val);
+    return d.getMonth()===0 ? String(d.getFullYear()) : MONTH_ABBR[d.getMonth()];
+  };
+  return { type:'time', time: cropActive()? {} : (monthly ? {unit:'month'} : {unit:'year'}),
     min: S.xr.from!=null ? S.xr.from : xmin,
     max: S.xr.to  !=null ? S.xr.to   : xmax,
     grid:{display:false},
-    ticks:{color:C.ink3, font:{size:10}, autoSkip:true, maxRotation:0, maxTicksLimit:12},
+    ticks:tickCfg,
     border:{color:C.line} };
 }
 function applyCrop(a,b){
@@ -3189,6 +3226,11 @@ function stackOpts({leftMax, rightLabel, xmin, xmax}){
       y1:{ position:'right', display:!!rightLabel, grace:'12%', min:0, ticks:{callback:v=>v+'%',color:C.grey,font:{size:10}}, grid:{drawOnChartArea:false}, border:{display:false},
            title:{display:!!rightLabel,text:rightLabel,color:C.grey,font:{size:10}} } } };
 }
+// The AUM-weighted quartile is a 1-4 number whose meaning is a QUARTILE, so every place it is
+// drawn spells the mapping out. Q1 is the best quartile and scores 4, so the axis reads "high is
+// good" the same way the green Q1+Q2 line above it does.
+const QSCORE_LABEL = {4:'Q1', 3:'Q2', 2:'Q3', 1:'Q4'};
+const QUARTILE_AXIS = true;
 function dualOpts({leftSuffix, rightLabel, rightMin, rightMax, xmin, xmax, noGrid}){
   return { maintainAspectRatio:false, responsive:true, interaction:{mode:'index',intersect:false}, ...chartMotion(),
     plugins:{ legend:{display:false}, tooltip:{...baseTooltip(),
@@ -3201,15 +3243,21 @@ function dualOpts({leftSuffix, rightLabel, rightMin, rightMax, xmin, xmax, noGri
       // a 1-to-4 quality score is a value the scale does not have. Chart.js was generating
       // half-steps, so the ticks are replaced outright (stepSize cannot do it: Chart.js steps
       // up FROM min, so it would still land on 1, 2, 3, 4 only by luck of the range).
+      // Kyser 2026-09-04: "declare Q1 = 4, Q2 = 3, Q3 = 2 and Q4 = 1 ... on secondary axis write
+      // this too". A bare 1-to-4 axis makes the reader carry the mapping in their head and guess
+      // which end is good, so each tick now SAYS which quartile it is. Axis and ticks take the
+      // line's own colour so the reader never has to work out which axis this series belongs to.
       y1:{ position:'right', min:rightMin, max:rightMax, grid:{drawOnChartArea:false},
-           ticks:{color:C.grey,font:{size:10}}, border:{display:false},
+           ticks:{color:C.quartile,font:{size:10},
+                  callback:v=>(QUARTILE_AXIS && QSCORE_LABEL[v]) ? v+' ('+QSCORE_LABEL[v]+')' : v},
+           border:{display:false},
            afterBuildTicks: ax => {
              const lo=Math.ceil(rightMin==null?ax.min:rightMin), hi=Math.floor(rightMax==null?ax.max:rightMax);
              if(!isFinite(lo) || !isFinite(hi) || hi-lo>12) return;      // leave odd ranges alone
              const t=[]; for(let v=lo; v<=hi; v++) t.push({value:v});
              ax.ticks = t;
            },
-           title:{display:!!rightLabel,text:rightLabel,color:C.grey,font:{size:10}} } } };
+           title:{display:!!rightLabel,text:rightLabel,color:C.quartile,font:{size:10}} } } };
 }
 // noGrid  — drop the horizontal rules (Kyser 2026-09-02, on the quartile-history chart).
 // qTicks  — the y-axis is a QUARTILE axis, so label it Q1..Q4 and nothing else. Chart.js was
@@ -3307,7 +3355,7 @@ function buildViews(){
             <div class="ch-right">
               <div class="fg"><label>Smooth (trailing mean)</label>
                 <div class="seg sm" id="sl-smooth"><button data-v="0" class="active">Raw</button><button data-v="3">3m</button><button data-v="6">6m</button><button data-v="12">12m</button></div></div>
-              <div class="legend"><span><span class="lline" style="background:${C.green}"></span>Q1+Q2 %</span><span><span class="lline" style="background:${C.red}"></span>Q4 %</span><span><span class="lline" style="background:${C.grey}"></span>Score (R)</span></div>
+              <div class="legend"><span><span class="lline" style="background:${C.green}"></span>Q1+Q2 %</span><span><span class="lline" style="background:${C.red}"></span>Q4 %</span><span><span class="lline" style="background:${C.quartile}"></span>AUM-wtd quartile (R)</span></div>
             </div>
           </div>
           <div class="chartbox"><canvas id="sl-trend"></canvas></div>
@@ -3335,7 +3383,7 @@ function buildViews(){
         <div class="card-h"><div><h3 id="mx-title">Top-half share by fund house and sleeve</h3><div class="sub" id="mx-sub"></div></div>
           <div style="display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap">
             <div class="fg"><label>Metric</label>
-              <div class="seg" id="mx-metric"><button data-v="tophalf" class="active">Q1+Q2 %</button><button data-v="q4">Q4 %</button><button data-v="score">Quality score</button><button data-v="q1">Q1 %</button></div></div>
+              <div class="seg" id="mx-metric"><button data-v="tophalf" class="active">Q1+Q2 %</button><button data-v="q4">Q4 %</button><button data-v="score">AUM-wtd quartile</button><button data-v="q1">Q1 %</button></div></div>
             <div class="fg"><label>As-of date</label><select id="mx-date"></select></div>
             <button class="btn btn-dark" id="mx-exp">${icoDown()} Export CSV</button>
           </div>
@@ -3390,8 +3438,8 @@ function buildViews(){
         <div id="am-stack-method"></div>
       </div>
       <div class="card">
-        <div class="card-h"><div><h3 id="am-rank-title">Q1+Q2 (green) &amp; Q4 (red) over time</h3><div class="sub" id="am-rank-sub">Solid = the selected house; faded = its peers</div></div>
-          <div class="legend"><span><span class="lline" style="background:${C.green}"></span>Q1+Q2 %</span><span><span class="lline" style="background:${C.red}"></span>Q4 %</span><span><span class="lline" style="background:${C.grey}"></span>Score (R)</span></div>
+        <div class="card-h"><div><h3 id="am-rank-title">Q1+Q2 (green) &amp; Q4 (red) over time</h3><div class="sub" id="am-rank-sub" hidden></div></div>
+          <div class="legend"><span><span class="lline" style="background:${C.green}"></span>Q1+Q2 %</span><span><span class="lline" style="background:${C.red}"></span>Q4 %</span><span><span class="lline" style="background:${C.quartile}"></span>AUM-wtd quartile (R)</span></div>
         </div>
         <div class="chartbox tall"><canvas id="am-rank"></canvas></div>
         <div id="am-rank-method"></div>
@@ -3679,15 +3727,15 @@ function renderSleeveTrend(){
   const base=[
     { label:'Q1+Q2 %', data:topHalf, borderColor:C.green, borderWidth:2.2, tension:0.3, pointRadius:0, yAxisID:'y', backgroundColor:c=>gradient(c.chart.ctx,c.chart.chartArea,C.green,0.16,0.01), fill:true },
     { label:'Q4 %', data:q4, borderColor:C.red, borderWidth:2.2, tension:0.3, pointRadius:0, yAxisID:'y', fill:false },
-    { label:'Quality score', data:scoreS, borderColor:C.grey, borderWidth:1.6, borderDash:[4,3], tension:0.3, pointRadius:0, yAxisID:'y1', fill:false }
+    { label:'AUM-weighted quartile', data:scoreS, borderColor:C.quartile, borderWidth:1.8, tension:0.3, pointRadius:0, yAxisID:'y1', fill:false }
   ];
   S.charts.slTrend=new Chart(ctx,{type:'line',data:{datasets:smoothSeries(base, sm)},
-    options:dualOpts({leftSuffix:'%', rightLabel:'Score 1–4', rightMin:1, rightMax:4, xmin, xmax, noGrid:true})});
+    options:dualOpts({leftSuffix:'%', rightLabel:'AUM-weighted quartile (Q1=4 … Q4=1)', rightMin:1, rightMax:4, xmin, xmax, noGrid:true})});
   const _slsub=document.getElementById('sl-trend-sub');
   if(_slsub) _slsub.textContent='Within sleeve: Q1+Q2 (green) and Q4 (red)'
     + (sm?` · ${sm}-month trailing mean (raw kept faint behind)`:'');
   document.getElementById('sl-trend-method').innerHTML=methodNote(
-    `<b>Q1+Q2 %</b> (green) and <b>Q4 %</b> (red) are the top-half and bottom-quartile shares <i>within</i> the sleeve (left axis), each as a share of the sleeve’s <b>rated</b> AUM on that date — the AUM carrying a quartile — so the line is a like-for-like read even in months when part of the sleeve was too young to rank. <b>Quality score</b> (right, 1–4) is the AUM-weighted mean quartile (Q1=4…Q4=1). Recomputed live from the chosen ${universeLabel()} basis.`);
+    `<b>Q1+Q2 %</b> (green) and <b>Q4 %</b> (red) are the top-half and bottom-quartile shares <i>within</i> the sleeve (left axis), each as a share of the sleeve’s <b>rated</b> AUM on that date — the AUM carrying a quartile — so the line is a like-for-like read even in months when part of the sleeve was too young to rank. The <b>AUM-weighted quartile</b> (right axis, blue) scores every rated rupee Q1=4, Q2=3, Q3=2, Q4=1 and averages by AUM. Recomputed live from the chosen ${universeLabel()} basis.`);
 }
 // ── the ranking's tie-break chain (Kyser 2026-09-03) ────────────────────────────────────────
 // The table sorted on Q1+Q2 ALONE, with no tie-break — so the six houses tied at 100% came out
@@ -3728,7 +3776,7 @@ function sleeveRows(i){
 function renderSleeveRank(){
   const i=S.sleeve.rankDate, rows=sleeveRows(i); rows.forEach((r,idx)=>r.rank=idx+1); const n=rows.length;
   let html='<table class="rt"><thead><tr><th>#</th><th>Fund House</th><th class="num">Q1+Q2</th><th class="num">Q4</th><th class="num">Score</th><th class="num">Weight</th><th class="num">Rated</th>'
-    + '<th class="num" title="Quality score x sleeve weight - the score weighted by how much of the house this sleeve actually carries">AUM-wtd score</th></tr></thead><tbody>';
+    + '<th class="num" title="AUM-weighted quartile x sleeve weight - the quartile score weighted by how much of the house this sleeve actually carries">AUM-wtd score</th></tr></thead><tbody>';
   rows.forEach(r=>{ const cls=r.fh===S.sleeve.fh?'hl':''; const pc=r.rank===1?'r1':r.rank<=Math.ceil(n/4)?'up':r.rank>n-Math.ceil(n/4)?'dn':'';
     // a thinly-rated sleeve's Q1+Q2 rests on a small slice of its money — flag it in the row
     // itself, so the rank can never be read without the coverage that qualifies it.
@@ -3824,16 +3872,18 @@ function renderAMC(){
     data:selS.dates.map((d,i)=>({x:d,y:aTop[i]})), borderColor:C.green, borderWidth:2.8, pointRadius:0, tension:0.3 });
   dsets.push({ label:houseLabel(fh)+' Q4', yAxisID:'y', order:1, backgroundColor:'transparent',
     data:selS.dates.map((d,i)=>({x:d,y:aQ4[i]})), borderColor:C.red, borderWidth:2.4, pointRadius:0, tension:0.3 });
-  dsets.push({ label:'Quality score', yAxisID:'y1', data:dates.map((d,i)=>({x:d,y:qualityScore(byQ,i)})),
-    borderColor:C.grey, borderWidth:1.6, borderDash:[4,3], pointRadius:0, tension:0.3, order:2, backgroundColor:'transparent' });
+  dsets.push({ label:'AUM-weighted quartile', yAxisID:'y1', data:dates.map((d,i)=>({x:d,y:qualityScore(byQ,i)})),
+    borderColor:C.quartile, borderWidth:1.8, pointRadius:0, tension:0.3, order:2, backgroundColor:'transparent' });
   const adDates=houseSeries(fh,null).dates;
   const {xmin:rxmin,xmax:rxmax}=xBounds(adDates, aTop, aQ4);
   S.charts.amRank=new Chart(ctx2,{type:'line',data:{datasets:dsets},
-    options:dualOpts({leftSuffix:'%', rightLabel:'Score 1–4', rightMin:1, rightMax:4, xmin:rxmin, xmax:rxmax})});
+    options:dualOpts({leftSuffix:'%', rightLabel:'AUM-weighted quartile (Q1=4 … Q4=1)', rightMin:1, rightMax:4, xmin:rxmin, xmax:rxmax})});
   document.getElementById('am-rank-title').textContent=`${houseLabel(fh)} — Q1+Q2 (green) & Q4 (red) over time`;
-  document.getElementById('am-rank-sub').textContent=`${houseLabel(fh)} only; dashed = quality score (right axis). Hover for its percentile against every peer.`;
+  // Kyser 2026-09-04: the old subtitle ("<house> only; dashed = quality score (right axis).
+  // Hover for its percentile against every peer.") is deleted as redundant -- the title already
+  // names the house, the legend already names all three lines, and the line is no longer dashed.
   document.getElementById('am-rank-method').innerHTML=methodNote(
-    `House-wide <b>Q1+Q2 share</b> (green) and <b>Q4 share</b> (red) for <b>${houseLabel(fh)}</b> over time, each as a share of the house's whole covered AUM — the same denominator the stacked chart above uses, so the two panels read on one scale. Dashed navy (right axis) = the AUM-weighted <b>quality score</b>, Q1=4 … Q4=1. ${universeLabel()} basis, recomputed live.`);
+    `House-wide <b>Q1+Q2 share</b> (green) and <b>Q4 share</b> (red) for <b>${houseLabel(fh)}</b> over time, each as a share of the house's whole covered AUM — the same denominator the stacked chart above uses, so the two panels read on one scale. The blue line (right axis) is the <b>AUM-weighted quartile</b> — every rated rupee scored Q1=4, Q2=3, Q3=2, Q4=1, then averaged by AUM. ${universeLabel()} basis, recomputed live.`);
 
   renderAMCSummary();                     // the scheme-by-scheme table (adaptive to every toggle)
   renderComposite();                      // the industry cross-section (KPI row + mix bar)
@@ -3868,7 +3918,7 @@ function renderAMCHouseKPIs(){
     <div class="kpi qc q-q1"><div class="k-lbl">Q1 share</div><div class="k-val">${fmt.pct(q1)}</div><div class="k-sub">top quartile, of all house AUM</div></div>
     <div class="kpi qc q-q12"><div class="k-lbl">Q1+Q2 share</div><div class="k-val">${fmt.pct((q1||0)+(q2||0))}</div><div class="k-sub">top half, of <b>all</b> house AUM</div></div>
     <div class="kpi mc m-aum${covWarn?' warn':''}"><div class="k-lbl">Rated</div><div class="k-val">${fmt.pct(A.cov)}</div><div class="k-sub">of AUM is ranked · its top half = ${fmt.pct(A.top)}</div></div>
-    <div class="kpi mc m-ret"><div class="k-lbl">Quality score</div><div class="k-val">${fmt.num(score)}</div><div class="k-sub">1 → 4, AUM-weighted</div></div>
+    <div class="kpi mc m-ret"><div class="k-lbl">AUM-weighted quartile</div><div class="k-val">${fmt.num(score)}</div><div class="k-sub">Q1=4 … Q4=1</div></div>
     <div class="kpi qc q-q4"><div class="k-lbl">Q3+Q4 share</div><div class="k-val">${fmt.pct((q3||0)+(q4||0))}</div><div class="k-sub">bottom half, of all house AUM</div></div>`;
 }
 // Everything on this tab that depends on the AS-OF DATE, and nothing else. The timeline
@@ -4264,7 +4314,7 @@ function renderAMCTable(){
   const k=S.league.sortKey, dir=S.league.sortDir;
   rows.sort((a,b)=> (a[k]-b[k])*dir);   // dir=-1 => descending
   rows.forEach((r,idx)=>r.rank=idx+1); const n=rows.length;
-  const cols=[['q1','Q1'],['top','Q1+Q2'],['q4','Q4'],['score','Quality score'],['cov','Scored %'],['cr','Covered AUM']];
+  const cols=[['q1','Q1'],['top','Q1+Q2'],['q4','Q4'],['score','AUM-wtd quartile'],['cov','Scored %'],['cr','Covered AUM']];
   let html='<table class="rt"><thead><tr><th>#</th><th>Fund House</th>';
   cols.forEach(([key,lbl])=> html+=`<th class="num lg-sort" data-k="${key}" style="cursor:pointer">${lbl}${k===key?(dir<0?' ▾':' ▴'):''}</th>`);
   html+='</tr></thead><tbody>';
@@ -4279,7 +4329,7 @@ function renderAMCTable(){
 }
 function exportAMC(){
   const fh=S.amc.fh, {dates,byQ}=houseSeries(fh,null);
-  let csv='Date,Q1,Q2,Q3,Q4,Quality score\n';
+  let csv='Date,Q1,Q2,Q3,Q4,AUM-weighted quartile\n';
   dates.forEach((d,i)=>{ csv+=[d,byQ['% in Q1']?.[i]??'',byQ['% in Q2']?.[i]??'',byQ['% in Q3']?.[i]??'',byQ['% in Q4']?.[i]??'',qualityScore(byQ,i)??''].join(',')+'\n'; });
   downloadCSV(csv,`amc_${fh}_${S.universe}.csv`);
 }
@@ -6427,7 +6477,7 @@ function renderCompositeKPIs(){
   document.getElementById('cp-kpis').innerHTML=`
     <div class="kpi qc q-q1"><div class="k-lbl">Aditya Q1</div><div class="k-val">${fmt.pct(q1)}</div><div class="k-sub">top quartile</div></div>
     <div class="kpi qc q-q12"><div class="k-lbl">Aditya Q1+Q2</div><div class="k-val">${fmt.pct((q1||0)+(q2||0))}</div><div class="k-sub">top half</div></div>
-    <div class="kpi mc m-ret"><div class="k-lbl">Aditya quality score</div><div class="k-val">${fmt.num(qualityScore(byQ,i))}</div><div class="k-sub">1 → 4</div></div>
+    <div class="kpi mc m-ret"><div class="k-lbl">Aditya AUM-wtd quartile</div><div class="k-val">${fmt.num(qualityScore(byQ,i))}</div><div class="k-sub">Q1=4 … Q4=1</div></div>
     <div class="kpi qc q-q4"><div class="k-lbl">Aditya Q4</div><div class="k-val">${fmt.pct(q4)}</div><div class="k-sub">bottom quartile</div></div>`;
 }
 // Stacked histogram of ONLY the ticked quartiles, each kept in its own Q-colour (Q1 dark-green
@@ -6527,7 +6577,7 @@ function leagueData(i){
 //  leagueData(). exportLeague below survives, driven by the AMC tab's as-of date.)
 function exportLeague(){
   const i=S.amc.rankDate, rows=leagueData(i);
-  let csv='Rank,Fund House,Q1,Q1+Q2,Q4,Quality score,Scored %,Covered AUM cr,Basis,Date\n';
+  let csv='Rank,Fund House,Q1,Q1+Q2,Q4,AUM-weighted quartile,Scored %,Covered AUM cr,Basis,Date\n';
   rows.sort((a,b)=>b.top-a.top).forEach((r,idx)=>{ csv+=[idx+1,r.fh,r.q1,r.top,r.q4,r.score,r.cov,Math.round(r.cr),`"${basisDesc()}"`,curDates()[i]].join(',')+'\n'; });
   downloadCSV(csv,`league_${S.universe}_${curDates()[i]}.csv`);
 }
@@ -7315,7 +7365,7 @@ loadData();
     ws.str(r, 0, 'How to read it', S_H2); r++;
     [['1_Raw', 'One row per scheme, for EVERY category this house competes in. Columns: category, sleeve, AUM (cr), % of this house’s AUM, and the window return. Nothing here is derived — these are the inputs.'],
      ['2_Quartile', 'Rebuilds the quartile from the return, in formulas: rank within category, then the bucket sizes, then the quartile. Column N compares the result against the quartile the website publishes.'],
-     ['3_Sleeve', 'SUMIFS over 2_Quartile: for each sleeve, the % of house AUM sitting in Q1/Q2/Q3/Q4, the rated total, Q1+Q2, coverage and the quality score.'],
+     ['3_Sleeve', 'SUMIFS over 2_Quartile: for each sleeve, the % of house AUM sitting in Q1/Q2/Q3/Q4, the rated total, Q1+Q2, coverage and the AUM-weighted quartile.'],
      ['4_AMC', 'The same sums across every sleeve — the AMC Roll-up headline numbers.'],
      ['5_SchemeDetail', 'This house’s schemes only, with rank, quartile, percentile and AUM.'],
      ['6_Check', 'The workbook against the website, cell by cell. If this sheet is not clean, trust the website and tell Claude — do not use the numbers.']
@@ -7326,7 +7376,7 @@ loadData();
      ['% of house AUM', 'Each scheme’s AUM as a share of its OWN fund house’s total AUM. A house’s shares therefore never move when another house is added or removed.'],
      ['Rated AUM', 'The share of the sleeve’s AUM that actually carries a quartile on this date. A scheme too young for the window has no quartile and is excluded from the denominator.'],
      ['Q1+Q2 within sleeve', '(Q1 + Q2) divided by RATED AUM — not by the whole sleeve. Unrated AUM is excluded, never counted as a failure. Coverage is shown next to it: a sleeve that is 95% unrated can print 100% here, and the coverage column is what stops that misleading.'],
-     ['Quality score', 'AUM-weighted mean quartile over rated AUM, scoring Q1=4, Q2=3, Q3=2, Q4=1. So 4.00 is every rated rupee in Q1; 1.00 is every rated rupee in Q4.']
+     ['AUM-weighted quartile', 'AUM-weighted mean quartile over rated AUM, scoring Q1=4, Q2=3, Q3=2, Q4=1. So 4.00 is every rated rupee in Q1; 1.00 is every rated rupee in Q4.']
     ].forEach(function (kv) { ws.str(r, 0, kv[0], S_LBL); ws.str(r, 1, kv[1], S_WRAP); ws.rowH[r] = 44; r++; });
     r++;
     ws.str(r, 0, 'Floor', S_H2); r++;
@@ -7395,7 +7445,7 @@ loadData();
     sl.str(0, 0, house + ' — sleeve roll-up on ' + actual, S_H1);
     sl.str(1, 0, label + ' · ' + window_ + ' · every cell below is a SUMIFS over 2_Quartile', S_LBL);
     var shdr = ['Sleeve', 'Q1 %AUM', 'Q2 %AUM', 'Q3 %AUM', 'Q4 %AUM', 'Rated AUM', 'Sleeve weight',
-                'Coverage', 'Q1+Q2 within sleeve', 'Q4 within sleeve', 'Quality score'];
+                'Coverage', 'Q1+Q2 within sleeve', 'Q4 within sleeve', 'AUM-weighted quartile'];
     var swid = [18, 10, 10, 10, 10, 11, 11, 10, 15, 13, 12], top = 4;
     shdr.forEach(function (t, c) { sl.str(top, c, t, S_HDR); sl.width(c, c, swid[c]); });
     sleeves.forEach(function (s, k) {
@@ -7431,7 +7481,7 @@ loadData();
       ['Coverage', 'IF(B9>0,MIN(1,B8/B9),"")', S_PCT],
       ['Q1+Q2 (house)', 'IF(B8>0,(B4+B5)/B8,"")', S_PCT],
       ['Q4 (house)', 'IF(B8>0,B7/B8,"")', S_PCT],
-      ['Quality score (house)', 'IF(B8>0,(' + SCOREW[1] + '*B4+' + SCOREW[2] + '*B5+' +
+      ['AUM-weighted quartile (house)', 'IF(B8>0,(' + SCOREW[1] + '*B4+' + SCOREW[2] + '*B5+' +
         SCOREW[3] + '*B6+' + SCOREW[4] + '*B7)/B8,"")', S_NUM]
     ];
     var ar = 3;
