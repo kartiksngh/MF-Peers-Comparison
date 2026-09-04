@@ -2374,7 +2374,10 @@ const fhSort = (a,b)=> a==='Aditya'?-1 : b==='Aditya'?1 : houseLabel(a).localeCo
 // DISPLAYED string is mapped here. Anything unmapped falls through to the prefix itself, so a new
 // AMC appearing in the data shows up correctly-grouped with a plain label, never blank.
 const HOUSE_LABEL = {
-  Aditya:'Aditya Birla Sun Life', Nippon:'Nippon India', Canara:'Canara Robeco', Mirae:'Mirae Asset',
+  // Kyser 2026-09-04: "drop india from nippon and invesco - its redundant". Both simply fall
+  // through to their key, the same deliberate mechanism Franklin uses below, so there is no
+  // entry for either. The KEY is untouched -- every cube, filter and CSV still joins on it.
+  Aditya:'Aditya Birla Sun Life', Canara:'Canara Robeco', Mirae:'Mirae Asset',
   Bank:'Bank of India', Old:'Old Bridge', The:'The Wealth Company', '360':'360 ONE',
   Baroda:'Baroda BNP Paribas', BARODA:'Baroda BNP Paribas', Bandhan:'Bandhan', Motilal:'Motilal Oswal',
   // Franklin: the Templeton-prefixed scheme is FOLDED INTO Franklin by the engine's HOUSE_CANON
@@ -2386,7 +2389,7 @@ const HOUSE_LABEL = {
   WhiteOak:'WhiteOak Capital', PGIM:'PGIM India', Bajaj:'Bajaj Finserv', BHARAT:'BHARAT Bond',
   JioBlackRock:'Jio BlackRock', TRUSTMF:'TRUST MF', NJ:'NJ', ITI:'ITI', JM:'JM Financial',
   LIC:'LIC MF', UTI:'UTI', SBI:'SBI', HSBC:'HSBC', HDFC:'HDFC', ICICI:'ICICI Prudential',
-  Kotak:'Kotak Mahindra', Axis:'Axis', DSP:'DSP', Invesco:'Invesco India', Tata:'Tata',
+  Kotak:'Kotak Mahindra', Axis:'Axis', DSP:'DSP', Tata:'Tata',
 };
 function houseLabel(fh){ return HOUSE_LABEL[fh] || fh; }
 // ── PER-AMC COLOUR (Kyser 2026-09-02) ─────────────────────────────────────────────────────
