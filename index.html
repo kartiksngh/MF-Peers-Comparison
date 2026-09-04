@@ -4325,7 +4325,7 @@ function renderAMCTable(){
   document.querySelectorAll('#am-table .lg-sort').forEach(th=> th.onclick=()=>{ const key=th.dataset.k;
     if(S.league.sortKey===key) S.league.sortDir*=-1; else { S.league.sortKey=key; S.league.sortDir=-1; } renderAMCTable(); });
   document.getElementById('am-table-method').innerHTML=methodNote(
-    `The <b>${n}</b> fund houses in scope (${scopeLabel()}) on <b>${fmt.date(curDates()[i])}</b> (${basisDesc()}). Q1 / Q1+Q2 / Q4 are AUM shares of the house; <b>Quality score</b> = AUM-weighted quartile (Q1=4…Q4=1). <b>Scored %</b> = share of the house's covered AUM that actually has a quartile on this basis — below 100% when funds are too new for the window (e.g. sub-3-year NFOs on the 3Y basis). <b>Covered AUM</b> = the absolute Rs cr that is scored. Click a numeric header to re-sort. The selected house's row is highlighted.`);
+    `The <b>${n}</b> fund houses in scope (${scopeLabel()}) on <b>${fmt.date(curDates()[i])}</b> (${basisDesc()}). Q1 / Q1+Q2 / Q4 are AUM shares of the house; <b>AUM-weighted quartile</b> = every rated rupee scored Q1=4, Q2=3, Q3=2, Q4=1, averaged by AUM. <b>Scored %</b> = share of the house's covered AUM that actually has a quartile on this basis — below 100% when funds are too new for the window (e.g. sub-3-year NFOs on the 3Y basis). <b>Covered AUM</b> = the absolute Rs cr that is scored. Click a numeric header to re-sort. The selected house's row is highlighted.`);
 }
 function exportAMC(){
   const fh=S.amc.fh, {dates,byQ}=houseSeries(fh,null);
