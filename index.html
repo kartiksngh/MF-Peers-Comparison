@@ -3369,7 +3369,7 @@ function buildViews(){
             <div class="ch-right">
               <div class="fg"><label>Smooth (trailing mean)</label>
                 <div class="seg sm" id="sl-smooth"><button data-v="0" class="active">Raw</button><button data-v="3">3m</button><button data-v="6">6m</button><button data-v="12">12m</button></div></div>
-              <div class="legend"><span><span class="lline" style="background:${C.green}"></span>Q1+Q2 %</span><span><span class="lline" style="background:${C.red}"></span>Q4 %</span><span><span class="lline" style="background:${C.quartile}"></span>AUM-wtd quartile (R)</span></div>
+              <div class="legend"><span><span class="lline" style="background:${C.green}"></span>Q1+Q2 %</span><span><span class="lline" style="background:${C.red}"></span>Q4 %</span><span><span class="lline" style="background:${C.quartile}"></span>AUM-wtd %ile (R)</span></div>
             </div>
           </div>
           <div class="chartbox"><canvas id="sl-trend"></canvas></div>
@@ -3397,7 +3397,7 @@ function buildViews(){
         <div class="card-h"><div><h3 id="mx-title">Top-half share by fund house and sleeve</h3><div class="sub" id="mx-sub"></div></div>
           <div style="display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap">
             <div class="fg"><label>Metric</label>
-              <div class="seg" id="mx-metric"><button data-v="tophalf" class="active">Q1+Q2 %</button><button data-v="q4">Q4 %</button><button data-v="score">AUM-wtd quartile</button><button data-v="q1">Q1 %</button></div></div>
+              <div class="seg" id="mx-metric"><button data-v="tophalf" class="active">Q1+Q2 %</button><button data-v="q4">Q4 %</button><button data-v="pctile">AUM-wtd %ile</button><button data-v="q1">Q1 %</button></div></div>
             <div class="fg"><label>As-of date</label><select id="mx-date"></select></div>
             <button class="btn btn-dark" id="mx-exp">${icoDown()} Export CSV</button>
           </div>
@@ -3659,6 +3659,7 @@ function sleeveAt(byQ, i){
     top:R!=null?((q1||0)+(q2||0))/R:null,
     qq4:R!=null?(q4||0)/R:null };
 }
+const esc0=t=> String(t==null?'':t).replace(/"/g,'&quot;');
 function renderSleeve(){
   const D=S.data, fhSel=document.getElementById('sl-fh');
   if(!fhSel.dataset.wired){
@@ -3687,7 +3688,12 @@ function renderSleeve(){
   const norm=q=>{ const raw=byQ[q]||[]; if(mode==='amc') return raw.map(v=>v==null?null:v*100);
     return raw.map((v,i)=>{ const r=sleeveAt(byQ,i).rated; return (v==null||!r)?null:(v/r)*100; }); };
 
-  const A=sleeveAt(byQ,li), score=qualityScore(byQ,li);
+  const A=sleeveAt(byQ,li);
+  // 2026-09-05: the 1-4 quartile score card became the AUM-weighted PERCENTILE, the same measure
+  // the AMC Roll-up now shows -- but restricted to THIS sleeve's schemes (see aumPctByHouse's
+  // sleeve argument). Ranking is still against the whole category; the sleeve only chooses whose
+  // AUM is averaged, which is exactly what "within this sleeve" should mean.
+  const slPr=housePctAt(fh,li,br);
   const covWarn = (A.cov!=null && A.cov<0.999);
   const _slt=document.getElementById('sl-title');
   // House and sleeve are the ONE place two different colour systems print side by side, and
@@ -3703,7 +3709,7 @@ function renderSleeve(){
     <div class="kpi qc q-q12"><div class="k-lbl">Q1+Q2 within sleeve</div><div class="k-val">${fmt.pct(A.top)}</div><div class="k-sub">of the sleeve's <b>rated</b> AUM</div></div>
     <div class="kpi mc m-aum"><div class="k-lbl">Sleeve weight in AMC</div><div class="k-val">${fmt.pct(A.weight)}</div><div class="k-sub">of total ${fh} AUM</div></div>
     <div class="kpi mc m-aum${covWarn?' warn':''}"><div class="k-lbl">Rated</div><div class="k-val">${fmt.pct(A.cov)}</div><div class="k-sub">${covWarn?'of sleeve AUM carries a quartile':'the whole sleeve is scored'}</div></div>
-    <div class="kpi mc m-ret"><div class="k-lbl">AUM-wtd quartile score</div><div class="k-val">${fmt.num(score)}</div><div class="k-sub">1 (worst) → 4 (best)</div></div>
+    <div class="kpi mc m-ret" title="${esc0('AUM-weighted percentile: each rated fund in this sleeve is ranked inside its OWN category on this basis, turned into a percentile by (n − rank + 0.5) ÷ n × 100 — 100 is the top of the peer group, 0 the bottom, 50 the middle whatever the category size — then AUM-weighted across the sleeve. It replaces the old 1–4 quartile score.')}"><div class="k-lbl">AUM-weighted %ile</div><div class="k-val">${slPr.v==null?(slPr.loading?'…':'—'):fmt.num(slPr.v,1)}</div><div class="k-sub">100 = top of peer group · rated AUM only</div></div>
     <div class="kpi qc q-q4"><div class="k-lbl">Q4 within sleeve</div><div class="k-val">${fmt.pct(A.qq4)}</div><div class="k-sub">bottom-quartile AUM</div></div>`;
 
   document.getElementById('sl-c1-title').textContent = mode==='within'?'Quartile distribution within sleeve':'Quartile distribution as % of AMC AUM';
@@ -3731,7 +3737,10 @@ function renderSleeveTrend(){
   const {fh,br}=S.sleeve, {dates,byQ}=houseSeries(fh,br);
   const topHalf=dates.map((d,i)=>{ const A=sleeveAt(byQ,i); return {x:d,y:A.top==null?null:A.top*100}; });
   const q4=dates.map((d,i)=>{ const A=sleeveAt(byQ,i); return {x:d,y:A.qq4==null?null:A.qq4*100}; });
-  const scoreS=dates.map((d,i)=>({x:d,y:qualityScore(byQ,i)}));
+  // 2026-09-05: the right-hand line is the AUM-weighted PERCENTILE for this house-and-sleeve,
+  // not the 1-4 score. 154 dates x one sleeve is affordable because the category rank maps are
+  // memoised per DATE and shared across sleeves (categoryRankMaps).
+  const scoreS=dates.map((d,i)=>({x:d,y:housePctAt(fh,i,br).v}));
   const {xmin,xmax}=xBounds(dates, topHalf.map(p=>p.y), q4.map(p=>p.y));
   const ctx=document.getElementById('sl-trend').getContext('2d');
   S.charts.slTrend?.destroy();
@@ -3741,15 +3750,15 @@ function renderSleeveTrend(){
   const base=[
     { label:'Q1+Q2 %', data:topHalf, borderColor:C.green, borderWidth:2.2, tension:0.3, pointRadius:0, yAxisID:'y', backgroundColor:c=>gradient(c.chart.ctx,c.chart.chartArea,C.green,0.16,0.01), fill:true },
     { label:'Q4 %', data:q4, borderColor:C.red, borderWidth:2.2, tension:0.3, pointRadius:0, yAxisID:'y', fill:false },
-    { label:'AUM-weighted quartile', data:scoreS, borderColor:C.quartile, borderWidth:1.8, tension:0.3, pointRadius:0, yAxisID:'y1', fill:false }
+    { label:'AUM-weighted %ile', data:scoreS, borderColor:C.quartile, borderWidth:1.8, tension:0.3, pointRadius:0, yAxisID:'y1', fill:false, spanGaps:true }
   ];
   S.charts.slTrend=new Chart(ctx,{type:'line',data:{datasets:smoothSeries(base, sm)},
-    options:dualOpts({leftSuffix:'%', rightLabel:'AUM-weighted quartile (Q1=4 … Q4=1)', rightMin:1, rightMax:4, xmin, xmax, noGrid:true})});
+    options:dualOpts({leftSuffix:'%', rightLabel:'AUM-weighted percentile (0–100)', rightMin:0, rightMax:100, xmin, xmax, noGrid:true})});
   const _slsub=document.getElementById('sl-trend-sub');
   if(_slsub) _slsub.textContent='Within sleeve: Q1+Q2 (green) and Q4 (red)'
     + (sm?` · ${sm}-month trailing mean (raw kept faint behind)`:'');
   document.getElementById('sl-trend-method').innerHTML=methodNote(
-    `<b>Q1+Q2 %</b> (green) and <b>Q4 %</b> (red) are the top-half and bottom-quartile shares <i>within</i> the sleeve (left axis), each as a share of the sleeve’s <b>rated</b> AUM on that date — the AUM carrying a quartile — so the line is a like-for-like read even in months when part of the sleeve was too young to rank. The <b>AUM-weighted quartile</b> (right axis, blue) scores every rated rupee Q1=4, Q2=3, Q3=2, Q4=1 and averages by AUM. Recomputed live from the chosen ${universeLabel()} basis.`);
+    `<b>Q1+Q2 %</b> (green) and <b>Q4 %</b> (red) are the top-half and bottom-quartile shares <i>within</i> the sleeve (left axis), each as a share of the sleeve’s <b>rated</b> AUM on that date — the AUM carrying a quartile — so the line is a like-for-like read even in months when part of the sleeve was too young to rank. The <b>AUM-weighted percentile</b> (right axis, blue) is a different and finer reading: each rated fund in the sleeve is ranked <i>inside its own category</i> (convention (rank−0.5)÷n, so a category's average is 50 whatever its size), and those percentiles are AUM-weighted across the sleeve — <b>100 = the top of the peer group</b>, 0 the bottom. It replaced the old 1–4 quartile score, which could not tell a rank-1 fund from a rank-9 fund once both were in Q1. Recomputed live from the chosen ${universeLabel()} basis.`);
 }
 // ── the ranking's tie-break chain (Kyser 2026-09-03) ────────────────────────────────────────
 // The table sorted on Q1+Q2 ALONE, with no tie-break — so the six houses tied at 100% came out
@@ -3758,7 +3767,8 @@ function renderSleeveTrend(){
 // Ties now fall down an explicit chain, and each step is a real claim about which house is
 // better, not a convenience:
 //   1. Q1+Q2 share        the headline — most of the sleeve's rated money in the top half
-//   2. quality score       HOW good that top half is; Q1 money beats Q2 money at the same Q1+Q2
+//   2. AUM-wtd %ile        HOW good that top half is; at the same Q1+Q2, better ranks win
+//                          (was the 1-4 quality score until 2026-09-05 -- same role, finer measure)
 //   3. Q4 share, INVERTED  less money in the bottom quartile is better ("inverse of Q4")
 //   4. AUM-weighted score  a strong sleeve carrying more of the house counts for more
 //   5. house name          so the order is deterministic and cannot reshuffle between renders
@@ -3776,11 +3786,12 @@ function sleeveRankCmp(a, b){
 }
 function sleeveRows(i){
   return housesPresent(S.sleeve.br).map(fh=>{ const {byQ}=houseSeries(fh,S.sleeve.br); const A=sleeveAt(byQ,i);
-    const sc=qualityScore(byQ,i), w=A.weight||0;
-    // AUM-weighted score = the sleeve's quality score TIMES how much of the house it carries.
-    // "Score" on its own is already AUM-weighted INSIDE the sleeve, so it says nothing about
-    // whether the sleeve is 3% or 24% of the house. This does: a 4.00 on 3.1% of the house is
-    // 0.12, a 3.97 on 24.2% is 0.96 — the second is eight times the firm-level bet.
+    const sc=housePctAt(fh,i,S.sleeve.br).v, w=A.weight||0;
+    // %ile x weight = the sleeve's percentile TIMES how much of the house it carries.
+    // The percentile on its own is already AUM-weighted INSIDE the sleeve, so it says nothing
+    // about whether the sleeve is 3% or 24% of the house. This does: an 86.6 on 3.1% of the house
+    // is 2.7, an 84.0 on 24.2% is 20.3 — the second is roughly eight times the firm-level bet.
+    // (Was quality score x weight until 2026-09-05; same construction, percentile in place of 1-4.)
     return { fh, topShare:A.top, weight:w, q4:A.qq4, cov:A.cov, score:sc,
              wscore: sc==null ? null : sc*w }; })
     // a house with weight but NO rated AUM has no top-half share to rank on — it is excluded from
@@ -3789,17 +3800,17 @@ function sleeveRows(i){
 }
 function renderSleeveRank(){
   const i=S.sleeve.rankDate, rows=sleeveRows(i); rows.forEach((r,idx)=>r.rank=idx+1); const n=rows.length;
-  let html='<table class="rt"><thead><tr><th>#</th><th>Fund House</th><th class="num">Q1+Q2</th><th class="num">Q4</th><th class="num">Score</th><th class="num">Weight</th><th class="num">Rated</th>'
-    + '<th class="num" title="AUM-weighted quartile x sleeve weight - the quartile score weighted by how much of the house this sleeve actually carries">AUM-wtd score</th></tr></thead><tbody>';
+  let html='<table class="rt"><thead><tr><th>#</th><th>Fund House</th><th class="num">Q1+Q2</th><th class="num">Q4</th><th class="num" title="AUM-weighted percentile within this sleeve: each rated fund ranked inside its own category, (n - rank + 0.5)/n x 100, AUM-weighted. 100 = top of the peer group.">AUM-wtd %ile</th><th class="num">Weight</th><th class="num">Rated</th>'
+    + '<th class="num" title="AUM-weighted percentile x sleeve weight - the percentile scaled by how much of the house this sleeve actually carries">%ile x weight</th></tr></thead><tbody>';
   rows.forEach(r=>{ const cls=r.fh===S.sleeve.fh?'hl':''; const pc=r.rank===1?'r1':r.rank<=Math.ceil(n/4)?'up':r.rank>n-Math.ceil(n/4)?'dn':'';
     // a thinly-rated sleeve's Q1+Q2 rests on a small slice of its money — flag it in the row
     // itself, so the rank can never be read without the coverage that qualifies it.
     const thin=(r.cov!=null && r.cov<0.9);
-    html+=`<tr class="${cls}"><td><span class="pill ${pc}">${r.rank}</span></td><td class="lbl">${houseLabel(r.fh)}</td><td class="num">${fmt.pct(r.topShare)}</td><td class="num">${fmt.pct(r.q4)}</td><td class="num">${fmt.num(r.score)}</td><td class="num">${fmt.pct(r.weight)}</td><td class="num${thin?' warn':''}"${thin?' title="only this share of the sleeve carries a quartile on this basis — the Q1+Q2 beside it is a share of that slice, not of the whole sleeve"':''}>${fmt.pct(r.cov)}</td><td class="num">${r.wscore==null?'—':fmt.num(r.wscore)}</td></tr>`; });
+    html+=`<tr class="${cls}"><td><span class="pill ${pc}">${r.rank}</span></td><td class="lbl">${houseLabel(r.fh)}</td><td class="num">${fmt.pct(r.topShare)}</td><td class="num">${fmt.pct(r.q4)}</td><td class="num">${r.score==null?'—':fmt.num(r.score,1)}</td><td class="num">${fmt.pct(r.weight)}</td><td class="num${thin?' warn':''}"${thin?' title="only this share of the sleeve carries a quartile on this basis — the Q1+Q2 beside it is a share of that slice, not of the whole sleeve"':''}>${fmt.pct(r.cov)}</td><td class="num">${r.wscore==null?'—':fmt.num(r.wscore,1)}</td></tr>`; });
   html+='</tbody></table>';
   document.getElementById('sl-rank').innerHTML=html;
   document.getElementById('sl-rank-method').innerHTML=methodNote(
-    `The fund houses in scope (${scopeLabel()}) ranked by <b>Q1+Q2 share within the ${S.sleeve.br} sleeve</b> on <b>${fmt.date(curDates()[i])}</b> (${basisDesc()}), with ties broken in order by <b>Score</b>, then by <b>Q4 inverted</b> (less bottom-quartile money ranks higher), then by <b>AUM-weighted score</b>, then by name so the order never reshuffles between renders. “Score” = AUM-weighted quartile (1–4) <i>within</i> the sleeve; “Weight” = sleeve size in each house; <b>“AUM-wtd score” = Score × Weight</b> — the same quality reading scaled by how much of the house rides on this sleeve, so a 4.00 on 3% of a house (0.12) is not read as the equal of a 3.97 on 24% (0.96). <b>Rated</b> = the share of that sleeve's AUM that actually carries a quartile on this basis, and is the <b>denominator of the Q1+Q2 and Q4 columns</b> — a house showing 100% Q1+Q2 on 30% Rated has its top half measured on 30% of its sleeve money, the rest being funds too young for the window. A house whose sleeve has no rated AUM at all is left out of the ranking rather than shown at 0%.`);
+    `The fund houses in scope (${scopeLabel()}) ranked by <b>Q1+Q2 share within the ${S.sleeve.br} sleeve</b> on <b>${fmt.date(curDates()[i])}</b> (${basisDesc()}), with ties broken in order by <b>AUM-wtd %ile</b>, then by <b>Q4 inverted</b> (less bottom-quartile money ranks higher), then by <b>%ile × weight</b>, then by name so the order never reshuffles between renders. <b>AUM-wtd %ile</b> = each rated fund in the sleeve ranked <i>inside its own category</i> ((rank−0.5)÷n, so a category's average is 50 whatever its size), AUM-weighted across the sleeve — <b>100 = the top of the peer group</b>; it replaced the old 1–4 quartile score on 2026-09-05. “Weight” = sleeve size in each house; <b>“%ile × weight”</b> is that percentile scaled by how much of the house rides on this sleeve, so an 86.6 on 3% of a house (2.7) is not read as the equal of an 84.0 on 24% (20.3). <b>Rated</b> = the share of that sleeve's AUM that actually carries a quartile on this basis, and is the <b>denominator of the Q1+Q2 and Q4 columns</b> — a house showing 100% Q1+Q2 on 30% Rated has its top half measured on 30% of its sleeve money, the rest being funds too young for the window. A house whose sleeve has no rated AUM at all is left out of the ranking rather than shown at 0%.`);
 }
 function renderSleeveBar(){
   const i=S.sleeve.rankDate, rows=sleeveRows(i);
@@ -3946,6 +3957,9 @@ function renderAMCHouseKPIs(){
   // "Rated" lost its card to keep the row at the six items Kyser asked for, but it is the number
   // that RECONCILES this row with the table below (see the note above), so it moves up into the
   // context line rather than off the page — still on screen, still amber when it is below 100%.
+  // `esc` is a LOCAL const in renderAMCSummary, not a global -- calling it from here threw and
+  // blanked the tab (caught by _verify/rollup6_probe.js, 2026-09-05). Declare our own.
+  const esc=t=> String(t==null?'':t).replace(/"/g,'&quot;');
   const ratedTip='Rated = the share of this house’s AUM that actually carries a quartile on this basis. '
     +'The four quartile cards below are shares of ALL house AUM, so they sum to exactly this number, and it is '
     +'the same figure the league table shows as “Scored %”. Unrated money therefore dilutes every card; the '
@@ -4381,8 +4395,12 @@ function renderAMCTable(){
 }
 function exportAMC(){
   const fh=S.amc.fh, {dates,byQ}=houseSeries(fh,null);
-  let csv='Date,Q1,Q2,Q3,Q4,AUM-weighted quartile\n';
-  dates.forEach((d,i)=>{ csv+=[d,byQ['% in Q1']?.[i]??'',byQ['% in Q2']?.[i]??'',byQ['% in Q3']?.[i]??'',byQ['% in Q4']?.[i]??'',qualityScore(byQ,i)??''].join(',')+'\n'; });
+  // 2026-09-05: converted with the panels. This CSV sits on the AMC Roll-up tab and was the last
+  // export there still carrying the 1-4 score, so a reader who exported it got a different measure
+  // from the one on screen. It now ships the percentile the tab displays.
+  let csv='Date,Q1,Q2,Q3,Q4,AUM-weighted %ile (100=best)\n';
+  dates.forEach((d,i)=>{ const pv=housePctAt(fh,i).v;
+    csv+=[d,byQ['% in Q1']?.[i]??'',byQ['% in Q2']?.[i]??'',byQ['% in Q3']?.[i]??'',byQ['% in Q4']?.[i]??'',pv==null?'':pv.toFixed(4)].join(',')+'\n'; });
   downloadCSV(csv,`amc_${fh}_${S.universe}.csv`);
 }
 
@@ -4670,20 +4688,43 @@ function buildCategoryRanks(members, cat, i){
 // once. A VR scheme is weighted ONCE via its HOME record (never double-counted through a widened
 // set), but ranking uses ALL peers in a category including borrowed ones -- exactly as
 // computeStanding does. Triggers the lazy rank fetch and reports `loading` so the UI can wait.
-let _PCTMEMO={sig:null, byI:new Map()};
-function aumPctByHouse(i){
+// ── 2026-09-05: SLEEVE-AWARE, and the rank maps are now shared. ─────────────────────────────
+// The percentile replaced the 1-4 quartile score everywhere it was drawn (Kyser), which means the
+// SLEEVE panels ask for it too -- and the sleeve trend chart asks 154 times, once per date. Ranking
+// is a CATEGORY question and has nothing to do with sleeves, so building a category's rank map once
+// per (date, sleeve) would have redone identical work five times over. The rank maps are therefore
+// memoised on the date alone (_RANKMEMO) and only the WEIGHTING loop is redone per sleeve
+// (_PCTMEMO, keyed date|sleeve). A fund is still ranked against its whole category; the sleeve only
+// decides whose AUM goes into the average.
+let _RANKMEMO={sig:null, byI:new Map()};
+function categoryRankMaps(i){
   if(RWOF[S.basis] && !standingSrc()) fetchStanding();   // raw window needs the shipped ranks
   const sig=_globalSig();
-  if(_PCTMEMO.sig!==sig) _PCTMEMO={sig, byI:new Map()};
-  if(_PCTMEMO.byI.has(i)) return _PCTMEMO.byI.get(i);
+  if(_RANKMEMO.sig!==sig) _RANKMEMO={sig, byI:new Map()};
+  if(_RANKMEMO.byI.has(i)) return _RANKMEMO.byI.get(i);
   const vr=S.universe==='vr', pool=(vr?S.data.vr:S.data.allpeer)||[];
   const byCat=new Map();
   pool.forEach(m=>{ if(BADCAT(m.c)) return; let a=byCat.get(m.c); if(!a){a=[];byCat.set(m.c,a);} a.push(m); });
   const rankMaps=new Map(); let loading=false;
   byCat.forEach((members,cat)=>{ const rk=buildCategoryRanks(members,cat,i);
     if(rk===null){ loading=true; return; } rankMaps.set(cat,{ranks:rk, n:rk.size}); });
+  const res={rankMaps, loading, pool, vr};
+  // a half-built map (ranks still in flight) must NOT be cached, or the panel would stay empty
+  // for the rest of the session after the fetch lands
+  if(!loading) _RANKMEMO.byI.set(i,res);
+  return res;
+}
+let _PCTMEMO={sig:null, byK:new Map()};
+// sleeve === null/undefined -> the whole house; otherwise only that sleeve's schemes are weighted.
+function aumPctByHouse(i, sleeve){
+  const sig=_globalSig(), key=i+'|'+(sleeve||'');
+  if(_PCTMEMO.sig!==sig) _PCTMEMO={sig, byK:new Map()};
+  if(_PCTMEMO.byK.has(key)) return _PCTMEMO.byK.get(key);
+  const {rankMaps, loading, pool, vr}=categoryRankMaps(i);
   const acc=new Map(), seen=new Set();
-  const record=(m)=>{ if(seen.has(m.s)) return; const rm=rankMaps.get(m.c); if(!rm||!rm.n) return;
+  const record=(m)=>{ if(seen.has(m.s)) return;
+    if(sleeve && m.sl!==sleeve) return;                            // sleeve filter (m.sl === sleeve.br)
+    const rm=rankMaps.get(m.c); if(!rm||!rm.n) return;
     const rk=rm.ranks.get(m); if(rk==null) return;                 // unrated: excluded both sides
     const aum=m.cr?m.cr[i]:null; if(aum==null||aum<=0) return;      // no AUM: cannot weight
     seen.add(m.s);
@@ -4695,10 +4736,25 @@ function aumPctByHouse(i){
   } else pool.forEach(record);
   const out=new Map(); acc.forEach((v,fh)=>{ if(v.den>0) out.set(fh, v.num/v.den); });
   const res={pct:out, loading};
-  _PCTMEMO.byI.set(i,res);
+  if(!loading) _PCTMEMO.byK.set(key,res);
   return res;
 }
-function housePctAt(fh,i){ const r=aumPctByHouse(i); return { v:(r.pct.has(fh)?r.pct.get(fh):null), loading:r.loading }; }
+function housePctAt(fh,i,sleeve){ const r=aumPctByHouse(i,sleeve); return { v:(r.pct.has(fh)?r.pct.get(fh):null), loading:r.loading }; }
+// One house's schemes -> {rank, n} inside their own category at date i, off the SAME rank maps the
+// percentile is built from. Exported to the Excel workbook so 6_Check can show, per scheme, where
+// its own COUNTIFS rebuild lands on a different rank from the engine (2-dp published returns vs
+// full precision) -- which is the only thing that can make the workbook's percentile differ.
+function schemeRanksAt(fh,i){
+  const {rankMaps, loading, pool, vr}=categoryRankMaps(i);
+  const out={};
+  const take=(m)=>{ if(m.h!==fh) return; const rm=rankMaps.get(m.c); if(!rm||!rm.n) return;
+    const rk=rm.ranks.get(m); if(rk==null) return; if(out[m.s]) return; out[m.s]={rank:rk, n:rm.n}; };
+  if(vr){ const home=new Map();
+    pool.forEach(m=>{ if(!home.has(m.s)) home.set(m.s, vrHomeRec(m.s)||m); });
+    home.forEach(take);
+  } else pool.forEach(take);
+  return {ranks:out, loading};
+}
 
 // All the numbers behind the standing card, for scheme `name` at as-of index i.
 // Returns {state:'ok', ...} or a non-ok state: 'nocat' (no mapped category),
@@ -6426,7 +6482,10 @@ function renderMatrix(){
 }
 function matrixValue(fh,br,i,metric){
   const {byQ}=houseSeries(fh,br); const w=byQ[WEIGHT_QT]?.[i]||0; if(!w) return null;
-  if(metric==='score') return qualityScore(byQ,i);
+  // 2026-09-05: 'score' (the 1-4 quartile) became 'pctile' (the AUM-weighted percentile, 100 =
+  // best), restricted to this house-and-sleeve. The old key is aliased so a stale UI state or a
+  // saved link cannot land on a metric that no longer exists and render an empty grid.
+  if(metric==='score'||metric==='pctile') return housePctAt(fh,i,br).v;
   if(metric==='q1') return (byQ['% in Q1']?.[i]||0)/w;
   if(metric==='q4') return (byQ['% in Q4']?.[i]||0)/w;
   return ((byQ['% in Q1']?.[i]||0)+(byQ['% in Q2']?.[i]||0))/w;
@@ -6483,8 +6542,8 @@ const _INK_LUM = (function(){ const n = parseInt(C.ink.slice(1), 16);
   return 0.2126*_s2l((n>>16)&255) + 0.7152*_s2l((n>>8)&255) + 0.0722*_s2l(n&255); })();
 function renderMatrixGrid(){
   const {metric,date:i}=S.matrix, brs=sleevesPresent(), fhs=housesPresent(null).sort(fhSort);
-  const isScore=metric==='score', q4=metric==='q4';
-  const titles={tophalf:'Top-half share (Q1+Q2) by fund house and sleeve',q4:'Bottom-quartile (Q4) share by fund house and sleeve',score:'AUM-weighted quartile score by fund house and sleeve',q1:'Q1 share by fund house and sleeve'};
+  const isScore=(metric==='pctile'||metric==='score'), q4=metric==='q4';
+  const titles={tophalf:'Top-half share (Q1+Q2) by fund house and sleeve',q4:'Bottom-quartile (Q4) share by fund house and sleeve',pctile:'AUM-weighted percentile (100 = best) by fund house and sleeve',score:'AUM-weighted percentile (100 = best) by fund house and sleeve',q1:'Q1 share by fund house and sleeve'};
   document.getElementById('mx-title').textContent=titles[metric];
   document.getElementById('mx-sub').textContent=`${basisDesc()} · ${fmt.date(curDates()[i])}`;
   document.getElementById('mx-ctx').innerHTML=`${basisDesc()}<br>${fmt.date(curDates()[i])}`;
@@ -6494,9 +6553,21 @@ function renderMatrixGrid(){
   // "Other" sleeve rendered a full column of dots under VR). Dynamic on purpose — a sleeve
   // that gains data in another universe/date reappears by itself; no name is hardcoded.
   const brsShown=brs.filter(br=> fhs.some(fh=> cells[fh+'|'+br]!=null));
+  // ── the percentile's COLOUR DOMAIN (Kyser 2026-09-05) ────────────────────────────────────
+  // The 1-4 score used a FIXED domain, (v-1)/3, not a min-max stretch of the data. The percentile
+  // keeps that choice and re-domains it to its own natural range: v/100. Two reasons it must be
+  // absolute and not data-driven. (1) A min-max stretch would repaint the whole grid every time
+  // the best or worst house moved, so the same 62 could be green one month and amber the next.
+  // (2) With a stretch, the BEST cell is always full green and the worst always full red however
+  // tightly the houses are bunched -- which is exactly the "every house turns green" failure.
+  // The midpoint is what makes the ramp readable, and it lands where it should: 50 -> t = 0.5,
+  // the same t the old 2.5 produced, i.e. the neutral gold-to-pale-jade junction of HEAT_STOPS.
+  // Asserted, not assumed: _verify/rollup6_heatmap.js checks heatColor(norm(50)) === heatColor(0.5),
+  // that it is neither the ramp's greenest nor its reddest end, and that G-R rises monotonically
+  // along the ramp so "greener = better" is a measurable claim rather than an impression.
   // for Q4, low is good → invert color scale
-  const norm=v=> v==null?null : isScore?(v-1)/3 : q4?(mx>mn?1-(v-mn)/(mx-mn):0.5) : (mx>mn?(v-mn)/(mx-mn):0.5);
-  const disp=v=> v==null?'·' : isScore?v.toFixed(2):(v*100).toFixed(0)+'%';
+  const norm=v=> v==null?null : isScore?v/100 : q4?(mx>mn?1-(v-mn)/(mx-mn):0.5) : (mx>mn?(v-mn)/(mx-mn):0.5);
+  const disp=v=> v==null?'·' : isScore?v.toFixed(1):(v*100).toFixed(0)+'%';
   let html='<table class="rt"><thead><tr><th>Fund House</th>'; brsShown.forEach(b=>html+=`<th class="num">${b}</th>`); html+='</tr></thead><tbody>';
   fhs.forEach(fh=>{ const cls=fh===S.amc.fh?'hl':''; html+=`<tr class="${cls}"><td class="lbl">${houseLabel(fh)}</td>`;
     brsShown.forEach(br=>{ const v=cells[fh+'|'+br]; const t=norm(v); const bg=v==null?'transparent':heatColor(t); const col=v==null?C.ink4:heatInk(bg);
@@ -6504,7 +6575,7 @@ function renderMatrixGrid(){
   html+='</tbody></table>';
   document.getElementById('mx-grid').innerHTML=html;
   document.getElementById('mx-method').innerHTML=methodNote(
-    isScore ? `Each cell = <b>AUM-weighted quartile score</b> (Q1=4…Q4=1) for that house's sleeve on <b>${fmt.date(curDates()[i])}</b> (${basisDesc()}). Greener = more AUM with top performers.`
+    isScore ? `Each cell = the <b>AUM-weighted percentile</b> of that house's sleeve on <b>${fmt.date(curDates()[i])}</b> (${basisDesc()}): every rated fund in the sleeve is ranked <i>inside its own category</i> ((rank−0.5)÷n, so a category's average is 50 whatever its size), then AUM-weighted. <b>100 = the top of the peer group</b>, 0 the bottom, 50 the middle. The colour scale is <b>fixed to 0–100</b>, not stretched to the best and worst cell on screen — so a given number is always the same colour, 50 always reads neutral, and a month when every house is bunched together does not paint them all green. Greener = better. Empty = no AUM in that sleeve.`
     : `Each cell = <b>${metric==='q1'?'Q1':metric==='q4'?'Q4':'Q1+Q2'} share within the sleeve</b> on <b>${fmt.date(curDates()[i])}</b> (${basisDesc()}). ${q4?'Lower is better, so green = low Q4.':'Green = strong, red = weak.'} Empty = no AUM in that sleeve. The selected house's row is highlighted.`);
 }
 function exportMatrix(){
@@ -7393,7 +7464,6 @@ loadData();
     '1 Year':  ['aq1y', 'q1y', '1 Year'],  '2 Year': ['aq24m', 'q24m', '2 Year'],
     '3 Year':  ['aq3y', 'q3y', '3 Year']
   };
-  var SCOREW = { 1: 4, 2: 3, 3: 2, 4: 1 };
 
   function at(arr, i) {
     if (!arr) return null;
@@ -7458,6 +7528,12 @@ loadData();
   function build(opts) {
     var data = opts.data, rets = opts.returns, house = opts.house,
         universe = opts.universe, window_ = opts.window;
+    // 2026-09-05: the page hands over the AUM-weighted percentiles it is displaying. They are NOT
+    // used to fill any workbook cell -- every percentile below is rebuilt from 2_Quartile's own
+    // ranks -- they are only the WEBSITE SIDE of the 6_Check comparison, exactly like the
+    // published Q1+Q2 series already is. A workbook that copied the number it claims to verify
+    // would be grading itself.
+    var pageP = opts.pctile || { house: null, bySleeve: {} };
     var R = buildRows(data, rets, house, universe, window_, opts.date);
     var rows = R.rows, actual = R.actual, di = R.di;
     var label = (universe === 'vr') ? 'Exact Peers (VR)' : 'All Peers (MFI)';
@@ -7487,9 +7563,9 @@ loadData();
     ws.str(r, 0, 'How to read it', S_H2); r++;
     [['1_Raw', 'One row per scheme, for EVERY category this house competes in. Columns: category, sleeve, AUM (cr), % of this house’s AUM, and the window return. Nothing here is derived — these are the inputs.'],
      ['2_Quartile', 'Rebuilds the quartile from the return, in formulas: rank within category, then the bucket sizes, then the quartile. Column N compares the result against the quartile the website publishes.'],
-     ['3_Sleeve', 'SUMIFS over 2_Quartile: for each sleeve, the % of house AUM sitting in Q1/Q2/Q3/Q4, the rated total, Q1+Q2, coverage and the AUM-weighted quartile.'],
+     ['3_Sleeve', 'SUMIFS over 2_Quartile: for each sleeve, the % of house AUM sitting in Q1/Q2/Q3/Q4, the rated total, Q1+Q2, coverage and the AUM-weighted percentile (100 = best).'],
      ['4_AMC', 'The same sums across every sleeve — the AMC Roll-up headline numbers.'],
-     ['5_SchemeDetail', 'This house’s schemes only, with rank, quartile, percentile and AUM.'],
+     ['5_SchemeDetail', 'This house’s schemes only, with rank in category, percentile (100 = best), quartile and AUM.'],
      ['6_Check', 'The workbook against the website, cell by cell. If this sheet is not clean, trust the website and tell Claude — do not use the numbers.']
     ].forEach(function (kv) { ws.str(r, 0, kv[0], S_LBL); ws.str(r, 1, kv[1], S_WRAP); ws.rowH[r] = 30; r++; });
     r++;
@@ -7498,7 +7574,8 @@ loadData();
      ['% of house AUM', 'Each scheme’s AUM as a share of its OWN fund house’s total AUM. A house’s shares therefore never move when another house is added or removed.'],
      ['Rated AUM', 'The share of the sleeve’s AUM that actually carries a quartile on this date. A scheme too young for the window has no quartile and is excluded from the denominator.'],
      ['Q1+Q2 within sleeve', '(Q1 + Q2) divided by RATED AUM — not by the whole sleeve. Unrated AUM is excluded, never counted as a failure. Coverage is shown next to it: a sleeve that is 95% unrated can print 100% here, and the coverage column is what stops that misleading.'],
-     ['AUM-weighted quartile', 'AUM-weighted mean quartile over rated AUM, scoring Q1=4, Q2=3, Q3=2, Q4=1. So 4.00 is every rated rupee in Q1; 1.00 is every rated rupee in Q4.']
+     ['AUM-weighted percentile', 'ONE convention everywhere in this workbook and on the website: 100 = the top of the peer group, 0 = the bottom, 50 = the middle. A scheme’s percentile is 100 x (n - rank + 0.5) / n on its rank inside its OWN category, so a category’s average is exactly 50 however many funds it holds; a sleeve’s or a house’s is the AUM-weighted mean of those, over rated AUM only. It replaced the old 1-4 AUM-weighted quartile score (Q1=4...Q4=1) on 2026-09-05, which could not tell the best fund in a category from the ninth once both sat in Q1.'],
+     ['Rank vs percentile', 'If you want a RANK, use "Rank in category" on 5_SchemeDetail — 1 is best, and it counts places. The percentile column beside it is the other direction on purpose: 100 is best. Until 2026-09-05 a column headed "Percentile (1 = best)" held rank/n, which pointed the opposite way to the website under nearly the same name; that column is gone.']
     ].forEach(function (kv) { ws.str(r, 0, kv[0], S_LBL); ws.str(r, 1, kv[1], S_WRAP); ws.rowH[r] = 44; r++; });
     r++;
     ws.str(r, 0, 'Floor', S_H2); r++;
@@ -7529,7 +7606,8 @@ loadData();
     [['Scheme', 52], ['Category', 26], ['Return %', 11], ['OrigIdx', 9], ['n rated in category', 11],
      ['Rank (1 = best)', 11], ['base = INT(n/4)', 11], ['extra = MOD(n,4)', 11], ['cut Q1', 9],
      ['cut Q2', 9], ['cut Q3', 9], ['Quartile (computed)', 11], ['Quartile (website)', 11],
-     ['Agree?', 11]].forEach(function (t, c) { q.str(0, c, t[0], S_HDR); q.width(c, c, t[1]); });
+     ['Agree?', 11], ['Percentile (100 = best)', 14], ['Percentile, 0 if unrated', 14]
+    ].forEach(function (t, c) { q.str(0, c, t[0], S_HDR); q.width(c, c, t[1]); });
     var RC = "'1_Raw'!$C$2:$C$" + last, RG = "'1_Raw'!$G$2:$G$" + last, RH = "'1_Raw'!$H$2:$H$" + last;
     for (i = 1; i <= nrow; i++) {
       var rr = i + 1;
@@ -7554,11 +7632,20 @@ loadData();
          arrive as 0, be compared against the computed "", and report MISMATCH on every one. */
       q.f(i, 12, 'IF(ISBLANK(\'1_Raw\'!I' + rr + '),"",\'1_Raw\'!I' + rr + ')', S_INT);
       q.f(i, 13, 'IF(AND(L' + rr + '="",M' + rr + '=""),"not rated",IF(L' + rr + '=M' + rr + ',"OK","MISMATCH"))', S_TXT);
+      /* THE percentile, and the only place it is defined in this workbook: 100*(n - rank + 0.5)/n
+         on the rank in column F and the rated count in column E, so 100 is the best fund in the
+         category, 0 the worst and 50 the middle whatever n is. Identical convention to the deck.
+         Column P is the same number with 0 in place of "" so it can go straight into SUMPRODUCT
+         (a text "" in an array multiplication is #VALUE!); the (F<>"") mask is what keeps the
+         unrated schemes out of both the numerator and the denominator. */
+      q.f(i, 14, 'IF(OR(F' + rr + '="",E' + rr + '=0),"",100*(E' + rr + '-F' + rr + '+0.5)/E' + rr + ')', S_NUM);
+      q.f(i, 15, 'IF(OR(F' + rr + '="",E' + rr + '=0),0,100*(E' + rr + '-F' + rr + '+0.5)/E' + rr + ')', S_NUM);
     }
     q.cf = { sqref: 'N2:N' + last, text: 'MISMATCH', first: 'N2' };
 
     var QL = "'2_Quartile'!$L$2:$L$" + last, RB = "'1_Raw'!$B$2:$B$" + last,
-        RD = "'1_Raw'!$D$2:$D$" + last, RF = "'1_Raw'!$F$2:$F$" + last;
+        RD = "'1_Raw'!$D$2:$D$" + last, RF = "'1_Raw'!$F$2:$F$" + last,
+        QF = "'2_Quartile'!$F$2:$F$" + last, QP = "'2_Quartile'!$P$2:$P$" + last;
     var hq = String(house).replace(/"/g, '""');   // a house name with a quote would break SUMIFS
 
     /* ---------------------------------------------------------------- 3_Sleeve ------------ */
@@ -7567,8 +7654,8 @@ loadData();
     sl.str(0, 0, house + ' — sleeve roll-up on ' + actual, S_H1);
     sl.str(1, 0, label + ' · ' + window_ + ' · every cell below is a SUMIFS over 2_Quartile', S_LBL);
     var shdr = ['Sleeve', 'Q1 %AUM', 'Q2 %AUM', 'Q3 %AUM', 'Q4 %AUM', 'Rated AUM', 'Sleeve weight',
-                'Coverage', 'Q1+Q2 within sleeve', 'Q4 within sleeve', 'AUM-weighted quartile'];
-    var swid = [18, 10, 10, 10, 10, 11, 11, 10, 15, 13, 12], top = 4;
+                'Coverage', 'Q1+Q2 within sleeve', 'Q4 within sleeve', 'AUM-wtd %ile (100 = best)'];
+    var swid = [18, 10, 10, 10, 10, 11, 11, 10, 15, 13, 20], top = 4;
     shdr.forEach(function (t, c) { sl.str(top, c, t, S_HDR); sl.width(c, c, swid[c]); });
     sleeves.forEach(function (s, k) {
       var rr = top + k + 2, ii = top + k + 1, qn;
@@ -7581,8 +7668,12 @@ loadData();
       sl.f(ii, 7, 'IF(G' + rr + '>0,MIN(1,F' + rr + '/G' + rr + '),"")', S_PCT);
       sl.f(ii, 8, 'IF(F' + rr + '>0,(B' + rr + '+C' + rr + ')/F' + rr + ',"")', S_PCT);
       sl.f(ii, 9, 'IF(F' + rr + '>0,E' + rr + '/F' + rr + ',"")', S_PCT);
-      sl.f(ii, 10, 'IF(F' + rr + '>0,(' + SCOREW[1] + '*B' + rr + '+' + SCOREW[2] + '*C' + rr + '+' +
-                   SCOREW[3] + '*D' + rr + '+' + SCOREW[4] + '*E' + rr + ')/F' + rr + ',"")', S_NUM);
+      /* AUM-weighted percentile for this sleeve: the AUM-weighted mean of each rated scheme's
+         2_Quartile percentile, over this house's rows in this sleeve. Weighted by column F of
+         1_Raw (% of house AUM) -- for a single house that is proportional to the rupee AUM the
+         deck weights by, so the mean is the same number. Rebuilt here, not copied. */
+      sl.f(ii, 10, 'IFERROR(SUMPRODUCT((' + RB + '="' + hq + '")*(' + RD + '=$A' + rr + ')*(' + QF + '<>"")*' + QP + '*' + RF +
+                   ')/SUMPRODUCT((' + RB + '="' + hq + '")*(' + RD + '=$A' + rr + ')*(' + QF + '<>"")*' + RF + '),"")', S_NUM);
     });
     var sfirst = top + 2, slast = top + sleeves.length + 1;
     sl.drawingId = 1;
@@ -7603,8 +7694,11 @@ loadData();
       ['Coverage', 'IF(B9>0,MIN(1,B8/B9),"")', S_PCT],
       ['Q1+Q2 (house)', 'IF(B8>0,(B4+B5)/B8,"")', S_PCT],
       ['Q4 (house)', 'IF(B8>0,B7/B8,"")', S_PCT],
-      ['AUM-weighted quartile (house)', 'IF(B8>0,(' + SCOREW[1] + '*B4+' + SCOREW[2] + '*B5+' +
-        SCOREW[3] + '*B6+' + SCOREW[4] + '*B7)/B8,"")', S_NUM]
+      /* Deliberately NOT a weighted mean of the sleeve column: it goes back to the scheme rows,
+         so a sleeve with no rated AUM (an empty cell on 3_Sleeve) cannot poison the average. */
+      ['AUM-wtd %ile (house, 100 = best)',
+        'IFERROR(SUMPRODUCT((' + RB + '="' + hq + '")*(' + QF + '<>"")*' + QP + '*' + RF +
+        ')/SUMPRODUCT((' + RB + '="' + hq + '")*(' + QF + '<>"")*' + RF + '),"")', S_NUM]
     ];
     var ar = 3;
     lines.forEach(function (L) { am.str(ar, 0, L[0], S_LBL); am.f(ar, 1, L[1], L[2]); ar++; });
@@ -7616,7 +7710,8 @@ loadData();
     sd.freeze = { r: 1, c: 1 };
     [['Scheme', 54], ['Category', 26], ['Sleeve', 17], ['AUM (cr)', 11], ['% of house AUM', 13],
      ['Return %', 11], ['Rank in category', 11], ['n in category', 11],
-     ['Percentile (1 = best)', 12], ['Quartile', 9]].forEach(function (t, c) {
+     ['Percentile (100 = best)', 16], ['Quartile', 9],
+     ['Rank on the website', 15], ['Rank agrees?', 13]].forEach(function (t, c) {
       sd.str(0, c, t[0], S_HDR); sd.width(c, c, t[1]);
     });
     var sdr = 1;
@@ -7628,8 +7723,22 @@ loadData();
       sd.f(sdr, 5, "IF(ISBLANK('1_Raw'!G" + qrow + "),\"\",'1_Raw'!G" + qrow + ')', S_NUM);
       sd.f(sdr, 6, "'2_Quartile'!F" + qrow, S_INT);
       sd.f(sdr, 7, "'2_Quartile'!E" + qrow, S_INT);
-      sd.f(sdr, 8, 'IF(OR(H' + (sdr + 1) + '="",H' + (sdr + 1) + '=0,G' + (sdr + 1) + '=""),"",G' + (sdr + 1) + '/H' + (sdr + 1) + ')', S_PCT);
+      /* WAS 'Percentile (1 = best)' = rank/n -- a LOW-is-good percentile, pointing the opposite
+         way to the deck's, under nearly the same name (Kyser, 2026-09-05). Now it simply reads
+         2_Quartile's percentile column, so the workbook has ONE percentile convention and the
+         scheme-level and house-level numbers cannot disagree. The rank itself is still here, in
+         the column called "Rank in category" -- which is what a reader who wants a rank should use. */
+      sd.f(sdr, 8, "'2_Quartile'!O" + qrow, S_NUM);
       sd.f(sdr, 9, "'2_Quartile'!L" + qrow, S_INT);
+      /* The site's own rank for this scheme, so the two rank routes sit side by side: this
+         workbook rebuilds the rank with COUNTIFS over 1_Raw's 2-decimal published returns, the
+         site ranks on full precision. Where two funds are inside 0.01% of each other the two can
+         order differently, and the percentile -- unlike the old 1-4 quartile score -- is fine
+         enough to show it. This column is what makes that visible instead of mysterious. */
+      var _pr = (pageP.rank || {})[x.scheme];
+      if (_pr && _pr.rank != null) sd.num(sdr, 10, _pr.rank, S_INT);
+      sd.f(sdr, 11, 'IF(K' + (sdr + 1) + '="","(site rank not in payload)",IF(G' + (sdr + 1) +
+                    '=K' + (sdr + 1) + ',"OK","differs"))', S_TXT);
       sdr++;
     });
 
@@ -7660,6 +7769,45 @@ loadData();
       cr++;
     });
     cr++;
+    /* The percentile is the newest derived column, so it gets the same treatment the Q1+Q2 share
+       has always had: the workbook's own rebuild beside the number the page was showing when the
+       export ran. 0.5 of a percentile point is the tolerance -- the two sides rank on independently
+       rebuilt ranks (COUNTIFS here, the engine's shipped ranks there), and a scheme can carry a
+       rank on one side and not the other, which moves n by one and the percentile by a fraction. */
+    ck.str(cr, 0, 'AUM-wtd percentile (100 = best)', S_H2); cr++;
+    ck.str(cr, 0, 'Ranks that differ from the site', S_LBL);
+    var LCOL = "'5_SchemeDetail'!L2:L" + sdr;   // rows 2..sdr are the ones actually written
+    ck.f(cr, 1, 'COUNTIF(' + LCOL + ',"differs")', S_INT);
+    ck.str(cr, 4, 'This workbook rebuilds each rank with COUNTIFS over 1_Raw’s published returns, '
+                + 'which carry 2 decimals; the site ranks on full precision. Two funds inside 0.01% of '
+                + 'each other can therefore swap places. Any gap in the table below comes from these '
+                + 'rows — and it is largest where the scheme that moved is a big share of the sleeve. '
+                + 'The quartile is coarse enough to absorb a one-place shift; a percentile is not.', S_WRAP);
+    ck.rowH[cr] = 58; cr++;
+    ck.str(cr, 0, 'Schemes compared', S_LBL);
+    ck.f(cr, 1, 'COUNTIF(' + LCOL + ',"OK")+COUNTIF(' + LCOL + ',"differs")', S_INT);
+    ck.str(cr, 4, 'The denominator for the row above — if this is 0 that check passed vacuously.', S_WRAP);
+    cr += 2;
+    ['Sleeve', 'Workbook %ile', 'Website %ile', 'Gap', 'Verdict'].forEach(function (t, c) {
+      ck.str(cr, c, t, S_HDR);
+    });
+    cr++;
+    sleeves.forEach(function (s, k) {
+      var srow = top + k + 2;
+      ck.str(cr, 0, s, S_TXT);
+      ck.f(cr, 1, "'3_Sleeve'!K" + srow, S_NUM);
+      var wv = pageP.bySleeve ? pageP.bySleeve[s] : null;
+      if (wv != null) ck.num(cr, 2, wv, S_NUM);
+      ck.f(cr, 3, 'IF(OR(B' + (cr + 1) + '="",C' + (cr + 1) + '=""),"",B' + (cr + 1) + '-C' + (cr + 1) + ')', S_NUM);
+      ck.f(cr, 4, 'IF(D' + (cr + 1) + '="","website value not in this payload",IF(ABS(D' + (cr + 1) + ')<=0.5,"OK (within rank-rebuild tolerance)","CHECK — gap over 0.5 %ile pt"))', S_TXT);
+      cr++;
+    });
+    ck.str(cr, 0, 'Whole house', S_LBL);
+    ck.f(cr, 1, "'4_AMC'!B13", S_NUM);
+    if (pageP.house != null) ck.num(cr, 2, pageP.house, S_NUM);
+    ck.f(cr, 3, 'IF(OR(B' + (cr + 1) + '="",C' + (cr + 1) + '=""),"",B' + (cr + 1) + '-C' + (cr + 1) + ')', S_NUM);
+    ck.f(cr, 4, 'IF(D' + (cr + 1) + '="","website value not in this payload",IF(ABS(D' + (cr + 1) + ')<=0.5,"OK (within rank-rebuild tolerance)","CHECK — gap over 0.5 %ile pt"))', S_TXT);
+    cr += 2;
     ck.str(cr, 0, 'Quartile rebuild', S_H2); cr++;
     ck.str(cr, 0, 'Rows that disagree', S_LBL);
     ck.f(cr, 1, "COUNTIF('2_Quartile'!N2:N" + last + ',"MISMATCH")', S_INT);
@@ -7710,7 +7858,27 @@ loadData();
       var uni  = S.universe;
       var win  = (uni === 'vr') ? (RWOF[S.basis] || '1 Year') : (S.window || '1 Year');
       var fh   = (S.amc && S.amc.fh) || 'Aditya';
-      var date = (S.amc && S.amc.rankDate) || null;
+      // ── 2026-09-05, a real defect found while wiring the percentile through ────────────────
+      // This passed S.amc.rankDate, which is an INDEX (153), into an option the workbook resolves
+      // with dates.indexOf(dateWant) -- a lookup for the string "2026-09-03" in a list of date
+      // strings. An integer never matches, so buildRows silently fell through to
+      // di = dates.length - 1 and the workbook ALWAYS exported the latest date, even when the
+      // reader had scrubbed the as-of selector back a year. It looked correct because rankDate
+      // defaults to the latest. Pass the date STRING and the workbook honours the selector; the
+      // `|| null` also had to go, because index 0 is falsy and would have sent null.
+      var _di  = (S.amc && S.amc.rankDate != null) ? S.amc.rankDate : (curDates().length - 1);
+      var date = curDates()[_di] || null;
+      // the percentiles the page is displaying, at that same date -- the WEBSITE side of 6_Check.
+      // The workbook rebuilds its own from 2_Quartile's ranks; these are only what it is graded
+      // against, exactly like the published Q1+Q2 series.
+      var pctile = { house: null, bySleeve: {} };
+      try {
+        var _hp = housePctAt(fh, _di); pctile.house = _hp.v;
+        pctile.rank = schemeRanksAt(fh, _di).ranks;      // per-scheme site rank, for 6_Check
+        sleevesPresent().forEach(function (br) {
+          var v = housePctAt(fh, _di, br).v; if (v != null) pctile.bySleeve[br] = v;
+        });
+      } catch (e) { try { console.warn('[xlsx] percentile handoff skipped', e); } catch (_) {} }
       if (!PeerXLSX._WINDOWS[win]) {
         say('No workbook for ' + win, 'bad'); reset(); return;
       }
@@ -7721,7 +7889,7 @@ loadData();
         say('Building…', '');
         return PeerXLSX.build({
           data: S.data, returns: (typeof returnsSrc === 'function' ? returnsSrc() : null),
-          house: fh, universe: uni, window: win, date: date
+          house: fh, universe: uni, window: win, date: date, pctile: pctile
         });
       }).then(function(res){
         var name = 'AMC Roll-up - ' + (typeof houseLabel === 'function' ? houseLabel(fh) : fh)
