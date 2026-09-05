@@ -500,6 +500,9 @@
   /* KPI cards */
   .kpis { display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; margin-bottom: 26px; }
   .kpis.k4 { grid-template-columns: repeat(4, 1fr); }
+  /* Kyser 2026-09-05: the AMC Roll-up KPI row is SIX cards (Q1, Q2, Q3, Q4, Q1+Q2,
+     AUM-weighted percentile), so it needs its own track count. */
+  .kpis.k6 { grid-template-columns: repeat(6, 1fr); }
   .kpi {
     background: var(--card); border: 1px solid var(--line-2); border-radius: var(--r-lg); padding: 18px 20px;
     box-shadow: var(--shadow-sm); position: relative; overflow: hidden;
@@ -843,16 +846,20 @@
   .note-cap { margin-bottom:16px; padding:13px 16px; background:#eef0f6; border:1px solid #cdd6e6; border-left:3px solid var(--navy); border-radius:var(--r); font-size:12px; color:var(--ink-2); line-height:1.6; }
   .note-cap b { color:var(--navy); }
 
+  /* six 1fr cards get cramped before the 2-up breakpoint bites, so step them to 3-up first */
+  @media (max-width: 1400px) {
+    .kpis.k6 { grid-template-columns: repeat(3, 1fr); }
+  }
   @media (max-width: 1180px) {
     .grid-2, .grid-2.even { grid-template-columns: 1fr; }
-    .kpis, .kpis.k4 { grid-template-columns: repeat(2, 1fr); }
+    .kpis, .kpis.k4, .kpis.k6 { grid-template-columns: repeat(2, 1fr); }
   }
   @media (max-width: 720px) {
     .masthead { grid-template-columns: 1fr; padding: 22px; }
     .mast-meta { text-align: left; }
     .tabs, .filters, .content { padding-left: 18px; padding-right: 18px; }
     .masthead h1 { font-size: 30px; }
-    .kpis, .kpis.k4 { grid-template-columns: 1fr 1fr; }
+    .kpis, .kpis.k4, .kpis.k6 { grid-template-columns: 1fr 1fr; }
 
     /* ░░ T8 — PHONE HEADER (Kyser 2026-09-03, from screenshots) ░░
        The pinned stack was taking 41–50% of the viewport because every .fg wraps to its own
@@ -910,7 +917,7 @@
     /* two Scheme-Detail grids carry an INLINE grid-template-columns (1.5fr 1fr); inline beats any
        stylesheet rule, so this is the one honest !important: phone width only, inside this query. */
     .grid-2.sc-split { grid-template-columns: 1fr !important; }
-    .kpis, .kpis.k4 { grid-template-columns: 1fr 1fr; gap: 10px; }
+    .kpis, .kpis.k4, .kpis.k6 { grid-template-columns: 1fr 1fr; gap: 10px; }
     .kpis .kpi:last-child:nth-child(odd) { grid-column: 1 / -1; }
     .card { overflow-x: auto; -webkit-overflow-scrolling: touch; }
     .tbl-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; max-width: 100%; }
@@ -3432,7 +3439,7 @@ function buildViews(){
            dashed quality-score line on a right-hand axis, was GRAFTED onto am-rank, so nothing
            was lost. Panel ids are otherwise untouched. -->
       <div class="shead"><h2><span id="am-house"></span></h2><div class="ctx" id="am-ctx"></div></div>
-      <div class="kpis" id="am-kpis"></div>
+      <div class="kpis k6" id="am-kpis"></div>
       <div class="card">
         <div class="card-h"><div><h3>AMC-level quartile distribution</h3><div class="sub" id="am-stack-sub"></div></div>
           <div class="legend">
@@ -3446,7 +3453,7 @@ function buildViews(){
       </div>
       <div class="card">
         <div class="card-h"><div><h3 id="am-rank-title">Q1+Q2 (green) &amp; Q4 (red) over time</h3><div class="sub" id="am-rank-sub" hidden></div></div>
-          <div class="legend"><span><span class="lline" style="background:${C.green}"></span>Q1+Q2 %</span><span><span class="lline" style="background:${C.red}"></span>Q4 %</span><span><span class="lline" style="background:${C.quartile}"></span>AUM-wtd quartile (R)</span></div>
+          <div class="legend"><span><span class="lline" style="background:${C.green}"></span>Q1+Q2 %</span><span><span class="lline" style="background:${C.red}"></span>Q4 %</span><span><span class="lline" style="background:${C.quartile}"></span>AUM-wtd %ile (R)</span></div>
         </div>
         <div class="chartbox tall"><canvas id="am-rank"></canvas></div>
         <div id="am-rank-method"></div>
@@ -3908,25 +3915,58 @@ function renderAMC(){
 function renderAMCHouseKPIs(){
   const fh=S.amc.fh, {dates,byQ}=houseSeries(fh,null);
   const i=Math.max(0, Math.min(dates.length-1, S.amc.rankDate==null?dates.length-1:S.amc.rankDate));
-  const q1=byQ['% in Q1']?.[i],q2=byQ['% in Q2']?.[i],q3=byQ['% in Q3']?.[i],q4=byQ['% in Q4']?.[i], score=qualityScore(byQ,i);
-  // ★ 2026-09-02 — THESE KPIs AND THE ROLL-UP TABLE BELOW USE DIFFERENT DENOMINATORS, ON PURPOSE.
-  // The KPIs answer "how much of this house's money is in the top half" (denominator = ALL of the
-  // house's AUM, so an unrated fund dilutes the share, which is the honest read for a CIO asking
-  // where the money sits). The table's Qtl column answers "of the money that IS ranked, how much
-  // ranks well" (denominator = quartile-bearing AUM). Both are legitimate; two numbers on one
-  // screen both called "Q1+Q2" were not. The Rated KPI is what reconciles them —
-  //     Q1+Q2 of house AUM  =  Rated  x  Q1+Q2 of rated AUM
-  // — so the reader can move between the two rather than wondering which is wrong.
+  const q1=byQ['% in Q1']?.[i],q2=byQ['% in Q2']?.[i],q3=byQ['% in Q3']?.[i],q4=byQ['% in Q4']?.[i];
+  // ★ Kyser 2026-09-05 — SIX items, in his order: Q1, Q2, Q3, Q4, Q1+Q2, AUM-weighted percentile.
+  // Two things changed and both were his call. (1) The old Q3+Q4 card was DROPPED as a repeat:
+  // once all four quartiles are on screen the bottom half is arithmetic the reader can already
+  // see, and it was the third way of saying the same split. (2) The old "AUM-weighted quartile"
+  // (a 1–4 number, Q1=4…Q4=1) was REPLACED by the AUM-weighted percentile — the same quantity the
+  // league table below and the trend chart's right axis now use, so one screen no longer carries
+  // two different quality scales. The percentile is a TRUE within-category rank, not a re-scaled
+  // quartile: housePctAt -> aumPctByHouse ranks every fund against every peer in its own
+  // category on the CHOSEN basis, converts to (n − rank + 0.5)/n × 100 so 100 = top of the peer
+  // group and a random category averages exactly 50 whatever its size, then AUM-weights across
+  // the house's distinct rated schemes. It shares buildCategoryRanks with the Scheme-Detail
+  // standing card, so the same fund can never be ranked two ways on one deck.
+  const pr=housePctAt(fh,i);
+  // ★ 2026-09-02, CORRECTED 2026-09-05. The 09-02 note here said the KPI row and the league table
+  // used DIFFERENT denominators (house AUM vs rated AUM). That is not true of the table as it now
+  // stands, and a stale comment about a denominator is exactly how a caption goes wrong: the table's
+  // quartile columns read the SAME houseSeries() bands these cards read, so both divide by ALL of
+  // the house's AUM and unrated money dilutes both the same way. The table's "Scored %" column is
+  // literally the sum of its own four band columns, i.e. the Rated figure in the context line above.
+  // Checked on the built page, not assumed: the KPI Q1 share and the table's Q1 cell for the same
+  // house print the same number, and the puppeteer probe asserts it.
+  // The one genuinely rated-denominated number left on this row is the bracket after Rated
+  // (top half OF RATED AUM), and it reconciles as:
+  //     Q1+Q2 of house AUM  =  Rated  x  top half of rated AUM
   const A=sleeveAt(byQ,i), covWarn=(A.cov!=null && A.cov<0.999);
   const _amh=document.getElementById('am-house');
   if(_amh){ _amh.textContent=houseLabel(fh); _amh.style.color=houseColor(fh)||''; }
-  document.getElementById('am-ctx').innerHTML=`${basisDesc()}<br>Snapshot ${fmt.date(dates[i])}`;
+  // "Rated" lost its card to keep the row at the six items Kyser asked for, but it is the number
+  // that RECONCILES this row with the table below (see the note above), so it moves up into the
+  // context line rather than off the page — still on screen, still amber when it is below 100%.
+  const ratedTip='Rated = the share of this house’s AUM that actually carries a quartile on this basis. '
+    +'The four quartile cards below are shares of ALL house AUM, so they sum to exactly this number, and it is '
+    +'the same figure the league table shows as “Scored %”. Unrated money therefore dilutes every card; the '
+    +'bracket is the top half measured on RATED AUM only, and the two reconcile as '
+    +'Q1+Q2 of house AUM = Rated × top half of rated AUM.';
+  document.getElementById('am-ctx').innerHTML=`${basisDesc()}<br>Snapshot ${fmt.date(dates[i])}`
+    + ` · <span title="${esc(ratedTip)}"${covWarn?' style="color:var(--q4)"':''}>Rated ${fmt.pct(A.cov)} of house AUM`
+    + ` (its top half = ${fmt.pct(A.top)})</span>`;
+  const pctTip='AUM-weighted percentile: every rated fund is ranked inside its OWN category on this basis, '
+    +'turned into a percentile by (n − rank + 0.5) ÷ n × 100 — so 100 is the top of the peer group, 0 the bottom, '
+    +'and the average of any category is exactly 50 however many funds it holds — and those percentiles are then '
+    +'averaged across the house weighted by each fund’s AUM. Unrated funds are left out of both sides. '
+    +'It replaces the old 1–4 quartile score (Q1=4…Q4=1), which the Excel export still carries.';
+  const pctVal=(pr.v==null) ? (pr.loading?'…':'—') : fmt.num(pr.v,1);
   document.getElementById('am-kpis').innerHTML=`
     <div class="kpi qc q-q1"><div class="k-lbl">Q1 share</div><div class="k-val">${fmt.pct(q1)}</div><div class="k-sub">top quartile, of all house AUM</div></div>
+    <div class="kpi qc q-q2"><div class="k-lbl">Q2 share</div><div class="k-val">${fmt.pct(q2)}</div><div class="k-sub">of all house AUM</div></div>
+    <div class="kpi qc q-q3"><div class="k-lbl">Q3 share</div><div class="k-val">${fmt.pct(q3)}</div><div class="k-sub">of all house AUM</div></div>
+    <div class="kpi qc q-q4"><div class="k-lbl">Q4 share</div><div class="k-val">${fmt.pct(q4)}</div><div class="k-sub">bottom quartile, of all house AUM</div></div>
     <div class="kpi qc q-q12"><div class="k-lbl">Q1+Q2 share</div><div class="k-val">${fmt.pct((q1||0)+(q2||0))}</div><div class="k-sub">top half, of <b>all</b> house AUM</div></div>
-    <div class="kpi mc m-aum${covWarn?' warn':''}"><div class="k-lbl">Rated</div><div class="k-val">${fmt.pct(A.cov)}</div><div class="k-sub">of AUM is ranked · its top half = ${fmt.pct(A.top)}</div></div>
-    <div class="kpi mc m-ret"><div class="k-lbl">AUM-weighted quartile</div><div class="k-val">${fmt.num(score)}</div><div class="k-sub">Q1=4 … Q4=1</div></div>
-    <div class="kpi qc q-q4"><div class="k-lbl">Q3+Q4 share</div><div class="k-val">${fmt.pct((q3||0)+(q4||0))}</div><div class="k-sub">bottom half, of all house AUM</div></div>`;
+    <div class="kpi mc m-ret" title="${esc(pctTip)}"><div class="k-lbl">AUM-weighted %ile</div><div class="k-val">${pctVal}</div><div class="k-sub">100 = top of peer group · rated AUM only</div></div>`;
 }
 // Everything on this tab that depends on the AS-OF DATE, and nothing else. The timeline
 // scrubber / GIF exporter calls this once per frame, so it deliberately leaves the
@@ -4323,18 +4363,21 @@ function renderAMCTable(){
     if(av==null && bv==null) return 0; if(av==null) return 1; if(bv==null) return -1;
     return (av-bv)*dir; });                       // dir=-1 => descending
   rows.forEach((r,idx)=>r.rank=idx+1); const n=rows.length;
-  const cols=[['q1','Q1'],['top','Q1+Q2'],['q4','Q4'],['pctile','AUM-wtd %ile'],['cov','Scored %'],['cr','Covered AUM']];
+  // ★ Kyser 2026-09-05 — the same six items as the KPI row above, in his order: the four
+  // quartile bands, then the top half, then the AUM-weighted percentile. Scored % and Covered
+  // AUM stay on as CONTEXT columns (they are denominators, not quartile readings).
+  const cols=[['q1','Q1'],['q2','Q2'],['q3','Q3'],['q4','Q4'],['top','Q1+Q2'],['pctile','AUM-wtd %ile'],['cov','Scored %'],['cr','Covered AUM']];
   let html='<table class="rt"><thead><tr><th>#</th><th>Fund House</th>';
   cols.forEach(([key,lbl])=> html+=`<th class="num lg-sort" data-k="${key}" style="cursor:pointer">${lbl}${k===key?(dir<0?' ▾':' ▴'):''}</th>`);
   html+='</tr></thead><tbody>';
   rows.forEach(r=>{ const cls=r.fh===S.amc.fh?'hl':''; const pc=r.rank===1?'r1':r.rank<=Math.ceil(n/4)?'up':r.rank>n-Math.ceil(n/4)?'dn':'';
-    html+=`<tr class="${cls}"><td><span class="pill ${pc}">${r.rank}</span></td><td class="lbl">${houseLabel(r.fh)}</td><td class="num">${fmt.pct(r.q1)}</td><td class="num">${fmt.pct(r.top)}</td><td class="num">${fmt.pct(r.q4)}</td><td class="num">${r.pctile==null?'—':fmt.num(r.pctile,1)}</td><td class="num">${fmt.pct(r.cov)}</td><td class="num">${fmt.cr(r.cr)}</td></tr>`; });
+    html+=`<tr class="${cls}"><td><span class="pill ${pc}">${r.rank}</span></td><td class="lbl">${houseLabel(r.fh)}</td><td class="num">${fmt.pct(r.q1)}</td><td class="num">${fmt.pct(r.q2)}</td><td class="num">${fmt.pct(r.q3)}</td><td class="num">${fmt.pct(r.q4)}</td><td class="num">${fmt.pct(r.top)}</td><td class="num">${r.pctile==null?'—':fmt.num(r.pctile,1)}</td><td class="num">${fmt.pct(r.cov)}</td><td class="num">${fmt.cr(r.cr)}</td></tr>`; });
   html+='</tbody></table>';
   document.getElementById('am-table').innerHTML=html;
   document.querySelectorAll('#am-table .lg-sort').forEach(th=> th.onclick=()=>{ const key=th.dataset.k;
     if(S.league.sortKey===key) S.league.sortDir*=-1; else { S.league.sortKey=key; S.league.sortDir=-1; } renderAMCTable(); });
   document.getElementById('am-table-method').innerHTML=methodNote(
-    `The <b>${n}</b> fund houses in scope (${scopeLabel()}) on <b>${fmt.date(curDates()[i])}</b> (${basisDesc()}). Q1 / Q1+Q2 / Q4 are AUM shares of the house; <b>AUM-weighted %ile</b> = each rated fund's percentile inside its own category (its rank among peers, on the SAME engine ranks the Scheme-Detail standing card uses; convention (rank−0.5)÷n, so the average of a random category is exactly 50 regardless of how many funds it holds), then AUM-weighted across the house; 100 ≈ top of the peer group. The 1–4 quality score is kept in the Excel export. <b>Scored %</b> = share of the house's covered AUM that actually has a quartile on this basis — below 100% when funds are too new for the window (e.g. sub-3-year NFOs on the 3Y basis). <b>Covered AUM</b> = the absolute Rs cr that is scored. Click a numeric header to re-sort. The selected house's row is highlighted.`);
+    `The <b>${n}</b> fund houses in scope (${scopeLabel()}) on <b>${fmt.date(curDates()[i])}</b> (${basisDesc()}). <b>Q1, Q2, Q3 and Q4</b> are each band's share of the house's <i>whole</i> AUM — so they sum to the Scored % column, not to 100% — and <b>Q1+Q2</b> is the top half on that same denominator. All four bands are shown because reading only Q1 / Q1+Q2 / Q4 left the middle of the distribution to be inferred. <b>AUM-weighted %ile</b> = each rated fund's percentile inside its own category (its rank among peers, on the SAME engine ranks the Scheme-Detail standing card uses; convention (rank−0.5)÷n, so the average of a random category is exactly 50 regardless of how many funds it holds), then AUM-weighted across the house; <b>100 = the top of the peer group</b>, 0 the bottom, 50 the middle. It is a true rank percentile, not the old 1–4 quartile score rescaled — that score is retired from the screen and survives only in the Excel export and this table's CSV. <b>Scored %</b> = share of the house's covered AUM that actually has a quartile on this basis — below 100% when funds are too new for the window (e.g. sub-3-year NFOs on the 3Y basis). <b>Covered AUM</b> = the absolute Rs cr that is scored. Click a numeric header to re-sort. The selected house's row is highlighted.`);
 }
 function exportAMC(){
   const fh=S.amc.fh, {dates,byQ}=houseSeries(fh,null);
@@ -6641,7 +6684,11 @@ function leagueData(i){
     // coverage = SCORED %AUM (sum of the four quartile bands). On 3Y this is < 100% for houses
     // with sub-3-year NFOs (no 3Y quartile yet) — NOT the total covered weight.
     const pr=housePctAt(fh,i);
-    return { fh, q1, top:q1+q2, q4, score:qualityScore(byQ,i)||0, pctile:(pr.v==null?null:pr.v),
+    // q2/q3 join the payload 2026-09-05: Kyser asked for all four quartiles on screen rather
+    // than Q1 / Q1+Q2 / Q4, which made the reader infer the middle. `cov` is q1+q2+q3+q4 BY
+    // CONSTRUCTION, so the four band columns must sum to the Scored % column exactly (to
+    // display rounding) — that is the table's own internal check.
+    return { fh, q1, q2, q3, q4, top:q1+q2, score:qualityScore(byQ,i)||0, pctile:(pr.v==null?null:pr.v),
              cov:q1+q2+q3+q4, cr:crmap[fh]||0 }; });
 }
 // (renderLeague / renderLeagueTable retired 2026-09-02 — the League Table tab merged into AMC
@@ -6649,8 +6696,11 @@ function leagueData(i){
 //  leagueData(). exportLeague below survives, driven by the AMC tab's as-of date.)
 function exportLeague(){
   const i=S.amc.rankDate, rows=leagueData(i);
-  let csv='Rank,Fund House,Q1,Q1+Q2,Q4,AUM-weighted %ile,AUM-weighted quartile,Scored %,Covered AUM cr,Basis,Date\n';
-  rows.sort((a,b)=>b.top-a.top).forEach((r,idx)=>{ csv+=[idx+1,r.fh,r.q1,r.top,r.q4,(r.pctile==null?'':r.pctile.toFixed(2)),r.score,r.cov,Math.round(r.cr),`"${basisDesc()}"`,curDates()[i]].join(',')+'\n'; });
+  // header mirrors the on-screen column order (Kyser 2026-09-05): the four bands, then the top
+  // half, then the percentile. The 1-4 quality score stays as a trailing CSV column — it is off
+  // the screen now, but silently dropping it from an export would break anyone's saved sheet.
+  let csv='Rank,Fund House,Q1,Q2,Q3,Q4,Q1+Q2,AUM-weighted %ile (100=best),AUM-weighted quartile (Q1=4..Q4=1),Scored %,Covered AUM cr,Basis,Date\n';
+  rows.sort((a,b)=>b.top-a.top).forEach((r,idx)=>{ csv+=[idx+1,r.fh,r.q1,r.q2,r.q3,r.q4,r.top,(r.pctile==null?'':r.pctile.toFixed(2)),r.score,r.cov,Math.round(r.cr),`"${basisDesc()}"`,curDates()[i]].join(',')+'\n'; });
   downloadCSV(csv,`league_${S.universe}_${curDates()[i]}.csv`);
 }
 
