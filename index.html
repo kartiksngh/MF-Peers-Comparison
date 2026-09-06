@@ -3067,20 +3067,137 @@ function timeX(xmin,xmax){
   // to navigate never disappears -- the months are added between those anchors, not instead of
   // them. autoSkip then thins the months to whatever actually fits, which is why this degrades
   // gracefully: wide screen shows more months, a cropped range shows more still.
-  const wide = wideViewport();
-  const monthly = !cropActive() && wide;
-  const tickCfg = {color:C.ink3, font:{size:10}, autoSkip:true, maxRotation:0,
-                   maxTicksLimit: monthly ? 26 : 12};
-  if(monthly) tickCfg.callback = (val) => {
-    const d = new Date(val);
-    return d.getMonth()===0 ? String(d.getFullYear()) : MONTH_ABBR[d.getMonth()];
+  // ══ THE TIME-AXIS RULE, one place for every chart on the deck (Kyser 2026-09-06) ══════════
+  // His words: "I dont see the years only months! ... year are the first set of info. Okay do add
+  // years and since months can be taking too much space of axis - add only quarter end months
+  // between years.. Mar, Jun, Sept and Dec. Also keep the months little more grey and dim
+  // compared to years since years are more imp."
+  //
+  // WHY THE YEARS HAD VANISHED. The old config asked for monthly ticks with autoSkip:true and
+  // maxTicksLimit:26, then renamed January to the year in the callback. But autoSkip decides
+  // WHICH ticks survive BEFORE any callback runs, and it thins by a fixed stride from whichever
+  // end it starts — so on a 154-month axis it kept every 6th month and landed on Feb/Aug, never
+  // on a January. The callback was renaming ticks that no longer existed. That is the whole bug:
+  // "Feb Aug Feb Aug…" with no year anywhere, and on the wider charts a year only wherever the
+  // stride happened to collide with a January.
+  //
+  // THE FIX is to choose the ticks ourselves and turn autoSkip off, so nothing can silently
+  // delete a year. Below, `quarterYearTicks` keeps January (the year anchor) plus Mar/Jun/Sep/Dec,
+  // thins the MONTHS — never the years — until the labels fit the axis it measured, and then does
+  // a real pixel-collision pass so a December sitting one month from the next year's label is the
+  // thing that gives way. `tickIsYear` marks the first kept tick of each year, which is also how a
+  // series starting in, say, August still gets its opening year labelled instead of waiting for
+  // the following January.
+  const lo = S.xr.from!=null ? S.xr.from : toMs(xmin);
+  const hi = S.xr.to  !=null ? S.xr.to   : toMs(xmax);
+  const spanM = (lo!=null && hi!=null && hi>lo) ? (hi-lo)/2629800000 : 999;
+  // Under ~4 months a monthly grid yields one tick or none, so let Chart.js pick its own unit and
+  // only promote the first tick of each year. The rule degrades, it does not go blank.
+  const monthly = spanM >= 4;
+  const tickCfg = {
+    maxRotation:0,
+    autoSkip: !monthly,                       // OFF on the monthly path: it is what ate the years
+    maxTicksLimit: monthly ? undefined : 12,
+    // Years read stronger than months in BOTH channels, colour and weight, because one of them
+    // alone is easy to miss at 10px on a busy chart.
+    color: (ctx)=> (ctx && ctx.tick && ctx.tick.$yr) ? C.ink : C.ink3,
+    font:  (ctx)=> (ctx && ctx.tick && ctx.tick.$yr)
+                     ? {size:10.5, weight:'700'} : {size:9.5, weight:'400'},
+    callback: (val, index, ticks) => {
+      const d = new Date(val);
+      const t = ticks && ticks[index];
+      if(t && t.$yr == null) t.$yr = tickIsYear(index, ticks);   // non-monthly path has no filter
+      if(t ? t.$yr : tickIsYear(index, ticks)) return String(d.getFullYear());
+      return monthly ? MONTH_ABBR[d.getMonth()] : (d.getDate()+' '+MONTH_ABBR[d.getMonth()]);
+    }
   };
-  return { type:'time', time: cropActive()? {} : (monthly ? {unit:'month'} : {unit:'year'}),
+  return { type:'time', time: monthly ? {unit:'month'} : {},
     min: S.xr.from!=null ? S.xr.from : xmin,
     max: S.xr.to  !=null ? S.xr.to   : xmax,
     grid:{display:false},
     ticks:tickCfg,
+    afterBuildTicks: monthly ? quarterYearTicks : flagYearTicks,
     border:{color:C.line} };
+}
+// A tick carries the YEAR when it is the first kept tick of its year — which makes the rule
+// self-repairing: whatever survives the thinning, every year still present gets exactly one year
+// label, and it is the earliest tick in that year rather than a hard-coded January.
+function tickIsYear(index, ticks){
+  if(!ticks || !ticks.length || index==null) return false;
+  const t = ticks[index]; if(!t) return false;
+  const y = new Date(t.value).getFullYear();
+  if(index===0) return true;
+  const prev = ticks[index-1]; if(!prev) return true;
+  return new Date(prev.value).getFullYear() !== y;
+}
+// Mar, Jun, Sep, Dec (0-indexed). January is never in these lists because it is the year anchor
+// and is always kept; the ladder only ever thins the months between the years.
+// Mar, Jun, Sep, Dec (0-indexed). January is never in these lists because it is the year anchor
+// and is always kept; the ladder only ever thins the months BETWEEN the years.
+// Each rung carries its own worst consecutive gap in MONTHS, counting the wrap from the last
+// month of one year to the next year's January -- which is the pair that actually collides:
+//   [Mar,Jun,Sep,Dec] -> Dec is 1 month from the next January
+//   [Mar,Jun,Sep]     -> January is 2 months from March
+//   [Jun]             -> 5 months either side
+//   []                -> 12
+const MONTH_LADDER = [
+  {months:[2,5,8,11], minGap:1},
+  {months:[2,5,8],    minGap:2},
+  {months:[5],        minGap:5},
+  {months:[],         minGap:12}
+];
+const MIN_LABEL_PX = 26;   // "Sep" at 9.5px is ~17px and "2017" at 10.5px bold ~25px, so the true
+                           // touch point for the tightest pair is ~21px; 26 leaves it air.
+function flagYearTicks(scale){
+  const ts = scale.ticks;
+  if(!ts) return;
+  ts.forEach((t,i)=>{ t.$yr = tickIsYear(i, ts); });
+}
+function quarterYearTicks(scale){
+  const all = scale.ticks;
+  if(!all || !all.length) return;
+  const yearOf = t => new Date(t.value).getFullYear();
+  const yearsPresent = new Set(all.map(yearOf));
+  // A chart on a hidden tab reports width 0. Do not let that collapse the axis to one tick --
+  // assume a desktop-ish width and let the tab's own resize re-run this with the real number.
+  const width = (scale.width && scale.width > 40) ? scale.width
+              : ((scale.chart && scale.chart.width > 40) ? scale.chart.width : 900);
+  const spanMonths = Math.max(1, (scale.max - scale.min) / 2629800000);
+  const pxPerMonth = width / spanMonths;
+  // Pick the densest rung whose WORST gap still clears a label width. Judging by the average
+  // instead is what let "2023" and "Mar" render 22.7px apart in the first attempt: the average
+  // was comfortable and the pair beside every year was not.
+  let rung = MONTH_LADDER[MONTH_LADDER.length-1];
+  for(const r of MONTH_LADDER){ if(r.minGap * pxPerMonth >= MIN_LABEL_PX){ rung = r; break; } }
+  let kept = all.filter(t => { const m = new Date(t.value).getMonth();
+    return m===0 || rung.months.indexOf(m)>=0; });
+  // A year whose January is outside the range -- a series that opens in August, or a crop --
+  // would otherwise vanish. Put its earliest tick back. Dropping a year is the one thing this
+  // function must never do.
+  const have = new Set(kept.map(yearOf));
+  yearsPresent.forEach(y => {
+    if(have.has(y)) return;
+    const first = all.find(t => yearOf(t)===y);
+    if(first) kept.push(first);
+  });
+  kept.sort((a,b)=>a.value-b.value);
+  // Safety net for anything the rung arithmetic could not foresee (an added-back partial year
+  // landing beside a January, a crop with an odd span): walk the kept ticks and, wherever two
+  // are closer than a label is wide, drop the MONTH. The year always wins.
+  const msPerPx = (scale.max - scale.min) / Math.max(1,width);
+  for(let pass=0; pass<8; pass++){
+    let dropped = false;
+    for(let i=1;i<kept.length;i++){
+      if((kept[i].value - kept[i-1].value) / msPerPx >= MIN_LABEL_PX) continue;
+      const aYear = tickIsYear(i-1, kept), bYear = tickIsYear(i, kept);
+      if(aYear && bYear) continue;              // two years genuinely this close: show both
+      kept.splice(aYear ? i : i-1, 1);
+      dropped = true; break;
+    }
+    if(!dropped) break;
+  }
+  kept.forEach((t,i)=>{ t.$yr = tickIsYear(i, kept); });
+  scale.ticks = kept;
 }
 function applyCrop(a,b){
   const lo=Math.min(a,b), hi=Math.max(a,b);
@@ -3227,7 +3344,7 @@ Chart.register({
     chart.$crop=null;
   }
 });
-function stackOpts({leftMax, rightLabel, xmin, xmax}){
+function stackOpts({leftMax, leftLabel, rightLabel, xmin, xmax}){
   // stacked bands keep DATASET order in the tooltip (Q1..Q4 top-down) — value-sorting them
   // would scramble the band story, so the ranked itemSort from baseTooltip is switched off here
   return { maintainAspectRatio:false, responsive:true, interaction:{mode:'index',intersect:false}, ...chartMotion(),
@@ -3236,7 +3353,10 @@ function stackOpts({leftMax, rightLabel, xmin, xmax}){
     scales:{ x:timeX(xmin,xmax),
       // Gridlines off across the whole deck (Kyser, twice). The axis ticks carry the scale; the
       // rules were competing with the data for the reader's attention on every panel.
-      y:{ stacked:true, min:0, max:leftMax, grace:leftMax?undefined:'5%', ticks:{callback:v=>v+'%',color:C.ink3,font:{size:10}}, grid:{display:false}, border:{display:false}, afterBuildTicks:pctTicksTo100 },
+      // Both axes carry a title (Kyser 2026-09-06). The left one is styled off the LEFT tick
+      // colour and the right off the right's, so each title reads as part of its own axis.
+      y:{ stacked:true, min:0, max:leftMax, grace:leftMax?undefined:'5%', ticks:{callback:v=>v+'%',color:C.ink3,font:{size:10}}, grid:{display:false}, border:{display:false}, afterBuildTicks:pctTicksTo100,
+          title:{display:!!leftLabel,text:leftLabel,color:C.ink3,font:{size:10}} },
       y1:{ position:'right', display:!!rightLabel, grace:'12%', min:0, ticks:{callback:v=>v+'%',color:C.grey,font:{size:10}}, grid:{drawOnChartArea:false}, border:{display:false},
            title:{display:!!rightLabel,text:rightLabel,color:C.grey,font:{size:10}} } } };
 }
@@ -3245,13 +3365,14 @@ function stackOpts({leftMax, rightLabel, xmin, xmax}){
 // good" the same way the green Q1+Q2 line above it does.
 const QSCORE_LABEL = {4:'Q1', 3:'Q2', 2:'Q3', 1:'Q4'};
 const QUARTILE_AXIS = true;
-function dualOpts({leftSuffix, rightLabel, rightMin, rightMax, xmin, xmax, noGrid}){
+function dualOpts({leftSuffix, leftLabel, rightLabel, rightMin, rightMax, xmin, xmax, noGrid}){
   return { maintainAspectRatio:false, responsive:true, interaction:{mode:'index',intersect:false}, ...chartMotion(),
     plugins:{ legend:{display:false}, tooltip:{...baseTooltip(),
       callbacks:{ label:c=>{ const v=c.parsed.y; if(v==null) return `${c.dataset.label}: —`;
         return c.dataset.yAxisID==='y1' ? `${c.dataset.label}: ${v.toFixed(2)}` : `${c.dataset.label}: ${v.toFixed(1)}${leftSuffix||''}`; } } } },
     scales:{ x:timeX(xmin,xmax),
       y:{ position:'left', min:0, grace:'8%', ticks:{callback:v=>v+(leftSuffix||''),color:C.ink3,font:{size:10}}, grid:{display:false}, border:{display:false},
+          title:{display:!!leftLabel,text:leftLabel,color:C.ink3,font:{size:10}},
           afterBuildTicks: leftSuffix==='%' ? pctTicksTo100 : undefined },
       // The score axis runs 1..4 and only the INTEGERS mean anything -- a tick reading "2.5" on
       // a 1-to-4 quality score is a value the scale does not have. Chart.js was generating
@@ -3309,13 +3430,55 @@ function rollMeanPts(pts, n){
   if(!n || n < 2) return pts;
   const need = Math.ceil(n/2);
   return pts.map((p,i)=>{
+    // ★ 2026-09-06: the month ITSELF must be rated. Without this the mean was emitted wherever
+    // ceil(n/2) of the trailing window had values, so a fund with no quartile in June still got a
+    // June point -- the smoothed line started a month late, ran a month past the data, and its
+    // gaps sat in different places from the real ones. That mismatch is what made the panel read
+    // as broken rather than sparse. A trailing mean summarises a month's standing; with no
+    // standing there is nothing to summarise.
+    if(p.y==null) return { x:p.x, y:null };
     let sum=0, cnt=0;
     for(let j=Math.max(0,i-n+1); j<=i; j++){ const v=pts[j].y; if(v!=null){ sum+=v; cnt++; } }
     return { x:p.x, y: cnt>=need ? sum/cnt : null };
   });
 }
+// A rated month with unrated months on both sides draws NOTHING at pointRadius 0 (and a two-month
+// run draws an unexplained stub). Show it as a dot instead, so a lone observation is visible as
+// what it is. Scriptable, so the ghost and the smoothed copy each judge their OWN data array.
+const ISLAND_PT = (ctx)=>{
+  const d = ctx.dataset && ctx.dataset.data, i = ctx.dataIndex;
+  if(!d || !d[i] || d[i].y==null) return 0;
+  const prev = i>0 ? d[i-1] : null, next = i<d.length-1 ? d[i+1] : null;
+  return ((!prev || prev.y==null) && (!next || next.y==null)) ? 2.4 : 0;
+};
+// Spans where EVERY plotted series is unrated, as [startMs,endMs] pairs — shaded by the
+// unratedBands plugin so a blank stretch reads as "no rating here", not as a rendering fault.
+function unratedSpans(dates, ...series){
+  const out=[]; let run=null;
+  for(let i=0;i<dates.length;i++){
+    const none = series.every(a => !a || a[i]==null);
+    if(none){ if(run==null) run=i; }
+    else if(run!=null){ out.push([toMs(dates[run]), toMs(dates[i])]); run=null; }
+  }
+  if(run!=null) out.push([toMs(dates[run]), toMs(dates[dates.length-1])]);
+  // a single month is too thin to read as a band and just adds noise
+  return out.filter(([a,b]) => b-a > 45*864e5);
+}
 // A ghost of the raw steps, drawn under the smoothed line so the smoothing never HIDES the data
 // it is summarising — the reader can always see the month-to-month reality it came from.
+Chart.register({
+  id:'unratedBands',
+  beforeDatasetsDraw(chart, args, opts){
+    const spans = opts && opts.spans; if(!spans || !spans.length) return;
+    const x = chart.scales.x, a = chart.chartArea; if(!x || !a) return;
+    const g = chart.ctx; g.save(); g.fillStyle = 'rgba(22,19,15,0.045)';
+    spans.forEach(([s0,s1])=>{
+      const p0 = Math.max(a.left, x.getPixelForValue(s0)), p1 = Math.min(a.right, x.getPixelForValue(s1));
+      if(p1 > p0) g.fillRect(p0, a.top, p1-p0, a.bottom-a.top);
+    });
+    g.restore();
+  }
+});
 function ghostOf(ds){
   return { ...ds, borderColor:hexA(ds.borderColor,0.22), borderWidth:1.2, label:ds.label+' (raw)',
            fill:false, backgroundColor:'transparent' };   // never re-paint the area under a ghost
@@ -3725,7 +3888,11 @@ function renderSleeve(){
   const weightDs={ label:'Sleeve weight', data:weight.map((v,i)=>({x:dates[i],y:v==null?null:v*100})),
     borderColor:C.grey, borderWidth:2.2, borderDash:[5,3], fill:false, tension:0.3, pointRadius:0, yAxisID:'y1' };
   S.charts.slStack=new Chart(ctx,{type:'line',data:{datasets:[...areaDs,weightDs]},
-    options:stackOpts({leftMax:mode==='within'?100:undefined, rightLabel:'Sleeve weight %', xmin, xmax})});
+    options:stackOpts({leftMax:mode==='within'?100:undefined,
+      // the left denominator CHANGES with the mode toggle, so the title has to change with it --
+      // a fixed label here would be wrong half the time
+      leftLabel: mode==='within' ? "% of the sleeve's rated AUM" : "% of the house's AUM",
+      rightLabel:"Sleeve's share of the house", xmin, xmax})});
   document.getElementById('sl-c1-method').innerHTML=methodNote(
     (mode==='within'
       ? `For ${fh}, ${br}: ${scoreMethodLine()} Each scheme’s <b>share of the house’s total AUM</b> is summed by quartile, then divided by the <b>sleeve’s rated AUM</b> — the sum of those same four bands — so they sum to exactly 100%. The denominator is deliberately the rated AUM and <b>not</b> the sleeve’s total weight: a fund too young to carry a quartile on this window is absent from both the numerator and the denominator, rather than counted as having failed to reach the top half. On <b>${fmt.date(dates[li])}</b>, <b>${fmt.pct(A.cov)}</b> of this sleeve’s AUM is rated${covWarn?` — so these bands describe that ${fmt.pct(A.cov)} slice, not the whole sleeve`:''}. The dashed red line (right axis) is the sleeve’s raw weight in the house, which does include the unrated part.`
@@ -3753,7 +3920,8 @@ function renderSleeveTrend(){
     { label:'AUM-weighted %ile', data:scoreS, borderColor:C.quartile, borderWidth:1.8, tension:0.3, pointRadius:0, yAxisID:'y1', fill:false, spanGaps:true }
   ];
   S.charts.slTrend=new Chart(ctx,{type:'line',data:{datasets:smoothSeries(base, sm)},
-    options:dualOpts({leftSuffix:'%', rightLabel:'AUM-weighted percentile (0–100)', rightMin:0, rightMax:100, xmin, xmax, noGrid:true})});
+    options:dualOpts({leftSuffix:'%', leftLabel:"% of the sleeve's rated AUM",
+      rightLabel:'Percentile vs peers (100 = best)', rightMin:0, rightMax:100, xmin, xmax, noGrid:true})});
   const _slsub=document.getElementById('sl-trend-sub');
   if(_slsub) _slsub.textContent='Within sleeve: Q1+Q2 (green) and Q4 (red)'
     + (sm?` · ${sm}-month trailing mean (raw kept faint behind)`:'');
@@ -3902,7 +4070,8 @@ function renderAMC(){
   const adDates=houseSeries(fh,null).dates;
   const {xmin:rxmin,xmax:rxmax}=xBounds(adDates, aTop, aQ4);
   S.charts.amRank=new Chart(ctx2,{type:'line',data:{datasets:dsets},
-    options:dualOpts({leftSuffix:'%', rightLabel:'AUM-weighted percentile (0–100)', rightMin:0, rightMax:100, xmin:rxmin, xmax:rxmax})});
+    options:dualOpts({leftSuffix:'%', leftLabel:"% of the house's AUM",
+      rightLabel:'Percentile vs peers (100 = best)', rightMin:0, rightMax:100, xmin:rxmin, xmax:rxmax})});
   document.getElementById('am-rank-title').textContent=`${houseLabel(fh)} — Q1+Q2 (green) & Q4 (red) over time`;
   // Kyser 2026-09-04: the old subtitle ("<house> only; dashed = quality score (right axis).
   // Hover for its percentile against every peer.") is deleted as redundant -- the title already
@@ -4499,8 +4668,10 @@ function renderSchemeBody(){
     const fs=rec?qseries(rec,field):null;                   // mode-routed series (null while SIP data loads -> empty chart)
     const qline=rec?dates.map((d,i)=>({x:d,y:(fs&&fs[i]!=null)?fs[i]:null})):[];
     const {xmin,xmax}=xBounds(dates, qline.map(p=>p.y));
-    const dq={ data:qline, borderColor:C.navy, borderWidth:2.4, tension:0, pointRadius:0, stepped:true, spanGaps:false, yAxisID:'y', fill:false }; dq.label=RWOF[S.basis]+' quartile';
-    S.charts.scScore=new Chart(ctx,{type:'line',data:{datasets:smoothSets([dq])},options:lineOpts({min:0.6,max:4.4,xmin,xmax,reverse:true,noGrid:true,qTicks:true})});
+    const dq={ data:qline, borderColor:C.navy, borderWidth:2.4, tension:0, pointRadius:ISLAND_PT, pointBackgroundColor:C.navy, stepped:true, spanGaps:false, yAxisID:'y', fill:false }; dq.label=RWOF[S.basis]+' quartile';
+    const _sp=unratedSpans(dates, fs);
+    S.charts.scScore=new Chart(ctx,{type:'line',data:{datasets:smoothSets([dq])},options:{...lineOpts({min:0.6,max:4.4,xmin,xmax,reverse:true,noGrid:true,qTicks:true}), plugins:{...lineOpts({min:0.6,max:4.4,xmin,xmax,reverse:true,noGrid:true,qTicks:true}).plugins, unratedBands:{spans:_sp}}}});
+    S.charts.scScore.$unrated=_sp;
     document.getElementById('sc-score-title').textContent=RWOF[S.basis]+' quartile history';
     document.getElementById('sc-score-sub').textContent=`${rawWord}${vr?'VR exact-peer':'MFI all-peer'} ${RWOF[S.basis]} return quartile (Q1 = top quartile, at the top of the axis)`+smNote;
     document.getElementById('sc-score-legend').innerHTML=`<span><span class="lline" style="background:${C.navy}"></span>${RWOF[S.basis]} quartile</span>`;
@@ -4530,13 +4701,20 @@ function renderSchemeBody(){
     const oneY=rec?dates.map((d,i)=>({x:d,y:a1?a1[i]:null})):[];
     const threeY=rec?dates.map((d,i)=>({x:d,y:a3?a3[i]:null})):[];
     const {xmin,xmax}=xBounds(dates, oneY.map(p=>p.y), threeY.map(p=>p.y));
-    const mk=(data,col,wd)=>({ data, borderColor:col, borderWidth:wd, tension:0, pointRadius:0, stepped:true, spanGaps:false, yAxisID:'y', fill:false });
+    const mk=(data,col,wd)=>({ data, borderColor:col, borderWidth:wd, tension:0, pointRadius:ISLAND_PT, stepped:true, spanGaps:false, yAxisID:'y', fill:false });
     const d1=mk(oneY,C.navy,2.2); d1.label='1Y quartile'; const d2=mk(threeY,C.q2,2.2); d2.label='3Y quartile';
-    S.charts.scScore=new Chart(ctx,{type:'line',data:{datasets:smoothSets([d1,d2])},options:lineOpts({min:0.6,max:4.4,xmin,xmax,reverse:true,noGrid:true,qTicks:true})});
+    d1.pointBackgroundColor=C.navy; d2.pointBackgroundColor=C.q2;
+    const _sp=unratedSpans(dates, a1, a3);
+    const _o=lineOpts({min:0.6,max:4.4,xmin,xmax,reverse:true,noGrid:true,qTicks:true});
+    S.charts.scScore=new Chart(ctx,{type:'line',data:{datasets:smoothSets([d1,d2])},
+      options:{..._o, plugins:{..._o.plugins, unratedBands:{spans:_sp}}}});
+    S.charts.scScore.$unrated=_sp;
     document.getElementById('sc-score-title').textContent='All-peer quartile history';
-    document.getElementById('sc-score-sub').textContent=rawWord+'MFI all-peer quartile (Q1 = top quartile, at the top of the axis)'+smNote;
+    const _nUn=(a1?a1.filter(v=>v==null).length:0);
+    document.getElementById('sc-score-sub').textContent=rawWord+'MFI all-peer quartile (Q1 = top quartile, at the top of the axis)'+smNote
+      + (_nUn ? ` \u00b7 ${_nUn} of ${dates.length} months unrated (shaded)` : '');
     document.getElementById('sc-score-legend').innerHTML=`<span><span class="lline" style="background:${C.navy}"></span>1Y quartile</span><span><span class="lline" style="background:${C.q2}"></span>3Y quartile</span>`;
-    document.getElementById('sc-score-method').innerHTML=methodNote(`Month-end <b>all-peer quartile</b> for <b>${name}</b> (1 = top). Ranked against its full MFI category on calendar 1Y/3Y returns. Axis reversed so Q1 sits on top.`+smMethod);
+    document.getElementById('sc-score-method').innerHTML=methodNote(`Month-end <b>all-peer quartile</b> for <b>${name}</b> (1 = top). Ranked against its full MFI category on calendar 1Y/3Y returns. Axis reversed so Q1 sits on top. <b>Blank, shaded stretches are months with no quartile at all</b> — the scheme lacked the history the window needs, or its category had too few peers to rank that month — and the line is deliberately broken there rather than drawn across a hole. A lone rated month between two such stretches is shown as a <b>dot</b>, because a single point cannot draw a line. On this scheme the 1Y series is unrated in <b>${_nUn} of ${dates.length}</b> month-ends.`+smMethod);
   }
 
   // While a SIP mode's data file is in flight the chart above rendered EMPTY (qseries
