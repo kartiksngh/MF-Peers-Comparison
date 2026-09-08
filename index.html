@@ -1375,8 +1375,14 @@
   #xs-grid tfoot tr.xs-rule td, #xs-grid tfoot tr.xs-rule th { border-top: 2px solid #111; }
   #xs-grid table.rt th.xs-sum, #xs-grid table.rt td.xs-sum { width: 46px; font-size: 10px; padding: 6px 4px;
                                                              background-color: var(--paper-2); }
-  #xs-grid table.rt th.xs-sum:first-of-type, #xs-grid table.rt td.xs-sum:first-of-type { border-left: 2px solid #111; }
-  #xs-grid table.rt th.xs-sum:last-of-type, #xs-grid table.rt td.xs-sum:last-of-type { border-right: 2px solid #111; }
+  /* The seam on BOTH sides of the per-house block: the name is on its left, the sleeves and the
+     grid begin on its right, and crossing either rule means the population being counted changed.
+     These used to be written as `:first-of-type` / `:last-of-type`, which fired zero times -- that
+     pseudo-class means "the first cell of this TAG among its siblings", and the first cell of every
+     row is the Fund-house label, so the selector asked for a label cell carrying the summary class.
+     The edges are now MARKED in the markup, which also survives reordering the summary columns. */
+  #xs-grid table.rt th.xs-sumA, #xs-grid table.rt td.xs-sumA { border-left: 2px solid #111; }
+  #xs-grid table.rt th.xs-sumZ, #xs-grid table.rt td.xs-sumZ { border-right: 2px solid #111; }
   #xs-grid tfoot td.xs-sum { border-right: 2px solid #111; border-left: 2px solid #111; }
   /* a summary cell's ground is FLAT and its value is a bar; a grid cell's ground IS the value.
      That is the whole separation, and it survives a black-and-white printout. */
@@ -1389,6 +1395,12 @@
   #xs-grid table.rt th.xs-h:hover { color: var(--absl); }
   #xs-grid table.rt th .arr { font-size: 9px; opacity: .8; }
   #xs-grid table.rt th .arr.dim { opacity: .25; }
+  /* A category that cannot be shown says so, right under the grid it is missing from. Quiet
+     enough not to compete with the table, framed on the left so the eye lands on it. */
+  #xs-grid .xs-drop { margin-top: 12px; padding: 9px 12px; font-size: 11px; line-height: 1.6;
+                      color: var(--ink-2); background: var(--paper-2);
+                      border-left: 3px solid #9a6b1f; border-radius: 0 3px 3px 0; }
+  #xs-grid .xs-drop b { color: var(--ink); }
   #xs-grid .xs-hdot { display: inline-block; width: 7px; height: 7px; border-radius: 50%;
                       margin-right: 6px; vertical-align: baseline; }
 
@@ -5129,9 +5141,18 @@ function computeCrossSection(i){
     let cc=cats.get(rec.c);
     if(!cc){ cc={c:rec.c, sl:rec.sl, cr:0, n:0, funds:[], bench:null, benchName:null,
                  bnSet:new Set(), bnCr:{}, bnVal:{}, bnMissing:0, bnMissCr:0, bnTotCr:0,
-                 benchShare:null, mixed:false}; cats.set(rec.c, cc); }
+                 benchShare:null, mixed:false, why:{}, whyBench:null, capDate:null}; cats.set(rec.c, cc); }
     cc.n++; if(cr!=null) cc.cr+=cr;
     cc.funds.push({h:rec.h, s:rec.s, cr, ret:fRet, alpha:fAlpha, qtl:fQtl});
+    // WHY a fund has no alpha, tallied per column. When every fund in a category lacks one the
+    // column is dropped, and a column that vanishes without a word reads as "nobody runs a fund
+    // here" -- which is the false reading. The reason is kept so the card can print it.
+    if(fAlpha==null){
+      const w = al.benchWhy || (al.own==null ? 'noreturn' : 'other');
+      cc.why[w] = (cc.why[w]||0) + 1;
+      if(al.capDate && !cc.capDate) cc.capDate = al.capDate;
+      if(al.benchName && !cc.whyBench) cc.whyBench = al.benchName;
+    }
     // A benchmark is only THE column's benchmark when every fund in the column names the same
     // one. Under the MFI all-peer universe a category is not a Value Research category, so its
     // members carry different indices or none at all — printing one member's index as the
@@ -5244,6 +5265,11 @@ function renderCrossSection(){
                 || a.c.localeCompare(b.c));
   // ROWS. Every in-scope house holding a fund in a shown category. Aditya first, then A–Z by
   // display name — the deck's order everywhere else, so the eye finds a house in the same place.
+  // Categories that HOLD funds but have nothing to show on this metric. Kept separate from the
+  // ones excluded by the category filter, which the reader chose and does not need explaining.
+  const _shown=new Set(cols.map(c=>c.c));
+  const dropped=[...cats.values()].filter(cc=> (slF==='(all)' || cc.sl===slF) && !_shown.has(cc.c)
+                                               && cc.funds.some(f=> f.ret!=null || f.qtl!=null || f.alpha!=null));
   const colSet=new Set(cols.map(c=>c.c)), hset=new Set();
   cells.forEach(a=>{ if(colSet.has(a.c)) hset.add(a.h); });
   const houses=[...hset].sort(fhSort);
@@ -5314,19 +5340,21 @@ function renderCrossSection(){
     });
   }
   const showRS = S.xs.rows !== false;
-  const rsHead = showRS ? XS_ROWSUM.map(c=>'<th class="num xs-sum xs-h" data-sk="#'+c.k+'" title="'+xsEsc(c.tip)+' Click to rank the houses on it.">'+c.lbl+' '+xsArrow('#'+c.k)+'</th>').join('') : '';
-  const rsCells = (h)=> !showRS ? '' : XS_ROWSUM.map(c=>{
-    const r=rs[h];
-    if(!c.f) return '<td class="num xs-sum">'+(r.n||'\u2014')+'</td>';
-    if(!r.n) return '<td class="num xs-sum">\u2014</td>';
+  // the block's outer edges are MARKED, never inferred from position -- see the CSS note
+  const rsEdge = (i)=> (i===0?' xs-sumA':'') + (i===XS_ROWSUM.length-1?' xs-sumZ':'');
+  const rsHead = showRS ? XS_ROWSUM.map((c,i)=>'<th class="num xs-sum xs-h'+rsEdge(i)+'" data-sk="#'+c.k+'" title="'+xsEsc(c.tip)+' Click to rank the houses on it.">'+c.lbl+' '+xsArrow('#'+c.k)+'</th>').join('') : '';
+  const rsCells = (h)=> !showRS ? '' : XS_ROWSUM.map((c,i)=>{
+    const e=rsEdge(i), r=rs[h];
+    if(!c.f) return '<td class="num xs-sum'+e+'">'+(r.n||'\u2014')+'</td>';
+    if(!r.n) return '<td class="num xs-sum'+e+'">\u2014</td>';
     const share=r[c.k]/r.n;
     const txt = S.xs.pct ? Math.round(100*share)+'%' : String(r[c.k]);
-    return '<td class="num xs-sum '+(rsInfo[c.k].rank[h]||'')+'" style="'
+    return '<td class="num xs-sum'+e+' '+(rsInfo[c.k].rank[h]||'')+'" style="'
       + xsBar(share, c.good)+'" title="'+r[c.k]+' of '+r.n+'">'+txt+'</td>';
   }).join('');
 
   // one spanning blank so every footer row stays aligned under the per-house block
-  const padRS = (showRS ? '<td class="xs-sum" colspan="'+XS_ROWSUM.length+'"></td>' : '');
+  const padRS = (showRS ? '<td class="xs-sum xs-sumA xs-sumZ" colspan="'+XS_ROWSUM.length+'"></td>' : '');
 
   // ── the grid. TWO header rows: the sleeve band, then the categories.
   const bands=[]; cols.forEach(cc=>{ const b=xsBandOf(cc);
@@ -5334,7 +5362,7 @@ function renderCrossSection(){
     else bands.push({b, n:1}); });
   let html='<table class="rt xs-tbl"><thead>';
   html+='<tr class="xs-bandrow"><th class="xs-lbl"></th>'
-      + (showRS?'<th class="xs-sum" colspan="'+XS_ROWSUM.length+'">Across the categories shown</th>':'')
+      + (showRS?'<th class="xs-sum xs-sumA xs-sumZ" colspan="'+XS_ROWSUM.length+'">Across the categories shown</th>':'')
       + bands.map(g=>{ const c=sleeveColor(g.b)||'#8e8e94';
           return '<th class="num xs-bandh" colspan="'+g.n+'" style="background:'+c+'1f;border-bottom:2px solid '+c+'" title="'+xsEsc(g.b)+'">'+xsEsc(g.b)+'</th>'; }).join('')
       + '</tr>';
@@ -5454,7 +5482,7 @@ function renderCrossSection(){
       s=> s.crAll>0 ? s.crB[k]/s.crAll : null,
       s=> !(s.crAll>0) ? '—' : (pct ? (100*s.crB[k]/s.crAll).toFixed(0)+'%' : inCr(s.crB[k]))));
   html+='</tfoot></table>';
-  host.innerHTML=html;
+  host.innerHTML=html + xsDropNote(dropped, m);
   // this grid sorts through app state, because a colspan in the header makes the shared DOM
   // sorter stand down -- and state is the better half of the trade: the order survives a
   // re-render instead of being thrown away by the next window change
@@ -5475,7 +5503,7 @@ function renderCrossSection(){
   const rw=RWOF[S.basis];
   if(sub) sub.innerHTML=XS_MLBL[m]+' · '+houses.length+' house'+(houses.length===1?'':'s')+' × '+cols.length
         +' categor'+(cols.length===1?'y':'ies')+' · '+universeLabel()+' · '+modeLabel()+' · '+rw+' · '+fmt.date(dates[i]);
-  if(meth) meth.innerHTML=xsMethodNote(cols, houses, colInfo, m, rw, dates[i]);
+  if(meth) meth.innerHTML=xsMethodNote(cols, houses, colInfo, m, rw, dates[i], dropped);
 }
 const xsFundVal = (f, m) => m==='ret' ? f.ret : m==='alpha' ? f.alpha : f.qtl;
 
@@ -5518,7 +5546,49 @@ function wireCrossSection(){
   const x=document.getElementById('xs-exp'); if(x) x.onclick=exportCrossSection;
 }
 
-function xsMethodNote(cols, houses, colInfo, m, rw, asof){
+// Plain words for each reason a category has no value on the chosen metric. Written as a
+// sentence ending, so the card reads "Large Cap, Flexi Cap -- their benchmark has stopped
+// updating (NIFTY 100, last value 31 May 2026)."
+const XS_WHYTXT = {
+  capped:      'their benchmark has stopped updating',
+  benchabsent: 'the data provider ships no values at all for the index they are measured against',
+  nobench:     'no benchmark is designated for them, so there is nothing to measure against',
+  benchwin:    'their benchmark does not go back far enough for this period',
+  nobenchbook: 'their benchmark does not cover this SIP book',
+  noaxis:      'their benchmark has no value at this date',
+  noreturn:    'no fund in them has a return over this period',
+  other:       'no fund in them has a value over this period'
+};
+// The categories that hold funds but cannot be shown on THIS metric, named under the grid with
+// the reason. Silence here was the actual defect: a whole sleeve could disappear and the card
+// gave the reader no way to tell a dead benchmark from an empty category.
+function xsDropNote(dropped, m){
+  if(!dropped || !dropped.length) return '';
+  const groups=new Map();
+  dropped.forEach(cc=>{
+    let best='other', bn=-1;
+    Object.keys(cc.why||{}).forEach(k=>{ if(cc.why[k]>bn){ bn=cc.why[k]; best=k; } });
+    const g = (best==='novr') ? 'nobench' : best;          // both mean "no designated benchmark"
+    if(!groups.has(g)) groups.set(g, []);
+    groups.get(g).push(cc);
+  });
+  const parts=[];
+  groups.forEach((list,g)=>{
+    list.sort((a,b)=>(b.cr||0)-(a.cr||0));
+    const names=list.map(cc=>'<b>'+xsEsc(xsShortCat(cc.c))+'</b>').join(', ');
+    let why = XS_WHYTXT[g] || XS_WHYTXT.other;
+    if(g==='capped'){
+      const idx=[...new Set(list.map(cc=>cc.whyBench).filter(Boolean))];
+      const last=list.map(cc=>cc.capDate).filter(Boolean).sort().slice(-1)[0];
+      if(idx.length===1)     why += ' (' + xsEsc(xsShortBench(idx[0])) + ', last value ' + fmt.date(last) + ')';
+      else if(idx.length>1)  why += ' (' + idx.length + ' different indices, the most recent ending ' + fmt.date(last) + ')';
+    }
+    const cr=list.reduce((a,cc)=>a+(cc.cr||0),0);
+    parts.push(names + ' \u2014 ' + why + (cr>0 ? '. That is ' + Math.round(cr).toLocaleString('en-IN') + ' cr of AUM held back from this view' : ''));
+  });
+  return '<div class="xs-drop"><b>Not shown under ' + XS_MLBL[m] + '.</b> ' + parts.join('. ') + '.</div>';
+}
+function xsMethodNote(cols, houses, colInfo, m, rw, asof, dropped){
   const mixed=cols.filter(c=>c.mixed).length;
   const nob=cols.filter(c=>!c.mixed && c.bench==null).length;
   const med=m==='ret' ? cols.filter(c=>!colInfo[c.c].byBench).length : 0;
@@ -5548,7 +5618,7 @@ function xsMethodNote(cols, houses, colInfo, m, rw, asof){
         + (nob? 'A further <b>'+nob+'</b> column'+(nob===1?'':'s')+' has no benchmark value on this window. ' : '') : '')
     +(S.xs.rows!==false ? '<br><br><b>The block beside each house</b> summarises that house ACROSS the categories on screen, and unlike the block at the foot it does not follow the toggle: a house is a whole book, and how much of it is top-quartile, how much is bottom-quartile and how much beats its benchmark are the same three questions whatever the cells are showing. Every fund counts once per category it is in, and the denominator is the funds of that house carrying any value at all — the hover on each cell gives the count over that denominator.' : '')
     +'<br><br><b>Column order.</b> By <b>sleeve</b> first, then by family inside it — the size ladder read large to small, the style cuts, then themes grouped by what they are about, then the wrappers. A rule marks where one sleeve ends and the next begins, and each header names its sleeve on hover. Ordering by money instead put Pharma between Flexi Cap and Arbitrage, which is an order but not a reading order.'
-    +'<br><br><b>Scope.</b> Rows are the houses in the current house scope ('+scopeLabel()+') holding a fund in a shown category; a column is dropped when no house in scope has a value in it. Change the peer universe, the investment mode, the period or the house scope and the whole grid re-derives — nothing here is pinned to a window or a book.');
+    +'<br><br><b>Scope.</b> Rows are the houses in the current house scope ('+scopeLabel()+') holding a fund in a shown category; a column is dropped when no house in scope has a value in it'+((dropped && dropped.length) ? ' \u2014 <b>'+dropped.length+'</b> categor'+(dropped.length===1?'y is':'ies are')+' dropped on this view for that reason, named directly under the grid with the reason for each, so a category that cannot be measured is never confused with one nobody runs a fund in' : '')+'. Change the peer universe, the investment mode, the period or the house scope and the whole grid re-derives — nothing here is pinned to a window or a book.');
 }
 // The one SIP sentence, in the third person the note needs (modeSentence() is written for a card
 // that has already named the fund). Empty under lumpsum, so a lumpsum note reads unchanged.
