@@ -2884,6 +2884,18 @@ function ctUnclamp(el){
     if (w.scrollWidth > w.clientWidth) { w.style.width = w.scrollWidth + "px"; }
     widest = Math.max(widest, w.scrollWidth);
   });
+  // ★ AND THE CARD ITSELF. Unclamping the inner scroll box is not enough: the box then overflows
+  // a card that is still the width of the screen, and html2canvas photographs the CARD -- so the
+  // right-hand columns were cut off exactly as if nothing had been unclamped. (Kyser: "downloaded
+  // image are coming as cropped out".) The card is widened to its content for the capture and put
+  // back afterwards, so nothing on screen moves.
+  const cardW = [el, el.style.width, el.style.maxWidth, el.style.overflow];
+  if (widest > el.clientWidth) {
+    el.style.width = (widest + 32) + "px";
+    el.style.maxWidth = "none";
+    el.style.overflow = "visible";
+  }
+  saved.push(cardW);
   // ★ THE CAPTURE WIDTH COMES FROM THE INNER SCROLL BOX, NOT THE CARD. The card never scrolls --
   // its .tbl-wrap does -- so card.scrollWidth reads the visible width and a 44-column grid would
   // be photographed cropped at exactly the point a reader would not notice.
