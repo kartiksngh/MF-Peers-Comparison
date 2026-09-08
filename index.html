@@ -1379,6 +1379,10 @@
   #xs-ctl { display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-end; margin: 0 0 14px; }
   #xs-ctl .fg label { display: block; }
   #xs-grid .xs-mark { color: var(--ink-4); font-size: 9px; }
+  /* the benchmark's NAME under its return (Kyser 2026-09-08) -- the number alone does not say
+     WHICH index a column is being measured against, and under the MFI universe that varies */
+  #xs-grid td.xs-bench .xs-bn { display:block; font-size: 8.5px; font-weight: 500; color: var(--ink-3);
+                                letter-spacing: .01em; margin-top: 1px; }
 
 </style>
 </head>
@@ -1612,7 +1616,7 @@ const S = {
   // the house x category cross-section (Kyser 2026-09-08). Mode and window are NOT here:
   // that grid runs on the page's own S.mode / S.basis, so it can never contradict the
   // AMC summary directly above it. Only what is genuinely local to the card lives here.
-  xs:{ metric:'ret', sleeve:'(all)', pct:false },
+  xs:{ metric:'ret', sleeve:'(all)', pct:true },
   composite:{ date:null, qsel:[1,2] },
   league:{ date:null, sortKey:'top', sortDir:-1 },
   // ── x-axis crop, shared by the typed date boxes AND drag-to-crop on any chart ──
@@ -3717,7 +3721,7 @@ function buildViews(){
             <div class="seg sm" id="xs-win"><button data-v="1M">1M</button><button data-v="3M">3M</button><button data-v="6M">6M</button><button data-v="9M">9M</button><button data-v="1Y" class="active">1Y</button><button data-v="2Y">2Y</button><button data-v="3Y">3Y</button><button data-v="5Y">5Y</button></div></div>
           <div class="fg"><label>Categories</label><select id="xs-sleeve"></select></div>
           <div class="fg"><label>Summary rows</label>
-            <div class="seg sm" id="xs-pct"><button data-v="n" class="active">Count / ₹ cr</button><button data-v="p">% share</button></div></div>
+            <div class="seg sm" id="xs-pct"><button data-v="n">Count / ₹ cr</button><button data-v="p" class="active">% share</button></div></div>
         </div>
         <div class="tbl-wrap" id="xs-grid"></div>
         <div id="xs-method"></div>
@@ -4655,6 +4659,10 @@ function exportAMCSummary(){
 const XS_TOPN = 3;              // best / worst per category carry the bold ink (Kyser 2026-09-08)
 const XS_MINRANK = 7;           // …only where a top-3 and a bottom-3 cannot overlap
 const XS_SPREAD_PCTL = 0.85;    // colour magnitude: robust to one runaway cell, unlike a max
+// Index names ship in full ("NIFTY 500 - TRI"); the cell has room for the recognisable part.
+function xsShortBench(n){
+  return String(n||'').replace(/\s*(Total Return Index|TRI|- TRI|Index)\s*$/i,'').trim() || String(n||'');
+}
 const xsEsc = t => String(t==null?'':t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
 // The summary block at the foot. Each metric brings its OWN ladder, because "positive" means
 // something different for a return, an alpha and a quartile — the shape of the block is shared,
@@ -4716,15 +4724,21 @@ function computeCrossSection(i){
     // ── the column. Fund-level values live here (rule 4), and so does the benchmark question.
     let cc=cats.get(rec.c);
     if(!cc){ cc={c:rec.c, sl:rec.sl, cr:0, n:0, funds:[], bench:null, benchName:null,
-                 bnSet:new Set(), bnMissing:0, mixed:false}; cats.set(rec.c, cc); }
+                 bnSet:new Set(), bnCr:{}, bnVal:{}, bnMissing:0, bnMissCr:0, bnTotCr:0,
+                 benchShare:null, mixed:false}; cats.set(rec.c, cc); }
     cc.n++; if(cr!=null) cc.cr+=cr;
     cc.funds.push({h:rec.h, s:rec.s, cr, ret:fRet, alpha:fAlpha, qtl:fQtl});
     // A benchmark is only THE column's benchmark when every fund in the column names the same
     // one. Under the MFI all-peer universe a category is not a Value Research category, so its
     // members carry different indices or none at all — printing one member's index as the
     // column's would be a quiet lie about the other thirty.
-    if(al.benchName){ cc.bnSet.add(al.benchName); if(cc.bench==null && al.bench!=null) cc.bench=al.bench; }
-    else cc.bnMissing++;
+    const _mv = (m0=>m0)(0);
+    if(al.benchName){
+      cc.bnSet.add(al.benchName);
+      cc.bnCr[al.benchName] = (cc.bnCr[al.benchName]||0) + (cr||0);
+      if(al.bench!=null && cc.bnVal[al.benchName]==null) cc.bnVal[al.benchName]=al.bench;
+    } else { cc.bnMissing++; cc.bnMissCr += (cr||0); }
+    cc.bnTotCr += (cr||0);
   }
   // ★ NEVER MEMOISE A FAILURE. 'loading' is a transient — returns.json and standing.json arrive
   // after the first paint — and the page signature does NOT change when they land, so caching a
@@ -4741,9 +4755,14 @@ function computeCrossSection(i){
     a.n     = a.funds.length;
   });
   cats.forEach(cc=>{
-    cc.mixed = cc.bnSet.size>1 || (cc.bnSet.size===1 && cc.bnMissing>0);
-    if(cc.bnSet.size===1 && cc.bnMissing===0) cc.benchName=[...cc.bnSet][0];
-    else { cc.benchName=null; cc.bench=null; }
+    // the index the most MONEY in this column follows, and how much of the column that is
+    let best=null, bestCr=-1;
+    Object.keys(cc.bnCr).forEach(n=>{ if(cc.bnCr[n]>bestCr){ bestCr=cc.bnCr[n]; best=n; } });
+    cc.benchName = best;
+    cc.bench = best ? (cc.bnVal[best]!=null ? cc.bnVal[best] : null) : null;
+    cc.benchShare = (best && cc.bnTotCr>0) ? (cc.bnCr[best]/cc.bnTotCr) : null;
+    // "mixed" now means the column is NOT unanimous -- the row is still shown, but marked
+    cc.mixed = !!(best && (cc.bnSet.size>1 || cc.bnMissing>0));
   });
   _XS={key, val:{state:'ok', cells, cats}};
   return _XS.val;
@@ -4870,10 +4889,13 @@ function renderCrossSection(){
   if(m!=='qtl'){
     html+='<tr class="xs-rule"><th class="xs-lbl">'+(m==='alpha'?'Benchmark, own return':'Benchmark')+'</th>';
     cols.forEach(cc=>{
-      const t=cc.benchName ? xsEsc(cc.benchName)
-            : (cc.mixed ? 'the funds in this column follow different benchmarks, so the column has none'
-                        : 'no benchmark for this category');
-      html+='<td class="num xs-bench" title="'+t+'">'+(cc.bench==null?'—':cc.bench.toFixed(1)+'%')+'</td>';
+      const sh=cc.benchShare==null?null:Math.round(100*cc.benchShare);
+      const t=cc.benchName
+        ? xsEsc(cc.benchName)+(cc.mixed&&sh!=null?' — followed by '+sh+'% of the rated money in this column; the rest name a different index, or none':' — every fund in this column')
+        : 'no fund in this column names a benchmark on this window';
+      html+='<td class="num xs-bench" title="'+t+'">'+(cc.bench==null?'—':cc.bench.toFixed(1)+'%')
+          + (cc.benchName?'<span class="xs-bn">('+xsEsc(xsShortBench(cc.benchName))+(cc.mixed?' · '+sh+'%':'')+')</span>':'')
+          + '</td>';
     });
     html+='</tr>';
   }
@@ -4881,6 +4903,9 @@ function renderCrossSection(){
   // the fund count and of the money, toggled between the absolute figure and the share so the
   // block is five rows twice rather than twenty.
   const bks=XS_BUCKETS[m], pct=S.xs.pct, stats={};
+  // +1 = a bigger number is better, -1 = a bigger number is worse. The ladders are written
+  // best-first then worst-last in XS_BUCKETS, so this is the polarity of each rung.
+  const GOOD = m==='qtl' ? [1,1,-1,-1,1] : [1,1,1,-1,-1];
   cols.forEach(cc=>{
     let nAll=0, crAll=0; const nB=bks.map(()=>0), crB=bks.map(()=>0);
     cc.funds.forEach(f=>{
@@ -4892,24 +4917,43 @@ function renderCrossSection(){
   });
   const tot=t=>'<span class="xs-tot">('+t+')</span>';
   const inCr=v=>Math.round(v).toLocaleString('en-IN');
+  // One row of the summary block. `share` decides BOTH the colour and the ranking even when the
+  // printed figure is a count, because a count cannot be compared across columns whose
+  // denominators differ -- 8 of 10 and 8 of 40 are not the same fact.
+  const sumRow = (label, k, shareOf, printOf) => {
+    const g = GOOD[k] || 1;
+    const sh = {}, rank = {};
+    cols.forEach(cc=>{ sh[cc.c] = shareOf(stats[cc.c]); });
+    const have = cols.filter(cc=> sh[cc.c]!=null);
+    // A row where every column is the same number has no best three and no worst three. Without
+    // this, a row reading 0% everywhere (nobody is more than 5pp behind) put three arbitrary
+    // columns in bold green and three in bold red, which is emphasis with nothing behind it.
+    const spread = have.length ? (Math.max.apply(null, have.map(cc=>sh[cc.c])) -
+                                  Math.min.apply(null, have.map(cc=>sh[cc.c]))) : 0;
+    if(have.length >= XS_MINRANK && spread > 1e-9){
+      const ord = have.slice().sort((x,y)=> g*(sh[y.c]-sh[x.c]) || x.c.localeCompare(y.c));
+      ord.slice(0, XS_TOPN).forEach(cc=> rank[cc.c]='xs-top');
+      ord.slice(-XS_TOPN).forEach(cc=> rank[cc.c]='xs-bot');
+    }
+    let h='<tr><th class="xs-lbl">'+label+'</th>';
+    cols.forEach(cc=>{
+      const v=sh[cc.c], txt=printOf(stats[cc.c]);
+      const bg = v==null ? '' : 'background:'+_amcMix(g>0?C.q1:C.q4, v);
+      h+='<td class="num '+(rank[cc.c]||'')+'" style="'+bg+'">'+txt+'</td>';
+    });
+    return h+'</tr>';
+  };
   html+='<tr class="xs-rule xs-band"><th class="xs-lbl">'+(pct?'% of rated funds':'Funds')+'</th>'
       + cols.map(()=>'<td class="num"></td>').join('')+'</tr>';
-  bks.forEach((b,k)=>{
-    html+='<tr><th class="xs-lbl">'+b[0]+'</th>';
-    cols.forEach(cc=>{ const s=stats[cc.c];
-      html+='<td class="num">'+(!s.nAll ? '—'
-        : pct ? (100*s.nB[k]/s.nAll).toFixed(0)+'%'+tot(s.nAll) : s.nB[k]+tot(s.nAll))+'</td>'; });
-    html+='</tr>';
-  });
+  bks.forEach((b,k)=> html+=sumRow(b[0], k,
+      s=> s.nAll ? s.nB[k]/s.nAll : null,
+      s=> !s.nAll ? '—' : (pct ? (100*s.nB[k]/s.nAll).toFixed(0)+'%'+tot(s.nAll) : s.nB[k]+tot(s.nAll))));
   html+='<tr class="xs-band"><th class="xs-lbl">'+(pct?'% of rated AUM':'AUM, ₹ cr')+'</th>'
       + cols.map(()=>'<td class="num"></td>').join('')+'</tr>';
-  bks.forEach((b,k)=>{
-    html+='<tr><th class="xs-lbl">'+b[0]+'</th>';
-    cols.forEach(cc=>{ const s=stats[cc.c];
-      html+='<td class="num">'+(!(s.crAll>0) ? '—'
-        : pct ? (100*s.crB[k]/s.crAll).toFixed(0)+'%'+tot(inCr(s.crAll)) : inCr(s.crB[k])+tot(inCr(s.crAll)))+'</td>'; });
-    html+='</tr>';
-  });
+  bks.forEach((b,k)=> html+=sumRow(b[0], k,
+      s=> s.crAll>0 ? s.crB[k]/s.crAll : null,
+      s=> !(s.crAll>0) ? '—' : (pct ? (100*s.crB[k]/s.crAll).toFixed(0)+'%'+tot(inCr(s.crAll))
+                                    : inCr(s.crB[k])+tot(inCr(s.crAll)))));
   html+='</tfoot></table>';
   host.innerHTML=html;
   _XSVIEW={cols, houses, colInfo, stats, m, i, asof:dates[i], bks};
