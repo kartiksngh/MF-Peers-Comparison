@@ -1350,10 +1350,23 @@
      only the categories scroll — a grid where you lose track of which row you are on is not a
      grid, it is a wall of numbers. */
   #xs-grid table.rt { font-size: 11px; }
-  #xs-grid table.rt th, #xs-grid table.rt td { padding: 6px 7px; white-space: nowrap; }
+  /* Equal, fixed columns (Kyser 2026-09-08). A category name is now short enough to wrap onto two
+     lines instead of stretching its column, so 44 categories fit in far less horizontal scroll and
+     every column is the same width -- which is what makes a row scannable at all. */
+  #xs-grid table.rt { table-layout: fixed; width: max-content; }
+  #xs-grid table.rt th, #xs-grid table.rt td { padding: 6px 7px; width: 76px; }
+  #xs-grid table.rt th { white-space: normal; word-break: normal; overflow-wrap: anywhere;
+                         vertical-align: bottom; line-height: 1.25; }
+  #xs-grid table.rt td { white-space: nowrap; }
+  #xs-grid table.rt th.xs-lbl, #xs-grid table.rt td.xs-lbl { width: 134px; white-space: normal; }
+  /* the per-house block: narrow, pinned beside the name, and set off from the categories by a rule
+     so nobody reads a summary column as one more category */
+  #xs-grid table.rt th.xs-sum, #xs-grid table.rt td.xs-sum { width: 46px; font-size: 10px; padding: 6px 4px; }
+  #xs-grid table.rt th.xs-sum:last-of-type, #xs-grid table.rt td.xs-sum:last-of-type { border-right: 2px solid var(--line); }
+  #xs-grid tfoot td.xs-sum { border-right: 2px solid var(--line); }
   #xs-grid table.rt th.xs-lbl, #xs-grid table.rt td.xs-lbl {
     position: sticky; left: 0; z-index: 3; text-align: left;
-    background: var(--srf-data, var(--card)); border-right: 1px solid var(--line); min-width: 128px;
+    background: var(--srf-data, var(--card)); border-right: 1px solid var(--line);
   }
   #xs-grid table.rt th.xs-lbl { z-index: 4; background: var(--card); }
   #xs-grid table.rt td.num { text-align: right; font-variant-numeric: tabular-nums; }
@@ -1384,6 +1397,26 @@
   #xs-grid td.xs-bench .xs-bn { display:block; font-size: 8.5px; font-weight: 500; color: var(--ink-3);
                                 letter-spacing: .01em; margin-top: 1px; }
 
+
+  /* ── POP OUT + SAVE AS IMAGE, on every card (Kyser 2026-09-08) ───────────────────────────── */
+  .card-h .ct-tools { display: inline-flex; gap: 6px; margin-left: auto; align-items: center; flex: 0 0 auto; }
+  .ct-b { appearance: none; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;
+          border: 1px solid var(--line); background: var(--card); color: var(--ink-3);
+          border-radius: var(--r); padding: 4px 8px; font-family: inherit; font-size: 10.5px;
+          line-height: 1.3; white-space: nowrap; transition: color .15s, border-color .15s; }
+  .ct-b:hover { color: var(--ink); border-color: var(--gold); }
+  .ct-b svg { width: 12px; height: 12px; }
+  .ct-back { position: fixed; inset: 0; z-index: 9000; background: rgba(20,18,15,.62);
+             display: flex; align-items: center; justify-content: center; padding: 22px; }
+  .ct-box { background: var(--paper); border-radius: 10px; box-shadow: var(--shadow-lg, 0 20px 60px rgba(0,0,0,.4));
+            width: min(1680px, 96vw); height: min(94vh, 1100px); display: flex; flex-direction: column; overflow: hidden; }
+  .ct-bar { display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-bottom: 1px solid var(--line); }
+  .ct-bar .ct-title { font-weight: 700; font-size: 13px; }
+  .ct-bar .ct-sp { flex: 1; }
+  .ct-body { flex: 1; overflow: auto; padding: 14px; }
+  .ct-body .card { box-shadow: none; border: none; margin: 0; }
+  .ct-body .chartbox { height: 62vh !important; }
+  .ct-body .tbl-wrap { max-height: none !important; }
 </style>
 </head>
 <!-- theme-mac = the Mac-style surface layer at the end of the stylesheet (Kyser 2026-09-02).
@@ -1616,7 +1649,7 @@ const S = {
   // the house x category cross-section (Kyser 2026-09-08). Mode and window are NOT here:
   // that grid runs on the page's own S.mode / S.basis, so it can never contradict the
   // AMC summary directly above it. Only what is genuinely local to the card lives here.
-  xs:{ metric:'ret', sleeve:'(all)', pct:true },
+  xs:{ metric:'ret', sleeve:'(all)', pct:true, rows:true },
   composite:{ date:null, qsel:[1,2] },
   league:{ date:null, sortKey:'top', sortDir:-1 },
   // ── x-axis crop, shared by the typed date boxes AND drag-to-crop on any chart ──
@@ -2753,6 +2786,160 @@ const gsObserver = new MutationObserver(ms=>{
 });
 function gsBoot(){ gsScan(); gsObserver.observe(document.body, {childList:true, subtree:true}); }
 if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', gsBoot); else gsBoot();
+
+//════════════════════════════════════════════════════════════════════════════
+//  POP OUT + SAVE AS AN IMAGE, ON EVERY CARD  (Kyser 2026-09-08)
+//════════════════════════════════════════════════════════════════════════════
+// "for each graph and table give the option to pop out ... also downloadable as jpeg/png".
+//
+// One implementation for both, because a card is a card: the tools are injected into every
+// .card header by a MutationObserver, exactly the way the click-to-sort engine attaches itself,
+// so a panel added next year gets them without anyone remembering to wire it.
+//
+// THREE THINGS THAT MAKE THE IMAGE USABLE RATHER THAN MERELY PRODUCED:
+//  1. A CHART IS RE-DRAWN, NOT SCALED. Popping a chart out and stretching its bitmap gives a
+//     blurry chart. The clone builds a NEW Chart from the original's own config, so the popped-out
+//     version is drawn at the larger size and stays sharp. Its data is the same object, so the two
+//     can never disagree.
+//  2. A TABLE IS CAPTURED AT ITS FULL WIDTH. The cross-section grid is 44 columns inside a
+//     scrolling box; html2canvas would otherwise photograph the visible slice and silently crop
+//     the rest. The scroll boxes are unclamped for the capture and put back afterwards.
+//  3. THE IMAGE CARRIES ITS OWN CONTEXT. The card's title and its sub-line ride along, so a PNG
+//     pasted into a deck still says which universe, mode, window and date it was taken on. An
+//     image of numbers with no caption is how a chart ends up meaning something it never said.
+const CT_SCALE = 2;                       // 2x pixel density: readable when pasted into a deck
+function ctIco(kind){
+  return kind === "pop"
+    ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h6v6M21 3l-9 9M10 4H4v16h16v-6"/></svg>'
+    : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v11m0 0l-4-4m4 4l4-4M4 20h16"/></svg>';
+}
+function ctName(card){
+  const h = card.querySelector(".card-h h3, .shead h2");
+  const t = (h ? h.textContent : "chart").replace(/[^\w\s-]/g, "").trim().replace(/\s+/g, "_");
+  return (t || "vistas").slice(0, 60);
+}
+// Every scrollable box inside `el`, unclamped so a capture sees the whole thing.
+function ctUnclamp(el){
+  const saved = [];
+  let widest = 0;
+  el.querySelectorAll(".tbl-wrap, .chartbox").forEach((w) => {
+    saved.push([w, w.style.maxHeight, w.style.overflow, w.style.width]);
+    w.style.maxHeight = "none"; w.style.overflow = "visible";
+    if (w.scrollWidth > w.clientWidth) { w.style.width = w.scrollWidth + "px"; }
+    widest = Math.max(widest, w.scrollWidth);
+  });
+  // ★ THE CAPTURE WIDTH COMES FROM THE INNER SCROLL BOX, NOT THE CARD. The card never scrolls --
+  // its .tbl-wrap does -- so card.scrollWidth reads the visible width and a 44-column grid would
+  // be photographed cropped at exactly the point a reader would not notice.
+  const undo = () => saved.forEach(([w, mh, ov, wd]) => { w.style.maxHeight = mh; w.style.overflow = ov; w.style.width = wd; });
+  undo.widest = widest;
+  return undo;
+}
+async function ctCapture(card, fmt){
+  // html2canvas rides in a <script type="text/plain"> block and is only compiled on first use
+  // (the deck does not pay ~200 KB of parse on every cold load). Asking for it here is what makes
+  // the very first PNG work -- without it the button threw ReferenceError and did nothing.
+  try { if (typeof ensureExportLibs === "function") await ensureExportLibs(); } catch (e) {}
+  if (typeof html2canvas !== "function") { alert("The image library did not load in this deck."); return; }
+  const restore = ctUnclamp(card);
+  const tools = card.querySelector(".ct-tools"); if (tools) tools.style.visibility = "hidden";
+  document.body.style.cursor = "progress";
+  try {
+    const bg = getComputedStyle(document.body).backgroundColor || "#ffffff";
+    const cv = await html2canvas(card, { scale: CT_SCALE, backgroundColor: bg, logging: false,
+      windowWidth: Math.max(document.documentElement.clientWidth, (restore.widest || 0) + 120,
+                            card.scrollWidth + 80) });
+    const url = cv.toDataURL(fmt === "jpeg" ? "image/jpeg" : "image/png", fmt === "jpeg" ? 0.94 : undefined);
+    const a = document.createElement("a");
+    a.href = url; a.download = ctName(card) + "." + (fmt === "jpeg" ? "jpg" : "png"); a.click();
+  } catch (e) {
+    console.error("card capture failed", e);
+    alert("Could not save this card as an image: " + (e && e.message ? e.message : e));
+  } finally { if (tools) tools.style.visibility = ""; restore(); document.body.style.cursor = ""; }
+}
+let _ctOpen = null;
+function ctClose(){
+  if (!_ctOpen) return;
+  try { (_ctOpen.charts || []).forEach((c) => { try { c.destroy(); } catch (e) {} }); } catch (e) {}
+  if (_ctOpen.el && _ctOpen.el.parentNode) _ctOpen.el.parentNode.removeChild(_ctOpen.el);
+  document.body.style.overflow = _ctOpen.ov || "";
+  _ctOpen = null;
+}
+function ctPop(card){
+  ctClose();
+  const back = document.createElement("div");
+  back.className = "ct-back";
+  const box = document.createElement("div");
+  box.className = "ct-box";
+  const bar = document.createElement("div");
+  bar.className = "ct-bar";
+  bar.innerHTML = '<span class="ct-title">' + (card.querySelector(".card-h h3") ? card.querySelector(".card-h h3").textContent : "") + "</span>"
+    + '<span class="ct-sp"></span>'
+    + '<button class="btn btn-dark ct-png">' + ctIco("dl") + " PNG</button>"
+    + '<button class="btn btn-dark ct-jpg">' + ctIco("dl") + " JPG</button>"
+    + '<button class="btn ct-x" title="Close (Esc)">Close</button>';
+  const body = document.createElement("div");
+  body.className = "ct-body";
+  const clone = card.cloneNode(true);
+  const ct = clone.querySelector(".ct-tools"); if (ct) ct.remove();
+  body.appendChild(clone);
+  box.appendChild(bar); box.appendChild(body); back.appendChild(box);
+  document.body.appendChild(back);
+  _ctOpen = { el: back, charts: [], ov: document.body.style.overflow };
+  document.body.style.overflow = "hidden";
+  // A cloned <canvas> is a dead bitmap. Rebuild each chart from the ORIGINAL's own config so the
+  // popped-out copy is drawn fresh at the bigger size (rule 1 above).
+  const srcC = card.querySelectorAll("canvas"), dstC = clone.querySelectorAll("canvas");
+  for (let i = 0; i < srcC.length && i < dstC.length; i++) {
+    let inst = null;
+    try { inst = (typeof Chart !== "undefined" && Chart.getChart) ? Chart.getChart(srcC[i]) : null; } catch (e) { inst = null; }
+    if (!inst) continue;
+    const fresh = document.createElement("canvas");
+    dstC[i].parentNode.replaceChild(fresh, dstC[i]);
+    try {
+      // inst.options is Chart.js's RESOLVED option tree, which is NOT a valid input config --
+      // feeding it back in throws inside the scale resolver. inst.config.options is what the call
+      // site actually passed, which is what a second chart of the same kind needs.
+      const src = inst.config.options || {};
+      const cfg = { type: inst.config.type,
+                    data: { labels: inst.config.data.labels,
+                            datasets: (inst.config.data.datasets || []).map((d) => Object.assign({}, d)) },
+                    options: Object.assign({}, src, { responsive: true, maintainAspectRatio: false, animation: false }) };
+      _ctOpen.charts.push(new Chart(fresh.getContext("2d"), cfg));
+    } catch (e) { console.error("pop-out chart", e); }
+  }
+  bar.querySelector(".ct-x").onclick = ctClose;
+  bar.querySelector(".ct-png").onclick = () => ctCapture(clone, "png");
+  bar.querySelector(".ct-jpg").onclick = () => ctCapture(clone, "jpeg");
+  back.onclick = (e) => { if (e.target === back) ctClose(); };
+}
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") ctClose(); });
+function ctAttach(card){
+  if (!card || card.dataset.ct) return;
+  const head = card.querySelector(".card-h");
+  if (!head) return;                       // a card with no header is a spacer, not a panel
+  card.dataset.ct = "1";
+  const wrap = document.createElement("span");
+  wrap.className = "ct-tools";
+  wrap.innerHTML = '<button class="ct-b ct-pop" title="Open this panel large, on its own.">' + ctIco("pop") + " Pop out</button>"
+    + '<button class="ct-b ct-png" title="Save this panel as a PNG image, at twice screen resolution.">' + ctIco("dl") + " PNG</button>"
+    + '<button class="ct-b ct-jpg" title="Save this panel as a JPG image.">' + ctIco("dl") + " JPG</button>";
+  head.appendChild(wrap);
+  wrap.querySelector(".ct-pop").onclick = () => ctPop(card);
+  wrap.querySelector(".ct-png").onclick = () => ctCapture(card, "png");
+  wrap.querySelector(".ct-jpg").onclick = () => ctCapture(card, "jpeg");
+}
+function ctScan(root){ (root || document).querySelectorAll(".card").forEach(ctAttach); }
+const ctObserver = new MutationObserver((ms) => {
+  for (const m of ms) for (const n of m.addedNodes) {
+    if (n.nodeType !== 1) continue;
+    if (n.matches && n.matches(".card")) ctAttach(n);
+    if (n.querySelectorAll) n.querySelectorAll(".card").forEach(ctAttach);
+  }
+});
+function ctBoot(){ ctScan(); ctObserver.observe(document.body, { childList: true, subtree: true }); }
+if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", ctBoot); else ctBoot();
+
 function downloadCSV(content, filename){
   const blob=new Blob([content],{type:'text/csv;charset=utf-8;'});
   const url=URL.createObjectURL(blob); const a=document.createElement('a');
@@ -2999,7 +3186,7 @@ function viewSig(view){
                           +'|'+S.matrix.metric+'|'+S.matrix.date;                  // matrix card lives here now
     case 'amc':    return g+'|'+S.amc.fh+'|'+S.amc.rankDate+'|'+(S.composite.qsel||[]).join('')
                           +'|'+S.league.sortKey+'|'+S.league.sortDir                    // league card lives here now
-                          +'|'+S.xs.metric+'|'+S.xs.sleeve+'|'+S.xs.pct;               // …and the cross-section
+                          +'|'+S.xs.metric+'|'+S.xs.sleeve+'|'+S.xs.pct+'|'+S.xs.rows;               // …and the cross-section
     case 'scheme': return g+'|'+S.scheme.fh+'|'+S.scheme.cat+'|'+S.scheme.sl+'|'+S.scheme.name+'|'+S.scheme.month+'|'+S.scheme.peerDate;
     default:       return null;                 // mapping (+ its data-quality block): DOM-driven filters, always render
   }
@@ -3720,6 +3907,8 @@ function buildViews(){
           <div class="fg"><label>Over what period</label>
             <div class="seg sm" id="xs-win"><button data-v="1M">1M</button><button data-v="3M">3M</button><button data-v="6M">6M</button><button data-v="9M">9M</button><button data-v="1Y" class="active">1Y</button><button data-v="2Y">2Y</button><button data-v="3Y">3Y</button><button data-v="5Y">5Y</button></div></div>
           <div class="fg"><label>Categories</label><select id="xs-sleeve"></select></div>
+          <div class="fg"><label>Per-house block</label>
+            <div class="seg sm" id="xs-rows"><button data-v="on" class="active">Show</button><button data-v="off">Hide</button></div></div>
           <div class="fg"><label>Summary rows</label>
             <div class="seg sm" id="xs-pct"><button data-v="n">Count / ₹ cr</button><button data-v="p" class="active">% share</button></div></div>
         </div>
@@ -4659,6 +4848,22 @@ function exportAMCSummary(){
 const XS_TOPN = 3;              // best / worst per category carry the bold ink (Kyser 2026-09-08)
 const XS_MINRANK = 7;           // …only where a top-3 and a bottom-3 cannot overlap
 const XS_SPREAD_PCTL = 0.85;    // colour magnitude: robust to one runaway cell, unlike a max
+// ── THE COLUMN NAME (Kyser 2026-09-08: "keep the columns minimal and clean") ────────────────
+// Every column in this grid is a fund category, so the words "Fund", "Funds" and "Schemes" say
+// nothing a reader does not already know, and "Cap" is redundant once you are looking at a row of
+// Large / Mid / Small. The ONE place it is kept is Multi Cap, because "Multi" alone sits one
+// column away from Multi Asset Allocation and the two are different things. The full name stays
+// in the header's tooltip and in every export, so nothing is actually lost.
+const XS_CATLONG = { "Dynamic Asset Allocation or Balanced Advantage": "Balanced Advantage",
+                     "Sector - Banking & Financial Services": "Banking & Financial" };
+function xsShortCat(n){
+  let t = String(n||'').trim();
+  if(XS_CATLONG[t]) return XS_CATLONG[t];
+  t = t.replace(/\s+(Funds?|Schemes?)$/i, '');
+  // "Multi Cap" keeps its Cap; every other "... Cap" loses it
+  if(!/^multi\s+cap$/i.test(t)) t = t.replace(/\s+Cap$/i, '');
+  return t.trim() || String(n||'');
+}
 // Index names ship in full ("NIFTY 500 - TRI"); the cell has room for the recognisable part.
 function xsShortBench(n){
   return String(n||'').replace(/\s*(Total Return Index|TRI|- TRI|Index)\s*$/i,'').trim() || String(n||'');
@@ -4672,6 +4877,21 @@ const XS_BUCKETS = {
   alpha: [['Beat benchmark', v=>v>0], ['≥ +2 pp', v=>v>=2], ['≥ +5 pp', v=>v>=5], ['≤ −2 pp', v=>v<=-2], ['≤ −5 pp', v=>v<=-5]],
   qtl:   [['Q1', v=>v===1], ['Q2', v=>v===2], ['Q3', v=>v===3], ['Q4', v=>v===4], ['Q1+Q2', v=>v<=2]]
 };
+// ── THE PER-HOUSE SUMMARY BLOCK (Kyser 2026-09-08) ──────────────────────────────────────────
+// Seven columns that sit beside the house name and never scroll away. `good` is +1 where a bigger
+// number is better and -1 where it is worse, which is what lets one shading rule serve all of
+// them: Q1 deepens in green, Q4 deepens in red, and neither has to be special-cased.
+// `f` reads a FUND, not a cell, so a house running two funds in a category contributes two
+// answers -- the same rule the column block at the foot uses, and it is stated in the note.
+const XS_ROWSUM = [
+  { k: "n",    lbl: "Funds", tip: "Funds of this house inside the categories on screen that carry any value at all.", good: 0, f: null },
+  { k: "q1",   lbl: "Q1",    tip: "Funds in the top quartile of their own category.", good: 1,  f: (x) => x.qtl != null && x.qtl <= 1 },
+  { k: "q12",  lbl: "Q1+Q2", tip: "Funds in the top HALF of their own category.", good: 1,  f: (x) => x.qtl != null && x.qtl <= 2 },
+  { k: "q4",   lbl: "Q4",    tip: "Funds in the bottom quartile of their own category.", good: -1, f: (x) => x.qtl != null && x.qtl >= 4 },
+  { k: "beat", lbl: "Beat",  tip: "Funds ahead of their own category benchmark on this window.", good: 1,  f: (x) => x.alpha != null && x.alpha > 0 },
+  { k: "a2",   lbl: "\u2265+2pp", tip: "Funds at least 2 percentage points ahead of their benchmark.", good: 1,  f: (x) => x.alpha != null && x.alpha >= 2 },
+  { k: "am2",  lbl: "\u2264\u22122pp", tip: "Funds at least 2 percentage points behind their benchmark.", good: -1, f: (x) => x.alpha != null && x.alpha <= -2 },
+];
 const XS_MLBL = { ret:'Return', alpha:'Alpha vs benchmark', qtl:'Quartile' };
 
 // ── the cross-section itself. One pass over the universe's records, bucketed to (house, cat).
@@ -4859,17 +5079,55 @@ function renderCrossSection(){
     }
     colInfo[cc.c]={byH, centre:ctr.v, byBench:ctr.byBench, mag, rank, vals};
   });
+  // ── the per-house block. Counted over the FUNDS of the shown columns, so a house running two
+  // funds in one category contributes two answers here and one cell in the grid.
+  const rs = {};
+  houses.forEach(h=>{ rs[h]={n:0}; XS_ROWSUM.forEach(c=>{ if(c.f) rs[h][c.k]=0; }); });
+  cols.forEach(cc=> cc.funds.forEach(f=>{
+    const r=rs[f.h]; if(!r) return;
+    if(f.ret==null && f.alpha==null && f.qtl==null) return;
+    r.n++;
+    XS_ROWSUM.forEach(c=>{ if(c.f && c.f(f)) r[c.k]++; });
+  }));
+  // each summary column gets the same treatment a category column gets: shaded by its own value
+  // in its own direction, with the best three and worst three in bold
+  const rsInfo = {};
+  XS_ROWSUM.forEach(c=>{
+    if(!c.f){ rsInfo[c.k]={rank:{}}; return; }
+    const sh={}; houses.forEach(h=>{ sh[h] = rs[h].n>0 ? rs[h][c.k]/rs[h].n : null; });
+    const have=houses.filter(h=>sh[h]!=null);
+    const spread = have.length ? (Math.max.apply(null,have.map(h=>sh[h])) - Math.min.apply(null,have.map(h=>sh[h]))) : 0;
+    const rank={};
+    if(have.length>=XS_MINRANK && spread>1e-9){
+      const ord=have.slice().sort((x,y)=> c.good*(sh[y]-sh[x]) || fhSort(x,y));
+      ord.slice(0,XS_TOPN).forEach(h=>rank[h]='xs-top');
+      ord.slice(-XS_TOPN).forEach(h=>rank[h]='xs-bot');
+    }
+    rsInfo[c.k]={sh, rank};
+  });
+  const showRS = S.xs.rows !== false;
+  const rsHead = showRS ? XS_ROWSUM.map(c=>'<th class="num xs-sum" title="'+xsEsc(c.tip)+'">'+c.lbl+'</th>').join('') : '';
+  const rsCells = (h)=> !showRS ? '' : XS_ROWSUM.map(c=>{
+    const r=rs[h];
+    if(!c.f) return '<td class="num xs-sum">'+(r.n||'\u2014')+'</td>';
+    if(!r.n) return '<td class="num xs-sum">\u2014</td>';
+    const share=r[c.k]/r.n;
+    const txt = S.xs.pct ? Math.round(100*share)+'%' : String(r[c.k]);
+    return '<td class="num xs-sum '+(rsInfo[c.k].rank[h]||'')+'" style="background:'
+      + _amcMix(c.good>0?C.q1:C.q4, share)+'" title="'+r[c.k]+' of '+r.n+'">'+txt+'</td>';
+  }).join('');
+
   // ── the grid
-  let html='<table class="rt"><thead><tr><th class="xs-lbl">Fund house</th>';
+  let html='<table class="rt"><thead><tr><th class="xs-lbl">Fund house</th>'+rsHead;
   cols.forEach(cc=>{
     const med = m==='ret' && !colInfo[cc.c].byBench;
     html+='<th class="num" title="'+xsEsc(cc.c)+(cc.benchName?' — benchmark: '+xsEsc(cc.benchName):'')
         + (med?' — no single benchmark for this column, so the colour is centred on the column median':'')+'">'
-        + xsEsc(cc.c)+(med?' <span class="xs-mark">◦</span>':'')+'</th>';
+        + xsEsc(xsShortCat(cc.c))+(med?' <span class="xs-mark">◦</span>':'')+'</th>';
   });
   html+='</tr></thead><tbody>';
   houses.forEach(h=>{
-    html+='<tr'+(h===S.amc.fh?' class="hl"':'')+'><td class="xs-lbl">'+xsEsc(houseLabel(h))+'</td>';
+    html+='<tr'+(h===S.amc.fh?' class="hl"':'')+'><td class="xs-lbl">'+xsEsc(houseLabel(h))+'</td>'+rsCells(h);
     cols.forEach(cc=>{
       const a=cells.get(h+'|'+cc.c), ci=colInfo[cc.c], v=ci.byH[h];
       const multi=!!(a && a.n>1);
@@ -4887,7 +5145,7 @@ function renderCrossSection(){
   // BENCHMARK ROW — the bottom line of the sheet Kyser shared. Blank where the column's funds do
   // not share one index (see the note), never filled in from one member's benchmark.
   if(m!=='qtl'){
-    html+='<tr class="xs-rule"><th class="xs-lbl">'+(m==='alpha'?'Benchmark, own return':'Benchmark')+'</th>';
+    html+='<tr class="xs-rule"><th class="xs-lbl">'+(m==='alpha'?'Benchmark, own return':'Benchmark')+'</th>'+(showRS?'<td class="xs-sum" colspan="'+XS_ROWSUM.length+'"></td>':'');
     cols.forEach(cc=>{
       const sh=cc.benchShare==null?null:Math.round(100*cc.benchShare);
       const t=cc.benchName
@@ -4935,7 +5193,7 @@ function renderCrossSection(){
       ord.slice(0, XS_TOPN).forEach(cc=> rank[cc.c]='xs-top');
       ord.slice(-XS_TOPN).forEach(cc=> rank[cc.c]='xs-bot');
     }
-    let h='<tr><th class="xs-lbl">'+label+'</th>';
+    let h='<tr><th class="xs-lbl">'+label+'</th>'+(showRS?'<td class="xs-sum" colspan="'+XS_ROWSUM.length+'"></td>':'');
     cols.forEach(cc=>{
       const v=sh[cc.c], txt=printOf(stats[cc.c]);
       const bg = v==null ? '' : 'background:'+_amcMix(g>0?C.q1:C.q4, v);
@@ -4943,12 +5201,12 @@ function renderCrossSection(){
     });
     return h+'</tr>';
   };
-  html+='<tr class="xs-rule xs-band"><th class="xs-lbl">'+(pct?'% of rated funds':'Funds')+'</th>'
+  html+='<tr class="xs-rule xs-band"><th class="xs-lbl">'+(pct?'% of rated funds':'Funds')+'</th>'+(showRS?'<td class="xs-sum" colspan="'+XS_ROWSUM.length+'"></td>':'')
       + cols.map(()=>'<td class="num"></td>').join('')+'</tr>';
   bks.forEach((b,k)=> html+=sumRow(b[0], k,
       s=> s.nAll ? s.nB[k]/s.nAll : null,
       s=> !s.nAll ? '—' : (pct ? (100*s.nB[k]/s.nAll).toFixed(0)+'%'+tot(s.nAll) : s.nB[k]+tot(s.nAll))));
-  html+='<tr class="xs-band"><th class="xs-lbl">'+(pct?'% of rated AUM':'AUM, ₹ cr')+'</th>'
+  html+='<tr class="xs-band"><th class="xs-lbl">'+(pct?'% of rated AUM':'AUM, ₹ cr')+'</th>'+(showRS?'<td class="xs-sum" colspan="'+XS_ROWSUM.length+'"></td>':'')
       + cols.map(()=>'<td class="num"></td>').join('')+'</tr>';
   bks.forEach((b,k)=> html+=sumRow(b[0], k,
       s=> s.crAll>0 ? s.crB[k]/s.crAll : null,
@@ -4971,6 +5229,7 @@ function xsSyncControls(){
   setSeg('xs-mode',   S.mode);
   setSeg('xs-win',    RWOF[S.basis] ? S.basis : '');
   setSeg('xs-pct',    S.xs.pct?'p':'n');
+  setSeg('xs-rows',   S.xs.rows?'on':'off');
   // A window longer than the SIP book ships nothing at all from the engine, so the button is
   // disabled rather than left to produce a grid of dashes with no explanation.
   const bm=modeBookMonths();
@@ -4993,6 +5252,7 @@ function wireCrossSection(){
   root.dataset.wired='1';
   segWire('xs-metric', v=>{ S.xs.metric=v; renderCrossSection(); });
   segWire('xs-pct',    v=>{ S.xs.pct=(v==='p'); renderCrossSection(); });
+  segWire('xs-rows',   v=>{ S.xs.rows=(v==='on'); renderCrossSection(); });
   // These two write the PAGE's state (rule 2 in the header note), so the global bar and every
   // other panel move with them — that is the point, not a side effect.
   segWire('xs-mode',   v=>{ setMode(v); });
@@ -5027,6 +5287,7 @@ function xsMethodNote(cols, houses, colInfo, m, rw, asof){
     + (m!=='qtl' ? '<br><br><b>The benchmark row</b> is shown only where every fund in the column follows the same index. '
         + (mixed? 'It is blank for <b>'+mixed+'</b> column'+(mixed===1?'':'s')+' whose funds do not — under the MFI all-peer universe a category is not a Value Research category, so its members can carry different indices or none, and there is no one benchmark to print. ' : '')
         + (nob? 'A further <b>'+nob+'</b> column'+(nob===1?'':'s')+' has no benchmark value on this window. ' : '') : '')
+    +(S.xs.rows!==false ? '<br><br><b>The block beside each house</b> summarises that house ACROSS the categories on screen, and unlike the block at the foot it does not follow the toggle: a house is a whole book, and how much of it is top-quartile, how much is bottom-quartile and how much beats its benchmark are the same three questions whatever the cells are showing. Every fund counts once per category it is in, and the denominator is the funds of that house carrying any value at all — the hover on each cell gives the count over that denominator.' : '')
     +'<br><br><b>Scope.</b> Rows are the houses in the current house scope ('+scopeLabel()+') holding a fund in a shown category; a column is dropped when no house in scope has a value in it. Change the peer universe, the investment mode, the period or the house scope and the whole grid re-derives — nothing here is pinned to a window or a book.');
 }
 // The one SIP sentence, in the third person the note needs (modeSentence() is written for a card
