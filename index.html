@@ -5306,8 +5306,16 @@ function renderCrossSection(){
   // qualifies. It is a property of the COLUMN, exactly like the benchmark, so it is stated where
   // the benchmark is stated. Nothing is lost: every share below is still a share of these.
   html+='<tr class="xs-den"><th class="xs-lbl">Rated funds</th>'+padRS
-      + cols.map(cc=>'<td class="num xs-den" title="Funds in this category with a value on this window — the denominator of every share below">'
-        + (stats[cc.c].nAll||'—')+'</td>').join('')+'</tr>';
+      + cols.map(cc=>{
+          // how many HOUSES those funds belong to. The grid above shows one cell per house, so a
+          // category where a house runs a dozen funds (FoF, where Mirae alone runs 12) prints a
+          // fund count far above the number of rows — which reads as an error until you are told
+          // it is two different populations. Both numbers, in the place the surprise happens.
+          const hs = new Set(); cc.funds.forEach(f=>{ if(xsFundVal(f,m)!=null) hs.add(f.h); });
+          const n = stats[cc.c].nAll;
+          return '<td class="num xs-den" title="'+(n||0)+' fund'+(n===1?'':'s')+' with a value on this window, run by '+hs.size+' house'+(hs.size===1?'':'s')+'. The grid above shows one cell per HOUSE; this row counts FUNDS, so a house running several funds in one category contributes several here and one cell there. It is the denominator of every share below.">'
+            + (n||'—') + (hs.size && n>hs.size ? '<span class="xs-tot">/'+hs.size+'</span>' : '') + '</td>';
+        }).join('')+'</tr>';
   html+='<tr class="xs-den"><th class="xs-lbl">Rated AUM, ₹ cr</th>'+padRS
       + cols.map(cc=>'<td class="num xs-den" title="AUM behind those funds — the denominator of every AUM share below">'
         + (stats[cc.c].crAll>0?inCr(stats[cc.c].crAll):'—')+'</td>').join('')+'</tr>';
@@ -5427,7 +5435,7 @@ function xsMethodNote(cols, houses, colInfo, m, rw, asof){
     +'<b>Bold green</b> marks the best '+XS_TOPN+' and <b>bold red</b> the worst '+XS_TOPN+' in each category'
     +(m==='qtl'?' — not shown here, because a quartile already is a rank':', shown only where a column has at least '+XS_MINRANK+' rated houses, so the two cannot overlap')+'.'
     +'<br><br><b>How the two kinds of cell are drawn.</b> A cell in the grid is <i>tinted</i> — its whole ground carries the value. A cell in either summary is a <i>bar</i> on a flat ground — its length carries the value, green where a bigger number is better and red where it is worse. Two channels rather than two palettes, so a summary can never be misread as one more category, and an empty bar reads as zero at a glance instead of as a pale shade of good.'
-    +'<br><br><b>The block at the foot counts FUNDS, while the grid above shows HOUSES.</b> "How many funds are in Q1" is a question about funds, so a house running two funds in a category contributes two answers there and one blended cell above. It is counted over the <b>'+houses.length+'</b> houses and <b>'+cols.length+'</b> categories on screen, and every figure carries its own denominator in brackets: funds — or ₹ cr of AUM — that actually have a value on this window. A fund with no history, no benchmark or no reported AUM leaves the numerator <i>and</i> the denominator rather than counting as a zero. The Count / % toggle switches both blocks at once.'
+    +'<br><br><b>The block at the foot counts FUNDS, while the grid above shows HOUSES.</b> "How many funds are in Q1" is a question about funds, so a house running two funds in a category contributes two answers there and one blended cell above. That is why a fund count can exceed the number of rows on screen — under <b>FoF Domestic</b> the industry runs 93 schemes across 24 houses, Mirae alone twelve of them. Where the two differ, the Rated-funds cell prints <b>funds/houses</b> and its cell in the grid carries a small superscript with how many funds it blends. It is counted over the <b>'+houses.length+'</b> houses and <b>'+cols.length+'</b> categories on screen, and every figure carries its own denominator in brackets: funds — or ₹ cr of AUM — that actually have a value on this window. A fund with no history, no benchmark or no reported AUM leaves the numerator <i>and</i> the denominator rather than counting as a zero. The Count / % toggle switches both blocks at once.'
     + (m!=='qtl' ? '<br><br><b>The benchmark row</b> is shown only where every fund in the column follows the same index. '
         + (mixed? 'It is blank for <b>'+mixed+'</b> column'+(mixed===1?'':'s')+' whose funds do not — under the MFI all-peer universe a category is not a Value Research category, so its members can carry different indices or none, and there is no one benchmark to print. ' : '')
         + (nob? 'A further <b>'+nob+'</b> column'+(nob===1?'':'s')+' has no benchmark value on this window. ' : '') : '')
