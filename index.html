@@ -3,8 +3,6 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta http-equiv="Cache-Control" content="no-cache, must-revalidate">
-<meta http-equiv="Pragma" content="no-cache">
 <title>Peer Performance Monitor — Quartile &amp; AUM Positioning</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%23591102'/%3E%3Ctext x='8' y='12' font-size='10' fill='%23f3ead8' text-anchor='middle' font-family='monospace'%3EQ%3C/text%3E%3C/svg%3E">
 <style>
@@ -1352,45 +1350,10 @@
      only the categories scroll — a grid where you lose track of which row you are on is not a
      grid, it is a wall of numbers. */
   #xs-grid table.rt { font-size: 11px; }
-  /* Equal, fixed columns (Kyser 2026-09-08). A category name is now short enough to wrap onto two
-     lines instead of stretching its column, so 44 categories fit in far less horizontal scroll and
-     every column is the same width -- which is what makes a row scannable at all. */
-  #xs-grid table.rt { table-layout: fixed; width: max-content; }
-  #xs-grid table.rt th, #xs-grid table.rt td { padding: 6px 7px; width: 76px; }
-  #xs-grid table.rt th { white-space: normal; word-break: normal; overflow-wrap: anywhere;
-                         vertical-align: bottom; line-height: 1.25; }
-  #xs-grid table.rt td { white-space: nowrap; }
-  #xs-grid table.rt th.xs-lbl, #xs-grid table.rt td.xs-lbl { width: 134px; white-space: normal; }
-  /* the per-house block: narrow, pinned beside the name, and set off from the categories by a rule
-     so nobody reads a summary column as one more category */
-  /* ── THREE BLOCKS, THREE BOXES (Kyser 2026-09-08) ─────────────────────────────────────────
-     The per-house block, the grid and the block at the foot are three different statements about
-     three different populations, and until they were boxed they read as one wall of shaded cells.
-     The rules are structural, not decorative: crossing one means the denominator changed. */
-  /* Kyser 2026-09-08: "boxed in black borders ... equivalent to Excel's thick outside border".
-     Not a hairline in the theme's line colour -- 2px of INK, on the outside of the table and on
-     every seam between the three blocks, so the eye reads three tables rather than one wall. */
-  #xs-grid table.rt { border: 2px solid #111; }
-  #xs-grid table.rt thead th { border-bottom: 2px solid #111; }
-  #xs-grid tfoot tr.xs-rule td, #xs-grid tfoot tr.xs-rule th { border-top: 2px solid #111; }
-  #xs-grid table.rt th.xs-sum, #xs-grid table.rt td.xs-sum { width: 46px; font-size: 10px; padding: 6px 4px;
-                                                             background-color: var(--paper-2); }
-  #xs-grid table.rt th.xs-sum:first-of-type, #xs-grid table.rt td.xs-sum:first-of-type { border-left: 2px solid #111; }
-  #xs-grid table.rt th.xs-sum:last-of-type, #xs-grid table.rt td.xs-sum:last-of-type { border-right: 2px solid #111; }
-  #xs-grid tfoot td.xs-sum { border-right: 2px solid #111; border-left: 2px solid #111; }
-  /* a summary cell's ground is FLAT and its value is a bar; a grid cell's ground IS the value.
-     That is the whole separation, and it survives a black-and-white printout. */
-  #xs-grid tfoot td.xs-fsum { background-color: var(--paper-2); }
-  #xs-grid tfoot { border-top: 2px solid #111; }
-  /* the two denominator rows: context, not data -- flat, quiet, and set off from the shares */
-  #xs-grid tfoot tr.xs-den td, #xs-grid tfoot tr.xs-den th { background-color: var(--paper-2); color: var(--ink-2); font-weight: 600; }
-  #xs-grid tfoot tr.xs-den + tr.xs-den td, #xs-grid tfoot tr.xs-den + tr.xs-den th { border-bottom: 2px solid #111; }
-
-  /* where one sleeve ends and the next begins */
-  #xs-grid table.rt th.xs-slv, #xs-grid table.rt td.xs-slv { border-left: 2px solid var(--line); }
+  #xs-grid table.rt th, #xs-grid table.rt td { padding: 6px 7px; white-space: nowrap; }
   #xs-grid table.rt th.xs-lbl, #xs-grid table.rt td.xs-lbl {
     position: sticky; left: 0; z-index: 3; text-align: left;
-    background: var(--srf-data, var(--card)); border-right: 1px solid var(--line);
+    background: var(--srf-data, var(--card)); border-right: 1px solid var(--line); min-width: 128px;
   }
   #xs-grid table.rt th.xs-lbl { z-index: 4; background: var(--card); }
   #xs-grid table.rt td.num { text-align: right; font-variant-numeric: tabular-nums; }
@@ -1406,7 +1369,7 @@
   /* The benchmark and the summary block sit in a tfoot, which is also what keeps them OUT of
      the click-to-sort (gsRuns only ever reorders tbody rows) — a summary that sorted into the
      middle of the houses would be a false table. */
-  #xs-grid tfoot td, #xs-grid tfoot th { border-top: 1px solid var(--line-2); background-color: var(--paper-2); font-size: 10.5px; }
+  #xs-grid tfoot td, #xs-grid tfoot th { border-top: 1px solid var(--line-2); background: var(--paper-2); font-size: 10.5px; }
   #xs-grid tfoot tr.xs-rule td, #xs-grid tfoot tr.xs-rule th { border-top: 1.5px solid var(--ink); }
   #xs-grid tfoot th.xs-lbl { background: var(--paper-2); text-transform: none; letter-spacing: 0;
                              font-size: 10.5px; font-weight: 600; color: var(--ink-2); position: sticky; left: 0; }
@@ -1419,36 +1382,8 @@
   /* the benchmark's NAME under its return (Kyser 2026-09-08) -- the number alone does not say
      WHICH index a column is being measured against, and under the MFI universe that varies */
   #xs-grid td.xs-bench .xs-bn { display:block; font-size: 8.5px; font-weight: 500; color: var(--ink-3);
-                                letter-spacing: .01em; margin-top: 1px; cursor: pointer;
-                                white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  /* opened, it wraps INSIDE the fixed column: the row gets taller, the grid never gets wider */
-  #xs-grid td.xs-bench .xs-bn.open { white-space: normal; overflow: visible; text-overflow: clip;
-                                     color: var(--ink-2); line-height: 1.3; }
+                                letter-spacing: .01em; margin-top: 1px; }
 
-
-  /* ── POP OUT + SAVE AS IMAGE, on every card (Kyser 2026-09-08) ───────────────────────────── */
-  .card-h .ct-tools { display: inline-flex; gap: 6px; margin-left: auto; align-items: center; flex: 0 0 auto; }
-  .ct-b { appearance: none; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;
-          border: 1px solid var(--line); background: var(--card); color: var(--ink-3);
-          border-radius: var(--r); padding: 4px 8px; font-family: inherit; font-size: 10.5px;
-          line-height: 1.3; white-space: nowrap; transition: color .15s, border-color .15s; }
-  .ct-b:hover { color: var(--ink); border-color: var(--gold); }
-  .ct-b svg { width: 12px; height: 12px; }
-  .ct-back { position: fixed; inset: 0; z-index: 9000; background: rgba(20,18,15,.62);
-             display: flex; align-items: center; justify-content: center; padding: 22px; }
-  .ct-box { background: var(--paper); border-radius: 10px; box-shadow: var(--shadow-lg, 0 20px 60px rgba(0,0,0,.4));
-            width: min(1680px, 96vw); height: min(94vh, 1100px); display: flex; flex-direction: column; overflow: hidden; }
-  .ct-bar { display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-bottom: 1px solid var(--line); }
-  .ct-bar .ct-title { font-weight: 700; font-size: 13px; }
-  .ct-bar .ct-sp { flex: 1; }
-  .ct-body { flex: 1; overflow: auto; padding: 14px; }
-  .ct-body .card { box-shadow: none; border: none; margin: 0; }
-  .ct-body .chartbox { height: 62vh !important; }
-  .ct-body .tbl-wrap { max-height: none !important; }
-  #vs-stamp { position: fixed; right: 10px; bottom: 8px; z-index: 8000; font-size: 9.5px;
-               color: var(--ink-4); background: var(--paper); border: 1px solid var(--line);
-               border-radius: 4px; padding: 2px 7px; opacity: .72; pointer-events: auto; }
-  #vs-stamp:hover { opacity: 1; color: var(--ink-2); }
 </style>
 </head>
 <!-- theme-mac = the Mac-style surface layer at the end of the stylesheet (Kyser 2026-09-02).
@@ -1531,7 +1466,7 @@
   <div class="fg" id="gc-rewardwrap" style="display:none"><label>Benchmark reward</label>
     <label class="chk"><input type="checkbox" id="gc-reward" checked> +1 if beats 3Y benchmark</label></div>
   <div class="fg"><label>Investment mode</label>
-    <div class="seg" id="gc-mode"><button data-v="ls" class="active">Lumpsum</button><button data-v="s1">1Y SIP</button><button data-v="s2">2Y SIP</button><button data-v="s3">3Y SIP</button><button data-v="s5">5Y SIP</button></div></div>
+    <div class="seg" id="gc-mode"><button data-v="ls" class="active">Lumpsum</button><button data-v="s3">3Y SIP book</button><button data-v="s5">5Y SIP book</button></div></div>
   <div class="fg" id="gc-xrwrap"><label>Date range &middot; charts</label>
     <div class="drow"><input type="date" id="gc-from" class="dtin" aria-label="Chart range start" title="Start date — blank means the start of the history"><span class="dsep">to</span><input type="date" id="gc-to" class="dtin" aria-label="Chart range end" title="End date — blank means the latest date"><button type="button" id="gc-xreset" class="xrst" disabled title="Reset to the full history. You can also double-click any chart.">Reset</button></div></div>
   <div class="spacer"></div>
@@ -1681,7 +1616,7 @@ const S = {
   // the house x category cross-section (Kyser 2026-09-08). Mode and window are NOT here:
   // that grid runs on the page's own S.mode / S.basis, so it can never contradict the
   // AMC summary directly above it. Only what is genuinely local to the card lives here.
-  xs:{ metric:'ret', sleeve:'(all)', pct:true, rows:true },
+  xs:{ metric:'ret', sleeve:'(all)', pct:true },
   composite:{ date:null, qsel:[1,2] },
   league:{ date:null, sortKey:'top', sortDir:-1 },
   // ── x-axis crop, shared by the typed date boxes AND drag-to-crop on any chart ──
@@ -1768,31 +1703,9 @@ const WINMONTHS={'1 Month':1,'3 Month':3,'6 Month':6,'9 Month':9,'1 Year':12,'2 
 // existing SIP actually has. When the window equals the book the two coincide, and the measure
 // is exactly the fresh SIP the deck shipped before.
 // SIP series ship as sip_sip3y.json / sip_sip5y.json (hosted, lazy) or inline as data.sip.
-// ONE TABLE, not four chained ternaries: adding the 1Y and 2Y books (Kyser 2026-09-08) touched
-// three separate ternaries in the old shape, which is exactly how a mode ends up meaning one thing
-// in the label and another in the file it fetches.
-const MODE_BOOKS = { s1:{k:'sip1y', m:12, lbl:'1Y SIP book'}, s2:{k:'sip2y', m:24, lbl:'2Y SIP book'},
-                     s3:{k:'sip3y', m:36, lbl:'3Y SIP book'}, s5:{k:'sip5y', m:60, lbl:'5Y SIP book'} };
-// Which investor books this PAYLOAD carries. A deck built before the 1Y/2Y books existed lists
-// neither, so its buttons stay hidden rather than offering a mode that can only ever say
-// "loading SIP data". The fallback is the pair every older payload has.
-function sipBooksAvailable(){
-  const m = (S.data && S.data.meta) || {};
-  const l = m.sip_books || m.sip_conventions;
-  return (Array.isArray(l) && l.length) ? l : ['sip3y','sip5y'];
-}
-function modeAvailable(mode){
-  if(mode === 'ls') return true;
-  const b = (MODE_BOOKS[mode]||{}).k;
-  return !!b && sipBooksAvailable().indexOf(b) >= 0;
-}
-function syncModeButtons(id){
-  const box = document.getElementById(id); if(!box) return;
-  box.querySelectorAll('button').forEach(b=>{ b.style.display = modeAvailable(b.dataset.v) ? '' : 'none'; });
-}
-const modeConv  = () => (MODE_BOOKS[S.mode]||{}).k || null;      // mode -> file/book key
-const modeBookMonths = () => (MODE_BOOKS[S.mode]||{}).m || null;
-const modeLabel = () => (MODE_BOOKS[S.mode]||{}).lbl || 'Lumpsum';
+const modeConv  = () => S.mode==='s3' ? 'sip3y' : S.mode==='s5' ? 'sip5y' : null;   // mode -> file/book key
+const modeBookMonths = () => S.mode==='s3' ? 36 : S.mode==='s5' ? 60 : null;
+const modeLabel = () => S.mode==='s3' ? '3Y SIP book' : S.mode==='s5' ? '5Y SIP book' : 'Lumpsum';
 // The instalment day, in words. ONE grid serves BOTH books (peer_monitor sip_month_grids →
 // grids["mid"]), so this is a constant, not a per-convention lookup. It WAS a lookup, back when
 // the deck shipped 1st-of-month AND month-end conventions; the key it tested became the BOOK key
@@ -2254,9 +2167,7 @@ function boot(data){
   // per-convention store so a mode switch is instant and the hosted lazy fetch never fires.
   // Each seeded convention is FLAGGED so sipEvict() leaves it alone: it is the same object
   // data.sip already holds, dropping it would free nothing, and nothing could fetch it back.
-  // every book the payload actually carries, not a hard-coded pair -- an offline deck built
-  // with the 1Y and 2Y books would otherwise silently ignore them
-  if(data.sip){ Object.keys(data.sip).forEach(k=>{ if(data.sip[k] && data.sip[k].sipret){ SIPD[k]=data.sip[k]; SIP_INLINE[k]=1; } }); }
+  if(data.sip){ ['sip3y','sip5y'].forEach(k=>{ if(data.sip[k]){ SIPD[k]=data.sip[k]; SIP_INLINE[k]=1; } }); }
 
   // default as-of indices
   S.sleeve.rankDate = data.aum_dates.length-1;
@@ -2271,7 +2182,7 @@ function boot(data){
   const h=location.hash||'';
   const mu=h.match(/[?&#]u=(all|vr)/); if(mu) S.universe=mu[1];
   const mb=h.match(/[?&#]b=([A-Za-z0-9]+)/); if(mb){ const map={'1Y':'1Y','2Y':'2Y','3Y':'3Y','5Y':'5Y','3Yr':'3Y+reward','Composite':'Composite'}; if(map[mb[1]]) S.basis=map[mb[1]]; }
-  const mm=h.match(/[?&#]m=(ls|s1|s2|s3|s5)/); if(mm) S.mode=mm[1];   // investment-mode deep link
+  const mm=h.match(/[?&#]m=(ls|s3|s5)/); if(mm) S.mode=mm[1];   // investment-mode deep link
   const ms=h.match(/[?&#]hs=(t15|all)/); if(ms && scopeAvailable()) S.scope=ms[1];  // house scope
 
   document.getElementById('mb-asof').textContent  = 'As of ' + fmt.date(data.meta.latest_aum_date || data.meta.latest);
@@ -2842,184 +2753,6 @@ const gsObserver = new MutationObserver(ms=>{
 });
 function gsBoot(){ gsScan(); gsObserver.observe(document.body, {childList:true, subtree:true}); }
 if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', gsBoot); else gsBoot();
-
-//════════════════════════════════════════════════════════════════════════════
-//  POP OUT + SAVE AS AN IMAGE, ON EVERY CARD  (Kyser 2026-09-08)
-//════════════════════════════════════════════════════════════════════════════
-// "for each graph and table give the option to pop out ... also downloadable as jpeg/png".
-//
-// One implementation for both, because a card is a card: the tools are injected into every
-// .card header by a MutationObserver, exactly the way the click-to-sort engine attaches itself,
-// so a panel added next year gets them without anyone remembering to wire it.
-//
-// THREE THINGS THAT MAKE THE IMAGE USABLE RATHER THAN MERELY PRODUCED:
-//  1. A CHART IS RE-DRAWN, NOT SCALED. Popping a chart out and stretching its bitmap gives a
-//     blurry chart. The clone builds a NEW Chart from the original's own config, so the popped-out
-//     version is drawn at the larger size and stays sharp. Its data is the same object, so the two
-//     can never disagree.
-//  2. A TABLE IS CAPTURED AT ITS FULL WIDTH. The cross-section grid is 44 columns inside a
-//     scrolling box; html2canvas would otherwise photograph the visible slice and silently crop
-//     the rest. The scroll boxes are unclamped for the capture and put back afterwards.
-//  3. THE IMAGE CARRIES ITS OWN CONTEXT. The card's title and its sub-line ride along, so a PNG
-//     pasted into a deck still says which universe, mode, window and date it was taken on. An
-//     image of numbers with no caption is how a chart ends up meaning something it never said.
-const CT_SCALE = 2;                       // 2x pixel density: readable when pasted into a deck
-function ctIco(kind){
-  return kind === "pop"
-    ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h6v6M21 3l-9 9M10 4H4v16h16v-6"/></svg>'
-    : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v11m0 0l-4-4m4 4l4-4M4 20h16"/></svg>';
-}
-function ctName(card){
-  const h = card.querySelector(".card-h h3, .shead h2");
-  const t = (h ? h.textContent : "chart").replace(/[^\w\s-]/g, "").trim().replace(/\s+/g, "_");
-  return (t || "vistas").slice(0, 60);
-}
-// Every scrollable box inside `el`, unclamped so a capture sees the whole thing.
-function ctUnclamp(el){
-  const saved = [];
-  let widest = 0;
-  el.querySelectorAll(".tbl-wrap, .chartbox").forEach((w) => {
-    saved.push([w, w.style.maxHeight, w.style.overflow, w.style.width]);
-    w.style.maxHeight = "none"; w.style.overflow = "visible";
-    if (w.scrollWidth > w.clientWidth) { w.style.width = w.scrollWidth + "px"; }
-    widest = Math.max(widest, w.scrollWidth);
-  });
-  // ★ AND THE CARD ITSELF. Unclamping the inner scroll box is not enough: the box then overflows
-  // a card that is still the width of the screen, and html2canvas photographs the CARD -- so the
-  // right-hand columns were cut off exactly as if nothing had been unclamped. (Kyser: "downloaded
-  // image are coming as cropped out".) The card is widened to its content for the capture and put
-  // back afterwards, so nothing on screen moves.
-  const cardW = [el, el.style.width, el.style.maxWidth, el.style.overflow];
-  if (widest > el.clientWidth) {
-    el.style.width = (widest + 32) + "px";
-    el.style.maxWidth = "none";
-    el.style.overflow = "visible";
-  }
-  saved.push(cardW);
-  // ★ THE CAPTURE WIDTH COMES FROM THE INNER SCROLL BOX, NOT THE CARD. The card never scrolls --
-  // its .tbl-wrap does -- so card.scrollWidth reads the visible width and a 44-column grid would
-  // be photographed cropped at exactly the point a reader would not notice.
-  const undo = () => saved.forEach(([w, mh, ov, wd]) => { w.style.maxHeight = mh; w.style.overflow = ov; w.style.width = wd; });
-  undo.widest = widest;
-  return undo;
-}
-async function ctCapture(card, fmt){
-  // html2canvas rides in a <script type="text/plain"> block and is only compiled on first use
-  // (the deck does not pay ~200 KB of parse on every cold load). Asking for it here is what makes
-  // the very first PNG work -- without it the button threw ReferenceError and did nothing.
-  try { if (typeof ensureExportLibs === "function") await ensureExportLibs(); } catch (e) {}
-  if (typeof html2canvas !== "function") { alert("The image library did not load in this deck."); return; }
-  const restore = ctUnclamp(card);
-  const tools = card.querySelector(".ct-tools"); if (tools) tools.style.visibility = "hidden";
-  document.body.style.cursor = "progress";
-  try {
-    const bg = getComputedStyle(document.body).backgroundColor || "#ffffff";
-    const cv = await html2canvas(card, { scale: CT_SCALE, backgroundColor: bg, logging: false,
-      windowWidth: Math.max(document.documentElement.clientWidth, (restore.widest || 0) + 120,
-                            card.scrollWidth + 80) });
-    const url = cv.toDataURL(fmt === "jpeg" ? "image/jpeg" : "image/png", fmt === "jpeg" ? 0.94 : undefined);
-    const a = document.createElement("a");
-    a.href = url; a.download = ctName(card) + "." + (fmt === "jpeg" ? "jpg" : "png"); a.click();
-  } catch (e) {
-    console.error("card capture failed", e);
-    alert("Could not save this card as an image: " + (e && e.message ? e.message : e));
-  } finally { if (tools) tools.style.visibility = ""; restore(); document.body.style.cursor = ""; }
-}
-let _ctOpen = null;
-function ctClose(){
-  if (!_ctOpen) return;
-  try { (_ctOpen.charts || []).forEach((c) => { try { c.destroy(); } catch (e) {} }); } catch (e) {}
-  if (_ctOpen.el && _ctOpen.el.parentNode) _ctOpen.el.parentNode.removeChild(_ctOpen.el);
-  document.body.style.overflow = _ctOpen.ov || "";
-  _ctOpen = null;
-}
-function ctPop(card){
-  ctClose();
-  const back = document.createElement("div");
-  back.className = "ct-back";
-  const box = document.createElement("div");
-  box.className = "ct-box";
-  const bar = document.createElement("div");
-  bar.className = "ct-bar";
-  bar.innerHTML = '<span class="ct-title">' + (card.querySelector(".card-h h3") ? card.querySelector(".card-h h3").textContent : "") + "</span>"
-    + '<span class="ct-sp"></span>'
-    + '<button class="btn btn-dark ct-png">' + ctIco("dl") + " PNG</button>"
-    + '<button class="btn btn-dark ct-jpg">' + ctIco("dl") + " JPG</button>"
-    + '<button class="btn ct-x" title="Close (Esc)">Close</button>';
-  const body = document.createElement("div");
-  body.className = "ct-body";
-  const clone = card.cloneNode(true);
-  const ct = clone.querySelector(".ct-tools"); if (ct) ct.remove();
-  body.appendChild(clone);
-  box.appendChild(bar); box.appendChild(body); back.appendChild(box);
-  document.body.appendChild(back);
-  _ctOpen = { el: back, charts: [], ov: document.body.style.overflow };
-  document.body.style.overflow = "hidden";
-  // A cloned <canvas> is a dead bitmap. Rebuild each chart from the ORIGINAL's own config so the
-  // popped-out copy is drawn fresh at the bigger size (rule 1 above).
-  const srcC = card.querySelectorAll("canvas"), dstC = clone.querySelectorAll("canvas");
-  for (let i = 0; i < srcC.length && i < dstC.length; i++) {
-    let inst = null;
-    try { inst = (typeof Chart !== "undefined" && Chart.getChart) ? Chart.getChart(srcC[i]) : null; } catch (e) { inst = null; }
-    if (!inst) continue;
-    const fresh = document.createElement("canvas");
-    dstC[i].parentNode.replaceChild(fresh, dstC[i]);
-    try {
-      // inst.options is Chart.js's RESOLVED option tree, which is NOT a valid input config --
-      // feeding it back in throws inside the scale resolver. inst.config.options is what the call
-      // site actually passed, which is what a second chart of the same kind needs.
-      const src = inst.config.options || {};
-      const cfg = { type: inst.config.type,
-                    data: { labels: inst.config.data.labels,
-                            datasets: (inst.config.data.datasets || []).map((d) => Object.assign({}, d)) },
-                    options: Object.assign({}, src, { responsive: true, maintainAspectRatio: false, animation: false }) };
-      _ctOpen.charts.push(new Chart(fresh.getContext("2d"), cfg));
-    } catch (e) { console.error("pop-out chart", e); }
-  }
-  bar.querySelector(".ct-x").onclick = ctClose;
-  bar.querySelector(".ct-png").onclick = () => ctCapture(clone, "png");
-  bar.querySelector(".ct-jpg").onclick = () => ctCapture(clone, "jpeg");
-  back.onclick = (e) => { if (e.target === back) ctClose(); };
-}
-document.addEventListener("keydown", (e) => { if (e.key === "Escape") ctClose(); });
-function ctAttach(card){
-  if (!card || card.dataset.ct) return;
-  const head = card.querySelector(".card-h");
-  if (!head) return;                       // a card with no header is a spacer, not a panel
-  card.dataset.ct = "1";
-  const wrap = document.createElement("span");
-  wrap.className = "ct-tools";
-  wrap.innerHTML = '<button class="ct-b ct-pop" title="Open this panel large, on its own.">' + ctIco("pop") + " Pop out</button>"
-    + '<button class="ct-b ct-png" title="Save this panel as a PNG image, at twice screen resolution.">' + ctIco("dl") + " PNG</button>"
-    + '<button class="ct-b ct-jpg" title="Save this panel as a JPG image.">' + ctIco("dl") + " JPG</button>";
-  head.appendChild(wrap);
-  wrap.querySelector(".ct-pop").onclick = () => ctPop(card);
-  wrap.querySelector(".ct-png").onclick = () => ctCapture(card, "png");
-  wrap.querySelector(".ct-jpg").onclick = () => ctCapture(card, "jpeg");
-}
-function ctScan(root){ (root || document).querySelectorAll(".card").forEach(ctAttach); }
-const ctObserver = new MutationObserver((ms) => {
-  for (const m of ms) for (const n of m.addedNodes) {
-    if (n.nodeType !== 1) continue;
-    if (n.matches && n.matches(".card")) ctAttach(n);
-    if (n.querySelectorAll) n.querySelectorAll(".card").forEach(ctAttach);
-  }
-});
-// The page's own build time, shown in the corner. If a reader reports a change missing, this
-// says in one glance whether they are looking at the file that has it.
-function vsStamp(){
-  try{
-    const el=document.createElement('div'); el.id='vs-stamp';
-    const d=new Date(document.lastModified);
-    el.textContent='page built '+d.toLocaleString('en-GB',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
-    el.title='When THIS copy of the page was built. If it is older than you expect, your browser is showing a cached copy - reload with Ctrl+Shift+R.';
-    document.body.appendChild(el);
-  }catch(e){}
-}
-if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', vsStamp); else vsStamp();
-function ctBoot(){ ctScan(); ctObserver.observe(document.body, { childList: true, subtree: true }); }
-if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", ctBoot); else ctBoot();
-
 function downloadCSV(content, filename){
   const blob=new Blob([content],{type:'text/csv;charset=utf-8;'});
   const url=URL.createObjectURL(blob); const a=document.createElement('a');
@@ -3152,8 +2885,6 @@ function syncGlobalControls(){
   document.getElementById('gc-wwrap').style.display      = comp?'':'none';
   document.getElementById('gc-rewardwrap').style.display = (vr && comp)?'':'none';
   setSeg('gc-basis', S.basis);
-  if(!modeAvailable(S.mode)) S.mode='ls';
-  syncModeButtons('gc-mode');
   setSeg('gc-mode', S.mode);
   document.getElementById('gc-w').value=S.w;
   document.getElementById('gc-wval').textContent=`${S.w} / ${100-S.w}`;
@@ -3268,7 +2999,7 @@ function viewSig(view){
                           +'|'+S.matrix.metric+'|'+S.matrix.date;                  // matrix card lives here now
     case 'amc':    return g+'|'+S.amc.fh+'|'+S.amc.rankDate+'|'+(S.composite.qsel||[]).join('')
                           +'|'+S.league.sortKey+'|'+S.league.sortDir                    // league card lives here now
-                          +'|'+S.xs.metric+'|'+S.xs.sleeve+'|'+S.xs.pct+'|'+S.xs.rows;               // …and the cross-section
+                          +'|'+S.xs.metric+'|'+S.xs.sleeve+'|'+S.xs.pct;               // …and the cross-section
     case 'scheme': return g+'|'+S.scheme.fh+'|'+S.scheme.cat+'|'+S.scheme.sl+'|'+S.scheme.name+'|'+S.scheme.month+'|'+S.scheme.peerDate;
     default:       return null;                 // mapping (+ its data-quality block): DOM-driven filters, always render
   }
@@ -3985,12 +3716,10 @@ function buildViews(){
           <div class="fg"><label>Value in each cell</label>
             <div class="seg sm" id="xs-metric"><button data-v="ret" class="active">Return</button><button data-v="alpha">Alpha vs benchmark</button><button data-v="qtl">Quartile</button></div></div>
           <div class="fg"><label>Invested how</label>
-            <div class="seg sm" id="xs-mode"><button data-v="ls" class="active">Lumpsum</button><button data-v="s1">1Y SIP</button><button data-v="s2">2Y SIP</button><button data-v="s3">3Y SIP</button><button data-v="s5">5Y SIP</button></div></div>
+            <div class="seg sm" id="xs-mode"><button data-v="ls" class="active">Lumpsum</button><button data-v="s3">3Y SIP book</button><button data-v="s5">5Y SIP book</button></div></div>
           <div class="fg"><label>Over what period</label>
             <div class="seg sm" id="xs-win"><button data-v="1M">1M</button><button data-v="3M">3M</button><button data-v="6M">6M</button><button data-v="9M">9M</button><button data-v="1Y" class="active">1Y</button><button data-v="2Y">2Y</button><button data-v="3Y">3Y</button><button data-v="5Y">5Y</button></div></div>
           <div class="fg"><label>Categories</label><select id="xs-sleeve"></select></div>
-          <div class="fg"><label>Per-house block</label>
-            <div class="seg sm" id="xs-rows"><button data-v="on" class="active">Show</button><button data-v="off">Hide</button></div></div>
           <div class="fg"><label>Summary rows</label>
             <div class="seg sm" id="xs-pct"><button data-v="n">Count / ₹ cr</button><button data-v="p" class="active">% share</button></div></div>
         </div>
@@ -4930,35 +4659,6 @@ function exportAMCSummary(){
 const XS_TOPN = 3;              // best / worst per category carry the bold ink (Kyser 2026-09-08)
 const XS_MINRANK = 7;           // …only where a top-3 and a bottom-3 cannot overlap
 const XS_SPREAD_PCTL = 0.85;    // colour magnitude: robust to one runaway cell, unlike a max
-// ── THE COLUMN NAME (Kyser 2026-09-08: "keep the columns minimal and clean") ────────────────
-// Every column in this grid is a fund category, so the words "Fund", "Funds" and "Schemes" say
-// nothing a reader does not already know, and "Cap" is redundant once you are looking at a row of
-// Large / Mid / Small. The ONE place it is kept is Multi Cap, because "Multi" alone sits one
-// column away from Multi Asset Allocation and the two are different things. The full name stays
-// in the header's tooltip and in every export, so nothing is actually lost.
-const XS_CATLONG = { "Dynamic Asset Allocation or Balanced Advantage": "Balanced Advantage",
-                     "Sector - Banking & Financial Services": "Banking & Financial" };
-// A benchmark name has to fit a 76px column. Boilerplate goes first ("Total Return Index"), then
-// a BLEND -- four indices and their weights -- collapses to how many parts it has, and anything
-// still too long becomes initials with its numbers kept (a number in an index name IS the name:
-// "NIFTY 100" and "NIFTY 500" differ by nothing else). The full string is always one click away,
-// and the tooltip carries it too, so nothing is actually hidden.
-function xsBenchTiny(n){
-  let t = xsShortBench(n);
-  if(t.indexOf(',') >= 0) return 'Blend of ' + (t.split(',').length) + ' indices';
-  if(t.length <= 16) return t;
-  const words = t.replace(/[()]/g,' ').split(/\s+/).filter(Boolean);
-  const out = words.map(w => /\d/.test(w) ? w : (w.length > 3 ? w[0].toUpperCase() : w)).join(' ');
-  return out.length < t.length ? out : t.slice(0, 15) + '…';
-}
-function xsShortCat(n){
-  let t = String(n||'').trim();
-  if(XS_CATLONG[t]) return XS_CATLONG[t];
-  t = t.replace(/\s+(Funds?|Schemes?)$/i, '');
-  // "Multi Cap" keeps its Cap; every other "... Cap" loses it
-  if(!/^multi\s+cap$/i.test(t)) t = t.replace(/\s+Cap$/i, '');
-  return t.trim() || String(n||'');
-}
 // Index names ship in full ("NIFTY 500 - TRI"); the cell has room for the recognisable part.
 function xsShortBench(n){
   return String(n||'').replace(/\s*(Total Return Index|TRI|- TRI|Index)\s*$/i,'').trim() || String(n||'');
@@ -4972,55 +4672,6 @@ const XS_BUCKETS = {
   alpha: [['Beat benchmark', v=>v>0], ['≥ +2 pp', v=>v>=2], ['≥ +5 pp', v=>v>=5], ['≤ −2 pp', v=>v<=-2], ['≤ −5 pp', v=>v<=-5]],
   qtl:   [['Q1', v=>v===1], ['Q2', v=>v===2], ['Q3', v=>v===3], ['Q4', v=>v===4], ['Q1+Q2', v=>v<=2]]
 };
-// ── THE PER-HOUSE SUMMARY BLOCK (Kyser 2026-09-08) ──────────────────────────────────────────
-// Seven columns that sit beside the house name and never scroll away. `good` is +1 where a bigger
-// number is better and -1 where it is worse, which is what lets one shading rule serve all of
-// them: Q1 deepens in green, Q4 deepens in red, and neither has to be special-cased.
-// `f` reads a FUND, not a cell, so a house running two funds in a category contributes two
-// answers -- the same rule the column block at the foot uses, and it is stated in the note.
-// A summary cell is encoded as a BAR, not a tint (see the block comment on the summary rows).
-// `good` +1 draws it TEAL, -1 RUSSET -- deliberately a different family from the grid's sage and
-// rose, so the summary cannot be read as more of the same cells; the length is the share itself,
-// on an absolute 0-100 scale so
-// the same number is always the same bar and a quiet month cannot make a small share look big.
-// It grows from the RIGHT because the numerals are right-aligned: a bar that starts at the far
-// left of the cell sits away from the figure it measures and the eye has to pair them up.
-function xsBar(v, good){
-  if(v==null || !isFinite(v)) return '';
-  const pct = Math.max(0, Math.min(100, 100*v)).toFixed(1);
-  const col = good>0 ? 'rgba(13,97,86,0.42)' : 'rgba(156,61,31,0.42)';
-  return 'background:linear-gradient(270deg,'+col+' 0 '+pct+'%, rgba(0,0,0,0) '+pct+'%)';
-}
-// ── COLUMN ORDER (Kyser 2026-09-08: "right now the columns seem randomly arranged") ─────────
-// They were ordered by money, which is an order but not a READING order -- Pharma landed between
-// Flexi Cap and Arbitrage because of what it happens to hold. Columns now sort by SLEEVE first,
-// and inside a sleeve by FAMILY: the size ladder read large to small, then the style cuts, then
-// themes grouped by what they are about, then the wrappers. Anything the ladder does not
-// recognise sorts after its sleeve-mates by money, so a category invented next year still lands
-// in the right block instead of at the front.
-const XS_SLEEVE_ORDER = ["Top Down", "Bottoms Up", "Thematic", "Asset Allocation", "Arbitrage+", "Other"];
-const XS_FAMILY = [
-  /large\s*&\s*mid/i, /^large/i, /multi\s*cap/i, /flexi/i, /focus/i, /^mid/i, /small/i, /micro/i,
-  /value|contra/i, /dividend\s*yield/i, /elss|tax\s*saver/i,
-  /bank|financ/i, /pharma|health/i, /tech|digital|\bit\b/i, /consum|fmcg/i,
-  /auto|transport|logistic/i, /infra|energy|power/i, /psu/i, /metal|commodit|resourc/i,
-  /manufactur|make\s*in\s*india/i, /mnc|conglom/i, /esg/i, /quant/i,
-  /business\s*cycle|special\s*opp|innovat|gennext/i, /internat|global|nasdaq|overseas/i,
-  /gold|silver/i, /retirement|children|bhavishya/i, /aggressive\s*hybrid/i,
-  /balanced\s*advantage|dynamic\s*asset/i, /multi\s*asset/i, /equity\s*saving/i,
-  /conservative/i, /arbitrage/i, /fof|fund\s*of\s*fund/i,
-];
-const _xsSlvRank = (sl) => { const i = XS_SLEEVE_ORDER.indexOf(String(sl || "Other")); return i < 0 ? 90 : i; };
-const _xsFamRank = (c) => { for (let i = 0; i < XS_FAMILY.length; i++) if (XS_FAMILY[i].test(c)) return i; return 900; };
-const XS_ROWSUM = [
-  { k: "n",    lbl: "Funds", tip: "Funds of this house inside the categories on screen that carry any value at all.", good: 0, f: null },
-  { k: "q1",   lbl: "Q1",    tip: "Funds in the top quartile of their own category.", good: 1,  f: (x) => x.qtl != null && x.qtl <= 1 },
-  { k: "q12",  lbl: "Q1+Q2", tip: "Funds in the top HALF of their own category.", good: 1,  f: (x) => x.qtl != null && x.qtl <= 2 },
-  { k: "q4",   lbl: "Q4",    tip: "Funds in the bottom quartile of their own category.", good: -1, f: (x) => x.qtl != null && x.qtl >= 4 },
-  { k: "beat", lbl: "Beat",  tip: "Funds ahead of their own category benchmark on this window.", good: 1,  f: (x) => x.alpha != null && x.alpha > 0 },
-  { k: "a2",   lbl: "\u2265+2pp", tip: "Funds at least 2 percentage points ahead of their benchmark.", good: 1,  f: (x) => x.alpha != null && x.alpha >= 2 },
-  { k: "am2",  lbl: "\u2264\u22122pp", tip: "Funds at least 2 percentage points behind their benchmark.", good: -1, f: (x) => x.alpha != null && x.alpha <= -2 },
-];
 const XS_MLBL = { ret:'Return', alpha:'Alpha vs benchmark', qtl:'Quartile' };
 
 // ── the cross-section itself. One pass over the universe's records, bucketed to (house, cat).
@@ -5183,10 +4834,7 @@ function renderCrossSection(){
   // no house in scope has a value in them — an all-dashes column is not information.
   const slF=S.xs.sleeve;
   let cols=[...cats.values()].filter(cc=> (slF==='(all)' || cc.sl===slF) && cc.funds.some(f=> xsFundVal(f,m)!=null));
-  cols.sort((a,b)=> _xsSlvRank(a.sl)-_xsSlvRank(b.sl)
-                || _xsFamRank(a.c)-_xsFamRank(b.c)
-                || (b.cr||0)-(a.cr||0)
-                || a.c.localeCompare(b.c));
+  cols.sort((a,b)=> (b.cr||0)-(a.cr||0) || a.c.localeCompare(b.c));
   // ROWS. Every in-scope house holding a fund in a shown category. Aditya first, then A–Z by
   // display name — the deck's order everywhere else, so the eye finds a house in the same place.
   const colSet=new Set(cols.map(c=>c.c)), hset=new Set();
@@ -5211,61 +4859,17 @@ function renderCrossSection(){
     }
     colInfo[cc.c]={byH, centre:ctr.v, byBench:ctr.byBench, mag, rank, vals};
   });
-  // ── the per-house block. Counted over the FUNDS of the shown columns, so a house running two
-  // funds in one category contributes two answers here and one cell in the grid.
-  const rs = {};
-  houses.forEach(h=>{ rs[h]={n:0}; XS_ROWSUM.forEach(c=>{ if(c.f) rs[h][c.k]=0; }); });
-  cols.forEach(cc=> cc.funds.forEach(f=>{
-    const r=rs[f.h]; if(!r) return;
-    if(f.ret==null && f.alpha==null && f.qtl==null) return;
-    r.n++;
-    XS_ROWSUM.forEach(c=>{ if(c.f && c.f(f)) r[c.k]++; });
-  }));
-  // each summary column gets the same treatment a category column gets: shaded by its own value
-  // in its own direction, with the best three and worst three in bold
-  const rsInfo = {};
-  XS_ROWSUM.forEach(c=>{
-    if(!c.f){ rsInfo[c.k]={rank:{}}; return; }
-    const sh={}; houses.forEach(h=>{ sh[h] = rs[h].n>0 ? rs[h][c.k]/rs[h].n : null; });
-    const have=houses.filter(h=>sh[h]!=null);
-    const spread = have.length ? (Math.max.apply(null,have.map(h=>sh[h])) - Math.min.apply(null,have.map(h=>sh[h]))) : 0;
-    const rank={};
-    if(have.length>=XS_MINRANK && spread>1e-9){
-      const ord=have.slice().sort((x,y)=> c.good*(sh[y]-sh[x]) || fhSort(x,y));
-      ord.slice(0,XS_TOPN).forEach(h=>rank[h]='xs-top');
-      ord.slice(-XS_TOPN).forEach(h=>rank[h]='xs-bot');
-    }
-    rsInfo[c.k]={sh, rank};
-  });
-  const showRS = S.xs.rows !== false;
-  const rsHead = showRS ? XS_ROWSUM.map(c=>'<th class="num xs-sum" title="'+xsEsc(c.tip)+'">'+c.lbl+'</th>').join('') : '';
-  const rsCells = (h)=> !showRS ? '' : XS_ROWSUM.map(c=>{
-    const r=rs[h];
-    if(!c.f) return '<td class="num xs-sum">'+(r.n||'\u2014')+'</td>';
-    if(!r.n) return '<td class="num xs-sum">\u2014</td>';
-    const share=r[c.k]/r.n;
-    const txt = S.xs.pct ? Math.round(100*share)+'%' : String(r[c.k]);
-    return '<td class="num xs-sum '+(rsInfo[c.k].rank[h]||'')+'" style="'
-      + xsBar(share, c.good)+'" title="'+r[c.k]+' of '+r.n+'">'+txt+'</td>';
-  }).join('');
-
-  // one spanning blank so every footer row stays aligned under the per-house block
-  const padRS = (showRS ? '<td class="xs-sum" colspan="'+XS_ROWSUM.length+'"></td>' : '');
-
   // ── the grid
-  let html='<table class="rt"><thead><tr><th class="xs-lbl">Fund house</th>'+rsHead;
-  let _prevSlv = null;
+  let html='<table class="rt"><thead><tr><th class="xs-lbl">Fund house</th>';
   cols.forEach(cc=>{
     const med = m==='ret' && !colInfo[cc.c].byBench;
-    const newSlv = (_prevSlv !== null && cc.sl !== _prevSlv); _prevSlv = cc.sl;
-    cc._brk = newSlv;
-    html+='<th class="num'+(newSlv?' xs-slv':'')+'" title="'+xsEsc(String(cc.sl||'')+' · '+cc.c)+(cc.benchName?' — benchmark: '+xsEsc(cc.benchName):'')
+    html+='<th class="num" title="'+xsEsc(cc.c)+(cc.benchName?' — benchmark: '+xsEsc(cc.benchName):'')
         + (med?' — no single benchmark for this column, so the colour is centred on the column median':'')+'">'
-        + xsEsc(xsShortCat(cc.c))+(med?' <span class="xs-mark">◦</span>':'')+'</th>';
+        + xsEsc(cc.c)+(med?' <span class="xs-mark">◦</span>':'')+'</th>';
   });
   html+='</tr></thead><tbody>';
   houses.forEach(h=>{
-    html+='<tr'+(h===S.amc.fh?' class="hl"':'')+'><td class="xs-lbl">'+xsEsc(houseLabel(h))+'</td>'+rsCells(h);
+    html+='<tr'+(h===S.amc.fh?' class="hl"':'')+'><td class="xs-lbl">'+xsEsc(houseLabel(h))+'</td>';
     cols.forEach(cc=>{
       const a=cells.get(h+'|'+cc.c), ci=colInfo[cc.c], v=ci.byH[h];
       const multi=!!(a && a.n>1);
@@ -5274,7 +4878,7 @@ function renderCrossSection(){
                         +(a.cr>0?' · '+Math.round(a.cr).toLocaleString('en-IN')+' cr':'')
                         +(multi?' — AUM-weighted: '+a.funds.join('; '):''))
                   : 'no fund from this house in this category';
-      html+='<td class="'+cls.trim()+(cc._brk?' xs-slv':'')+'"'+(multi?' data-n="'+a.n+'"':'')
+      html+='<td class="'+cls.trim()+'"'+(multi?' data-n="'+a.n+'"':'')
           + ' style="'+xsBg(v, ci.centre, ci.mag, m)+'" title="'+tip+'">'+xsFmt(v,m)+'</td>';
     });
     html+='</tr>';
@@ -5283,15 +4887,14 @@ function renderCrossSection(){
   // BENCHMARK ROW — the bottom line of the sheet Kyser shared. Blank where the column's funds do
   // not share one index (see the note), never filled in from one member's benchmark.
   if(m!=='qtl'){
-    html+='<tr class="xs-rule"><th class="xs-lbl">'+(m==='alpha'?'Benchmark, own return':'Benchmark')+'</th>'+padRS;
+    html+='<tr class="xs-rule"><th class="xs-lbl">'+(m==='alpha'?'Benchmark, own return':'Benchmark')+'</th>';
     cols.forEach(cc=>{
       const sh=cc.benchShare==null?null:Math.round(100*cc.benchShare);
       const t=cc.benchName
         ? xsEsc(cc.benchName)+(cc.mixed&&sh!=null?' — followed by '+sh+'% of the rated money in this column; the rest name a different index, or none':' — every fund in this column')
         : 'no fund in this column names a benchmark on this window';
-      html+='<td class="num xs-bench'+(cc._brk?' xs-slv':'')+'" title="'+t+'">'+(cc.bench==null?'—':cc.bench.toFixed(1)+'%')
-          + (cc.benchName?'<span class="xs-bn" data-full="'+xsEsc(cc.benchName)+(cc.mixed?' · '+sh+'% of the column':'')+'" title="Click to show the full name">'
-              + xsEsc(xsBenchTiny(cc.benchName))+(cc.mixed?' · '+sh+'%':'')+'</span>':'')
+      html+='<td class="num xs-bench" title="'+t+'">'+(cc.bench==null?'—':cc.bench.toFixed(1)+'%')
+          + (cc.benchName?'<span class="xs-bn">('+xsEsc(xsShortBench(cc.benchName))+(cc.mixed?' · '+sh+'%':'')+')</span>':'')
           + '</td>';
     });
     html+='</tr>';
@@ -5312,29 +4915,11 @@ function renderCrossSection(){
     });
     stats[cc.c]={nAll, crAll, nB, crB};
   });
+  const tot=t=>'<span class="xs-tot">('+t+')</span>';
   const inCr=v=>Math.round(v).toLocaleString('en-IN');
-  // ★ THE DENOMINATOR, ONCE. It used to ride in brackets on every one of the ten rows below,
-  // which is the same number printed 440 times on a 44-column grid and drowns the figure it
-  // qualifies. It is a property of the COLUMN, exactly like the benchmark, so it is stated where
-  // the benchmark is stated. Nothing is lost: every share below is still a share of these.
-  html+='<tr class="xs-den"><th class="xs-lbl">Rated funds</th>'+padRS
-      + cols.map(cc=>{
-          // how many HOUSES those funds belong to. The grid above shows one cell per house, so a
-          // category where a house runs a dozen funds (FoF, where Mirae alone runs 12) prints a
-          // fund count far above the number of rows — which reads as an error until you are told
-          // it is two different populations. Both numbers, in the place the surprise happens.
-          const hs = new Set(); cc.funds.forEach(f=>{ if(xsFundVal(f,m)!=null) hs.add(f.h); });
-          const n = stats[cc.c].nAll;
-          return '<td class="num xs-den" title="'+(n||0)+' fund'+(n===1?'':'s')+' with a value on this window, run by '+hs.size+' house'+(hs.size===1?'':'s')+'. The grid above shows one cell per HOUSE; this row counts FUNDS, so a house running several funds in one category contributes several here and one cell there. It is the denominator of every share below.">'
-            + (n||'—') + (hs.size && n>hs.size ? '<span class="xs-tot">/'+hs.size+'</span>' : '') + '</td>';
-        }).join('')+'</tr>';
-  html+='<tr class="xs-den"><th class="xs-lbl">Rated AUM, ₹ cr</th>'+padRS
-      + cols.map(cc=>'<td class="num xs-den" title="AUM behind those funds — the denominator of every AUM share below">'
-        + (stats[cc.c].crAll>0?inCr(stats[cc.c].crAll):'—')+'</td>').join('')+'</tr>';
   // One row of the summary block. `share` decides BOTH the colour and the ranking even when the
   // printed figure is a count, because a count cannot be compared across columns whose
   // denominators differ -- 8 of 10 and 8 of 40 are not the same fact.
-
   const sumRow = (label, k, shareOf, printOf) => {
     const g = GOOD[k] || 1;
     const sh = {}, rank = {};
@@ -5350,32 +4935,27 @@ function renderCrossSection(){
       ord.slice(0, XS_TOPN).forEach(cc=> rank[cc.c]='xs-top');
       ord.slice(-XS_TOPN).forEach(cc=> rank[cc.c]='xs-bot');
     }
-    let h='<tr><th class="xs-lbl">'+label+'</th>'+padRS;
+    let h='<tr><th class="xs-lbl">'+label+'</th>';
     cols.forEach(cc=>{
       const v=sh[cc.c], txt=printOf(stats[cc.c]);
-      h+='<td class="num xs-fsum '+(rank[cc.c]||'')+(cc._brk?' xs-slv':'')+'" style="'+xsBar(v, g)+'">'+txt+'</td>';
+      const bg = v==null ? '' : 'background:'+_amcMix(g>0?C.q1:C.q4, v);
+      h+='<td class="num '+(rank[cc.c]||'')+'" style="'+bg+'">'+txt+'</td>';
     });
     return h+'</tr>';
   };
-  html+='<tr class="xs-rule xs-band"><th class="xs-lbl">'+(pct?'% of rated funds':'Funds')+'</th>'+padRS
+  html+='<tr class="xs-rule xs-band"><th class="xs-lbl">'+(pct?'% of rated funds':'Funds')+'</th>'
       + cols.map(()=>'<td class="num"></td>').join('')+'</tr>';
   bks.forEach((b,k)=> html+=sumRow(b[0], k,
       s=> s.nAll ? s.nB[k]/s.nAll : null,
-      s=> !s.nAll ? '—' : (pct ? (100*s.nB[k]/s.nAll).toFixed(0)+'%' : String(s.nB[k]))));
-  html+='<tr class="xs-band"><th class="xs-lbl">'+(pct?'% of rated AUM':'AUM, ₹ cr')+'</th>'+padRS
+      s=> !s.nAll ? '—' : (pct ? (100*s.nB[k]/s.nAll).toFixed(0)+'%'+tot(s.nAll) : s.nB[k]+tot(s.nAll))));
+  html+='<tr class="xs-band"><th class="xs-lbl">'+(pct?'% of rated AUM':'AUM, ₹ cr')+'</th>'
       + cols.map(()=>'<td class="num"></td>').join('')+'</tr>';
   bks.forEach((b,k)=> html+=sumRow(b[0], k,
       s=> s.crAll>0 ? s.crB[k]/s.crAll : null,
-      s=> !(s.crAll>0) ? '—' : (pct ? (100*s.crB[k]/s.crAll).toFixed(0)+'%' : inCr(s.crB[k]))));
+      s=> !(s.crAll>0) ? '—' : (pct ? (100*s.crB[k]/s.crAll).toFixed(0)+'%'+tot(inCr(s.crAll))
+                                    : inCr(s.crB[k])+tot(inCr(s.crAll)))));
   html+='</tfoot></table>';
   host.innerHTML=html;
-  // a benchmark name expands in place on click -- width fixed, height free (Kyser 2026-09-08)
-  host.querySelectorAll('.xs-bn').forEach(el=>{ el.onclick=(e)=>{
-    e.stopPropagation();
-    const open = el.classList.toggle('open');
-    if(open){ el.dataset.short = el.textContent; el.textContent = el.getAttribute('data-full') || el.textContent; }
-    else if(el.dataset.short){ el.textContent = el.dataset.short; }
-  }; });
   _XSVIEW={cols, houses, colInfo, stats, m, i, asof:dates[i], bks};
   const rw=RWOF[S.basis];
   if(sub) sub.innerHTML=XS_MLBL[m]+' · '+houses.length+' house'+(houses.length===1?'':'s')+' × '+cols.length
@@ -5388,11 +4968,9 @@ const xsFundVal = (f, m) => m==='ret' ? f.ret : m==='alpha' ? f.alpha : f.qtl;
 // three. Called on every render, so the card can never show a toggle the grid is not on.
 function xsSyncControls(){
   setSeg('xs-metric', S.xs.metric);
-  syncModeButtons('xs-mode');
   setSeg('xs-mode',   S.mode);
   setSeg('xs-win',    RWOF[S.basis] ? S.basis : '');
   setSeg('xs-pct',    S.xs.pct?'p':'n');
-  setSeg('xs-rows',   S.xs.rows?'on':'off');
   // A window longer than the SIP book ships nothing at all from the engine, so the button is
   // disabled rather than left to produce a grid of dashes with no explanation.
   const bm=modeBookMonths();
@@ -5415,7 +4993,6 @@ function wireCrossSection(){
   root.dataset.wired='1';
   segWire('xs-metric', v=>{ S.xs.metric=v; renderCrossSection(); });
   segWire('xs-pct',    v=>{ S.xs.pct=(v==='p'); renderCrossSection(); });
-  segWire('xs-rows',   v=>{ S.xs.rows=(v==='on'); renderCrossSection(); });
   // These two write the PAGE's state (rule 2 in the header note), so the global bar and every
   // other panel move with them — that is the point, not a side effect.
   segWire('xs-mode',   v=>{ setMode(v); });
@@ -5446,13 +5023,10 @@ function xsMethodNote(cols, houses, colInfo, m, rw, asof){
     +(med?'<b>'+med+'</b> column'+(med===1?'':'s')+' marked <b>◦</b> ha'+(med===1?'s':'ve')+' no single benchmark, so there the centre is the column\'s own median and green means "above the middle of this column", not "ahead of an index". ':'')
     +'<b>Bold green</b> marks the best '+XS_TOPN+' and <b>bold red</b> the worst '+XS_TOPN+' in each category'
     +(m==='qtl'?' — not shown here, because a quartile already is a rank':', shown only where a column has at least '+XS_MINRANK+' rated houses, so the two cannot overlap')+'.'
-    +'<br><br><b>How the two kinds of cell are drawn.</b> A cell in the grid is <i>tinted</i> — its whole ground carries the value. A cell in either summary is a <i>bar</i> on a flat ground — its length carries the value, green where a bigger number is better and red where it is worse. Two channels rather than two palettes, so a summary can never be misread as one more category, and an empty bar reads as zero at a glance instead of as a pale shade of good.'
-    +'<br><br><b>The block at the foot counts FUNDS, while the grid above shows HOUSES.</b> "How many funds are in Q1" is a question about funds, so a house running two funds in a category contributes two answers there and one blended cell above. That is why a fund count can exceed the number of rows on screen — under <b>FoF Domestic</b> the industry runs 93 schemes across 24 houses, Mirae alone twelve of them. Where the two differ, the Rated-funds cell prints <b>funds/houses</b> and its cell in the grid carries a small superscript with how many funds it blends. It is counted over the <b>'+houses.length+'</b> houses and <b>'+cols.length+'</b> categories on screen, and every figure carries its own denominator in brackets: funds — or ₹ cr of AUM — that actually have a value on this window. A fund with no history, no benchmark or no reported AUM leaves the numerator <i>and</i> the denominator rather than counting as a zero. The Count / % toggle switches both blocks at once.'
+    +'<br><br><b>The block at the foot counts FUNDS, while the grid above shows HOUSES.</b> "How many funds are in Q1" is a question about funds, so a house running two funds in a category contributes two answers there and one blended cell above. It is counted over the <b>'+houses.length+'</b> houses and <b>'+cols.length+'</b> categories on screen, and every figure carries its own denominator in brackets: funds — or ₹ cr of AUM — that actually have a value on this window. A fund with no history, no benchmark or no reported AUM leaves the numerator <i>and</i> the denominator rather than counting as a zero. The Count / % toggle switches both blocks at once.'
     + (m!=='qtl' ? '<br><br><b>The benchmark row</b> is shown only where every fund in the column follows the same index. '
         + (mixed? 'It is blank for <b>'+mixed+'</b> column'+(mixed===1?'':'s')+' whose funds do not — under the MFI all-peer universe a category is not a Value Research category, so its members can carry different indices or none, and there is no one benchmark to print. ' : '')
         + (nob? 'A further <b>'+nob+'</b> column'+(nob===1?'':'s')+' has no benchmark value on this window. ' : '') : '')
-    +(S.xs.rows!==false ? '<br><br><b>The block beside each house</b> summarises that house ACROSS the categories on screen, and unlike the block at the foot it does not follow the toggle: a house is a whole book, and how much of it is top-quartile, how much is bottom-quartile and how much beats its benchmark are the same three questions whatever the cells are showing. Every fund counts once per category it is in, and the denominator is the funds of that house carrying any value at all — the hover on each cell gives the count over that denominator.' : '')
-    +'<br><br><b>Column order.</b> By <b>sleeve</b> first, then by family inside it — the size ladder read large to small, the style cuts, then themes grouped by what they are about, then the wrappers. A rule marks where one sleeve ends and the next begins, and each header names its sleeve on hover. Ordering by money instead put Pharma between Flexi Cap and Arbitrage, which is an order but not a reading order.'
     +'<br><br><b>Scope.</b> Rows are the houses in the current house scope ('+scopeLabel()+') holding a fund in a shown category; a column is dropped when no house in scope has a value in it. Change the peer universe, the investment mode, the period or the house scope and the whole grid re-derives — nothing here is pinned to a window or a book.');
 }
 // The one SIP sentence, in the third person the note needs (modeSentence() is written for a card
