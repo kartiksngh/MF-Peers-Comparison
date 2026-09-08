@@ -1361,9 +1361,26 @@
   #xs-grid table.rt th.xs-lbl, #xs-grid table.rt td.xs-lbl { width: 134px; white-space: normal; }
   /* the per-house block: narrow, pinned beside the name, and set off from the categories by a rule
      so nobody reads a summary column as one more category */
-  #xs-grid table.rt th.xs-sum, #xs-grid table.rt td.xs-sum { width: 46px; font-size: 10px; padding: 6px 4px; }
-  #xs-grid table.rt th.xs-sum:last-of-type, #xs-grid table.rt td.xs-sum:last-of-type { border-right: 2px solid var(--line); }
-  #xs-grid tfoot td.xs-sum { border-right: 2px solid var(--line); }
+  /* ── THREE BLOCKS, THREE BOXES (Kyser 2026-09-08) ─────────────────────────────────────────
+     The per-house block, the grid and the block at the foot are three different statements about
+     three different populations, and until they were boxed they read as one wall of shaded cells.
+     The rules are structural, not decorative: crossing one means the denominator changed. */
+  #xs-grid table.rt { border: 1px solid var(--line); }
+  #xs-grid table.rt th.xs-sum, #xs-grid table.rt td.xs-sum { width: 46px; font-size: 10px; padding: 6px 4px;
+                                                             background-color: var(--paper-2); }
+  #xs-grid table.rt th.xs-sum:first-of-type, #xs-grid table.rt td.xs-sum:first-of-type { border-left: 2px solid var(--ink); }
+  #xs-grid table.rt th.xs-sum:last-of-type, #xs-grid table.rt td.xs-sum:last-of-type { border-right: 2px solid var(--ink); }
+  #xs-grid tfoot td.xs-sum { border-right: 2px solid var(--ink); border-left: 2px solid var(--ink); }
+  /* a summary cell's ground is FLAT and its value is a bar; a grid cell's ground IS the value.
+     That is the whole separation, and it survives a black-and-white printout. */
+  #xs-grid tfoot td.xs-fsum { background-color: var(--paper-2); }
+  #xs-grid tfoot { border-top: 2px solid var(--ink); }
+  /* the two denominator rows: context, not data -- flat, quiet, and set off from the shares */
+  #xs-grid tfoot tr.xs-den td, #xs-grid tfoot tr.xs-den th { background-color: var(--paper-2); color: var(--ink-2); font-weight: 600; }
+  #xs-grid tfoot tr.xs-den + tr.xs-den td, #xs-grid tfoot tr.xs-den + tr.xs-den th { border-bottom: 1px solid var(--line); }
+
+  /* where one sleeve ends and the next begins */
+  #xs-grid table.rt th.xs-slv, #xs-grid table.rt td.xs-slv { border-left: 2px solid var(--line); }
   #xs-grid table.rt th.xs-lbl, #xs-grid table.rt td.xs-lbl {
     position: sticky; left: 0; z-index: 3; text-align: left;
     background: var(--srf-data, var(--card)); border-right: 1px solid var(--line);
@@ -1382,7 +1399,7 @@
   /* The benchmark and the summary block sit in a tfoot, which is also what keeps them OUT of
      the click-to-sort (gsRuns only ever reorders tbody rows) — a summary that sorted into the
      middle of the houses would be a false table. */
-  #xs-grid tfoot td, #xs-grid tfoot th { border-top: 1px solid var(--line-2); background: var(--paper-2); font-size: 10.5px; }
+  #xs-grid tfoot td, #xs-grid tfoot th { border-top: 1px solid var(--line-2); background-color: var(--paper-2); font-size: 10.5px; }
   #xs-grid tfoot tr.xs-rule td, #xs-grid tfoot tr.xs-rule th { border-top: 1.5px solid var(--ink); }
   #xs-grid tfoot th.xs-lbl { background: var(--paper-2); text-transform: none; letter-spacing: 0;
                              font-size: 10.5px; font-weight: 600; color: var(--ink-2); position: sticky; left: 0; }
@@ -4883,6 +4900,38 @@ const XS_BUCKETS = {
 // them: Q1 deepens in green, Q4 deepens in red, and neither has to be special-cased.
 // `f` reads a FUND, not a cell, so a house running two funds in a category contributes two
 // answers -- the same rule the column block at the foot uses, and it is stated in the note.
+// A summary cell is encoded as a BAR, not a tint (see the block comment on the summary rows).
+// `good` +1 draws it green, -1 red; the length is the share itself, on an absolute 0-100 scale so
+// the same number is always the same bar and a quiet month cannot make a small share look big.
+// It grows from the RIGHT because the numerals are right-aligned: a bar that starts at the far
+// left of the cell sits away from the figure it measures and the eye has to pair them up.
+function xsBar(v, good){
+  if(v==null || !isFinite(v)) return '';
+  const pct = Math.max(0, Math.min(100, 100*v)).toFixed(1);
+  const col = good>0 ? 'rgba(31,92,61,0.34)' : 'rgba(192,82,62,0.34)';
+  return 'background:linear-gradient(270deg,'+col+' 0 '+pct+'%, rgba(0,0,0,0) '+pct+'%)';
+}
+// ── COLUMN ORDER (Kyser 2026-09-08: "right now the columns seem randomly arranged") ─────────
+// They were ordered by money, which is an order but not a READING order -- Pharma landed between
+// Flexi Cap and Arbitrage because of what it happens to hold. Columns now sort by SLEEVE first,
+// and inside a sleeve by FAMILY: the size ladder read large to small, then the style cuts, then
+// themes grouped by what they are about, then the wrappers. Anything the ladder does not
+// recognise sorts after its sleeve-mates by money, so a category invented next year still lands
+// in the right block instead of at the front.
+const XS_SLEEVE_ORDER = ["Top Down", "Bottoms Up", "Thematic", "Asset Allocation", "Arbitrage+", "Other"];
+const XS_FAMILY = [
+  /large\s*&\s*mid/i, /^large/i, /multi\s*cap/i, /flexi/i, /focus/i, /^mid/i, /small/i, /micro/i,
+  /value|contra/i, /dividend\s*yield/i, /elss|tax\s*saver/i,
+  /bank|financ/i, /pharma|health/i, /tech|digital|\bit\b/i, /consum|fmcg/i,
+  /auto|transport|logistic/i, /infra|energy|power/i, /psu/i, /metal|commodit|resourc/i,
+  /manufactur|make\s*in\s*india/i, /mnc|conglom/i, /esg/i, /quant/i,
+  /business\s*cycle|special\s*opp|innovat|gennext/i, /internat|global|nasdaq|overseas/i,
+  /gold|silver/i, /retirement|children|bhavishya/i, /aggressive\s*hybrid/i,
+  /balanced\s*advantage|dynamic\s*asset/i, /multi\s*asset/i, /equity\s*saving/i,
+  /conservative/i, /arbitrage/i, /fof|fund\s*of\s*fund/i,
+];
+const _xsSlvRank = (sl) => { const i = XS_SLEEVE_ORDER.indexOf(String(sl || "Other")); return i < 0 ? 90 : i; };
+const _xsFamRank = (c) => { for (let i = 0; i < XS_FAMILY.length; i++) if (XS_FAMILY[i].test(c)) return i; return 900; };
 const XS_ROWSUM = [
   { k: "n",    lbl: "Funds", tip: "Funds of this house inside the categories on screen that carry any value at all.", good: 0, f: null },
   { k: "q1",   lbl: "Q1",    tip: "Funds in the top quartile of their own category.", good: 1,  f: (x) => x.qtl != null && x.qtl <= 1 },
@@ -5054,7 +5103,10 @@ function renderCrossSection(){
   // no house in scope has a value in them — an all-dashes column is not information.
   const slF=S.xs.sleeve;
   let cols=[...cats.values()].filter(cc=> (slF==='(all)' || cc.sl===slF) && cc.funds.some(f=> xsFundVal(f,m)!=null));
-  cols.sort((a,b)=> (b.cr||0)-(a.cr||0) || a.c.localeCompare(b.c));
+  cols.sort((a,b)=> _xsSlvRank(a.sl)-_xsSlvRank(b.sl)
+                || _xsFamRank(a.c)-_xsFamRank(b.c)
+                || (b.cr||0)-(a.cr||0)
+                || a.c.localeCompare(b.c));
   // ROWS. Every in-scope house holding a fund in a shown category. Aditya first, then A–Z by
   // display name — the deck's order everywhere else, so the eye finds a house in the same place.
   const colSet=new Set(cols.map(c=>c.c)), hset=new Set();
@@ -5113,15 +5165,21 @@ function renderCrossSection(){
     if(!r.n) return '<td class="num xs-sum">\u2014</td>';
     const share=r[c.k]/r.n;
     const txt = S.xs.pct ? Math.round(100*share)+'%' : String(r[c.k]);
-    return '<td class="num xs-sum '+(rsInfo[c.k].rank[h]||'')+'" style="background:'
-      + _amcMix(c.good>0?C.q1:C.q4, share)+'" title="'+r[c.k]+' of '+r.n+'">'+txt+'</td>';
+    return '<td class="num xs-sum '+(rsInfo[c.k].rank[h]||'')+'" style="'
+      + xsBar(share, c.good)+'" title="'+r[c.k]+' of '+r.n+'">'+txt+'</td>';
   }).join('');
+
+  // one spanning blank so every footer row stays aligned under the per-house block
+  const padRS = (showRS ? '<td class="xs-sum" colspan="'+XS_ROWSUM.length+'"></td>' : '');
 
   // ── the grid
   let html='<table class="rt"><thead><tr><th class="xs-lbl">Fund house</th>'+rsHead;
+  let _prevSlv = null;
   cols.forEach(cc=>{
     const med = m==='ret' && !colInfo[cc.c].byBench;
-    html+='<th class="num" title="'+xsEsc(cc.c)+(cc.benchName?' — benchmark: '+xsEsc(cc.benchName):'')
+    const newSlv = (_prevSlv !== null && cc.sl !== _prevSlv); _prevSlv = cc.sl;
+    cc._brk = newSlv;
+    html+='<th class="num'+(newSlv?' xs-slv':'')+'" title="'+xsEsc(String(cc.sl||'')+' · '+cc.c)+(cc.benchName?' — benchmark: '+xsEsc(cc.benchName):'')
         + (med?' — no single benchmark for this column, so the colour is centred on the column median':'')+'">'
         + xsEsc(xsShortCat(cc.c))+(med?' <span class="xs-mark">◦</span>':'')+'</th>';
   });
@@ -5136,7 +5194,7 @@ function renderCrossSection(){
                         +(a.cr>0?' · '+Math.round(a.cr).toLocaleString('en-IN')+' cr':'')
                         +(multi?' — AUM-weighted: '+a.funds.join('; '):''))
                   : 'no fund from this house in this category';
-      html+='<td class="'+cls.trim()+'"'+(multi?' data-n="'+a.n+'"':'')
+      html+='<td class="'+cls.trim()+(cc._brk?' xs-slv':'')+'"'+(multi?' data-n="'+a.n+'"':'')
           + ' style="'+xsBg(v, ci.centre, ci.mag, m)+'" title="'+tip+'">'+xsFmt(v,m)+'</td>';
     });
     html+='</tr>';
@@ -5145,13 +5203,13 @@ function renderCrossSection(){
   // BENCHMARK ROW — the bottom line of the sheet Kyser shared. Blank where the column's funds do
   // not share one index (see the note), never filled in from one member's benchmark.
   if(m!=='qtl'){
-    html+='<tr class="xs-rule"><th class="xs-lbl">'+(m==='alpha'?'Benchmark, own return':'Benchmark')+'</th>'+(showRS?'<td class="xs-sum" colspan="'+XS_ROWSUM.length+'"></td>':'');
+    html+='<tr class="xs-rule"><th class="xs-lbl">'+(m==='alpha'?'Benchmark, own return':'Benchmark')+'</th>'+padRS;
     cols.forEach(cc=>{
       const sh=cc.benchShare==null?null:Math.round(100*cc.benchShare);
       const t=cc.benchName
         ? xsEsc(cc.benchName)+(cc.mixed&&sh!=null?' — followed by '+sh+'% of the rated money in this column; the rest name a different index, or none':' — every fund in this column')
         : 'no fund in this column names a benchmark on this window';
-      html+='<td class="num xs-bench" title="'+t+'">'+(cc.bench==null?'—':cc.bench.toFixed(1)+'%')
+      html+='<td class="num xs-bench'+(cc._brk?' xs-slv':'')+'" title="'+t+'">'+(cc.bench==null?'—':cc.bench.toFixed(1)+'%')
           + (cc.benchName?'<span class="xs-bn">('+xsEsc(xsShortBench(cc.benchName))+(cc.mixed?' · '+sh+'%':'')+')</span>':'')
           + '</td>';
     });
@@ -5173,11 +5231,21 @@ function renderCrossSection(){
     });
     stats[cc.c]={nAll, crAll, nB, crB};
   });
-  const tot=t=>'<span class="xs-tot">('+t+')</span>';
   const inCr=v=>Math.round(v).toLocaleString('en-IN');
+  // ★ THE DENOMINATOR, ONCE. It used to ride in brackets on every one of the ten rows below,
+  // which is the same number printed 440 times on a 44-column grid and drowns the figure it
+  // qualifies. It is a property of the COLUMN, exactly like the benchmark, so it is stated where
+  // the benchmark is stated. Nothing is lost: every share below is still a share of these.
+  html+='<tr class="xs-den"><th class="xs-lbl">Rated funds</th>'+padRS
+      + cols.map(cc=>'<td class="num xs-den" title="Funds in this category with a value on this window — the denominator of every share below">'
+        + (stats[cc.c].nAll||'—')+'</td>').join('')+'</tr>';
+  html+='<tr class="xs-den"><th class="xs-lbl">Rated AUM, ₹ cr</th>'+padRS
+      + cols.map(cc=>'<td class="num xs-den" title="AUM behind those funds — the denominator of every AUM share below">'
+        + (stats[cc.c].crAll>0?inCr(stats[cc.c].crAll):'—')+'</td>').join('')+'</tr>';
   // One row of the summary block. `share` decides BOTH the colour and the ranking even when the
   // printed figure is a count, because a count cannot be compared across columns whose
   // denominators differ -- 8 of 10 and 8 of 40 are not the same fact.
+
   const sumRow = (label, k, shareOf, printOf) => {
     const g = GOOD[k] || 1;
     const sh = {}, rank = {};
@@ -5193,25 +5261,23 @@ function renderCrossSection(){
       ord.slice(0, XS_TOPN).forEach(cc=> rank[cc.c]='xs-top');
       ord.slice(-XS_TOPN).forEach(cc=> rank[cc.c]='xs-bot');
     }
-    let h='<tr><th class="xs-lbl">'+label+'</th>'+(showRS?'<td class="xs-sum" colspan="'+XS_ROWSUM.length+'"></td>':'');
+    let h='<tr><th class="xs-lbl">'+label+'</th>'+padRS;
     cols.forEach(cc=>{
       const v=sh[cc.c], txt=printOf(stats[cc.c]);
-      const bg = v==null ? '' : 'background:'+_amcMix(g>0?C.q1:C.q4, v);
-      h+='<td class="num '+(rank[cc.c]||'')+'" style="'+bg+'">'+txt+'</td>';
+      h+='<td class="num xs-fsum '+(rank[cc.c]||'')+(cc._brk?' xs-slv':'')+'" style="'+xsBar(v, g)+'">'+txt+'</td>';
     });
     return h+'</tr>';
   };
-  html+='<tr class="xs-rule xs-band"><th class="xs-lbl">'+(pct?'% of rated funds':'Funds')+'</th>'+(showRS?'<td class="xs-sum" colspan="'+XS_ROWSUM.length+'"></td>':'')
+  html+='<tr class="xs-rule xs-band"><th class="xs-lbl">'+(pct?'% of rated funds':'Funds')+'</th>'+padRS
       + cols.map(()=>'<td class="num"></td>').join('')+'</tr>';
   bks.forEach((b,k)=> html+=sumRow(b[0], k,
       s=> s.nAll ? s.nB[k]/s.nAll : null,
-      s=> !s.nAll ? '—' : (pct ? (100*s.nB[k]/s.nAll).toFixed(0)+'%'+tot(s.nAll) : s.nB[k]+tot(s.nAll))));
-  html+='<tr class="xs-band"><th class="xs-lbl">'+(pct?'% of rated AUM':'AUM, ₹ cr')+'</th>'+(showRS?'<td class="xs-sum" colspan="'+XS_ROWSUM.length+'"></td>':'')
+      s=> !s.nAll ? '—' : (pct ? (100*s.nB[k]/s.nAll).toFixed(0)+'%' : String(s.nB[k]))));
+  html+='<tr class="xs-band"><th class="xs-lbl">'+(pct?'% of rated AUM':'AUM, ₹ cr')+'</th>'+padRS
       + cols.map(()=>'<td class="num"></td>').join('')+'</tr>';
   bks.forEach((b,k)=> html+=sumRow(b[0], k,
       s=> s.crAll>0 ? s.crB[k]/s.crAll : null,
-      s=> !(s.crAll>0) ? '—' : (pct ? (100*s.crB[k]/s.crAll).toFixed(0)+'%'+tot(inCr(s.crAll))
-                                    : inCr(s.crB[k])+tot(inCr(s.crAll)))));
+      s=> !(s.crAll>0) ? '—' : (pct ? (100*s.crB[k]/s.crAll).toFixed(0)+'%' : inCr(s.crB[k]))));
   html+='</tfoot></table>';
   host.innerHTML=html;
   _XSVIEW={cols, houses, colInfo, stats, m, i, asof:dates[i], bks};
@@ -5283,11 +5349,13 @@ function xsMethodNote(cols, houses, colInfo, m, rw, asof){
     +(med?'<b>'+med+'</b> column'+(med===1?'':'s')+' marked <b>◦</b> ha'+(med===1?'s':'ve')+' no single benchmark, so there the centre is the column\'s own median and green means "above the middle of this column", not "ahead of an index". ':'')
     +'<b>Bold green</b> marks the best '+XS_TOPN+' and <b>bold red</b> the worst '+XS_TOPN+' in each category'
     +(m==='qtl'?' — not shown here, because a quartile already is a rank':', shown only where a column has at least '+XS_MINRANK+' rated houses, so the two cannot overlap')+'.'
+    +'<br><br><b>How the two kinds of cell are drawn.</b> A cell in the grid is <i>tinted</i> — its whole ground carries the value. A cell in either summary is a <i>bar</i> on a flat ground — its length carries the value, green where a bigger number is better and red where it is worse. Two channels rather than two palettes, so a summary can never be misread as one more category, and an empty bar reads as zero at a glance instead of as a pale shade of good.'
     +'<br><br><b>The block at the foot counts FUNDS, while the grid above shows HOUSES.</b> "How many funds are in Q1" is a question about funds, so a house running two funds in a category contributes two answers there and one blended cell above. It is counted over the <b>'+houses.length+'</b> houses and <b>'+cols.length+'</b> categories on screen, and every figure carries its own denominator in brackets: funds — or ₹ cr of AUM — that actually have a value on this window. A fund with no history, no benchmark or no reported AUM leaves the numerator <i>and</i> the denominator rather than counting as a zero. The Count / % toggle switches both blocks at once.'
     + (m!=='qtl' ? '<br><br><b>The benchmark row</b> is shown only where every fund in the column follows the same index. '
         + (mixed? 'It is blank for <b>'+mixed+'</b> column'+(mixed===1?'':'s')+' whose funds do not — under the MFI all-peer universe a category is not a Value Research category, so its members can carry different indices or none, and there is no one benchmark to print. ' : '')
         + (nob? 'A further <b>'+nob+'</b> column'+(nob===1?'':'s')+' has no benchmark value on this window. ' : '') : '')
     +(S.xs.rows!==false ? '<br><br><b>The block beside each house</b> summarises that house ACROSS the categories on screen, and unlike the block at the foot it does not follow the toggle: a house is a whole book, and how much of it is top-quartile, how much is bottom-quartile and how much beats its benchmark are the same three questions whatever the cells are showing. Every fund counts once per category it is in, and the denominator is the funds of that house carrying any value at all — the hover on each cell gives the count over that denominator.' : '')
+    +'<br><br><b>Column order.</b> By <b>sleeve</b> first, then by family inside it — the size ladder read large to small, the style cuts, then themes grouped by what they are about, then the wrappers. A rule marks where one sleeve ends and the next begins, and each header names its sleeve on hover. Ordering by money instead put Pharma between Flexi Cap and Arbitrage, which is an order but not a reading order.'
     +'<br><br><b>Scope.</b> Rows are the houses in the current house scope ('+scopeLabel()+') holding a fund in a shown category; a column is dropped when no house in scope has a value in it. Change the peer universe, the investment mode, the period or the house scope and the whole grid re-derives — nothing here is pinned to a window or a book.');
 }
 // The one SIP sentence, in the third person the note needs (modeSentence() is written for a card
