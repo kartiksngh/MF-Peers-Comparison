@@ -5720,8 +5720,13 @@ function xscCompute(i){
     if (vr && isBorrowed(rec)) continue;
     if (seen.has(rec.s)) continue; seen.add(rec.s);
     const cum = xscCum(N.funds[rec.s], i0, i1);
-    const home = vr ? vrHomeRec(rec.s) : rec;
-    const bcat = (home && !BADCAT(home.c)) ? home.c : null;
+    // ★ THE BENCHMARK COMES FROM THE SCHEME'S VALUE-RESEARCH HOME IN BOTH UNIVERSES -- exactly
+    // what computeStandingAlpha does a few hundred lines below, and for the same reason: a
+    // benchmark belongs to a CATEGORY, not to a peer universe. Resolving it from the all-peer
+    // category here would make this card print a different alpha for the same fund than the
+    // fixed windows do, which is the one thing this whole card is built not to do.
+    const vrHome = vrHomeRec(rec.s);
+    const bcat = (vrHome && !BADCAT(vrHome.c)) ? vrHome.c : null;
     const bname = bcat ? benchNameFor(bcat) : null;
     const B = benchOf(bname);
     const ret = xscAnnualize(cum, days);
