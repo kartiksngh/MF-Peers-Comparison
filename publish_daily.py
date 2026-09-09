@@ -63,11 +63,32 @@ def main():
         data["sip"] = None                    # page lazy-fetches sip_<book>.json
     if returns is not None:
         data["returns"] = None                # page lazy-fetches returns.json
+    # ── THE DAILY NAV INDEX (Kyser 2026-09-09), which lets the reader pick a start and an end
+    # date of their own. Built beside the engine by build_navidx.py, not inside the payload: it
+    # is ~24 MB and only the custom-window path ever reads it.
+    #
+    # The FILE and its MARKER are written in the same breath, deliberately. On the Vistas terminal
+    # the night before, a build wrote a tab's data and then — because a later step threw — shipped
+    # a page with no pointer to it; every check passed and the tab went live empty with its data
+    # sitting beside it, served and 200-OK. Copy-then-stamp here makes that split impossible: no
+    # file, no marker, and the deck simply hides the Custom button.
+    navsrc = src / "out" / "navidx.json"
+    if navsrc.exists() and navsrc.stat().st_size > 1000:
+        import shutil
+        shutil.copyfile(navsrc, REPO / "navidx.json")
+        data.setdefault("meta", {})["has_navidx"] = 1
+        written_nav = f"navidx.json ({navsrc.stat().st_size/1e6:.1f} MB)"
+    else:
+        data.get("meta", {}).pop("has_navidx", None)   # no file => the deck must not offer it
+        written_nav = None
+
     data = pack_data(data)                    # ~4x smaller month-series, page unpacks at boot
     (REPO / "peer_data.json").write_text(json.dumps(data, separators=(",", ":")), encoding="utf-8")
     (REPO / "residency.json").write_text(json.dumps(pack_residency(residency), separators=(",", ":")),
                                          encoding="utf-8")
     written = ["peer_data.json", "residency.json"]
+    if written_nav:
+        written.append(written_nav)
     if standing is not None:
         (REPO / "standing.json").write_text(json.dumps(pack_standing(standing), separators=(",", ":")),
                                             encoding="utf-8")

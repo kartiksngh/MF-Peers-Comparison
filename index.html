@@ -1401,6 +1401,10 @@
                       color: var(--ink-2); background: var(--paper-2);
                       border-left: 3px solid #9a6b1f; border-radius: 0 3px 3px 0; }
   #xs-grid .xs-drop b { color: var(--ink); }
+  #xs-ctl .xs-dates { display: flex; align-items: center; gap: 6px; }
+  #xs-ctl .xs-dates input[type=date] { font: inherit; font-size: 11px; padding: 4px 6px;
+      border: 1px solid var(--line); border-radius: 4px; background: var(--card); color: var(--ink); }
+  #xs-ctl .xs-dates span { font-size: 10.5px; color: var(--ink-2); }
   #xs-grid .xs-hdot { display: inline-block; width: 7px; height: 7px; border-radius: 50%;
                       margin-right: 6px; vertical-align: baseline; }
 
@@ -1705,7 +1709,11 @@ const S = {
   // the house x category cross-section (Kyser 2026-09-08). Mode and window are NOT here:
   // that grid runs on the page's own S.mode / S.basis, so it can never contradict the
   // AMC summary directly above it. Only what is genuinely local to the card lives here.
-  xs:{ metric:'ret', sleeve:'(all)', pct:true, rows:true, sort:{k:null, dir:-1} },
+  xs:{ metric:'ret', sleeve:'(all)', pct:true, rows:true, sort:{k:null, dir:-1},
+       // the reader's OWN window. Grid-local on purpose: the fixed buttons write the
+       // page's state so every panel moves together, but a free date range has no meaning
+       // on the panels that only hold pre-computed windows.
+       range:{ on:false, a:'', b:'' } },
   composite:{ date:null, qsel:[1,2] },
   league:{ date:null, sortKey:'top', sortDir:-1 },
   // ── x-axis crop, shared by the typed date boxes AND drag-to-crop on any chart ──
@@ -3326,7 +3334,7 @@ function viewSig(view){
                           +'|'+S.matrix.metric+'|'+S.matrix.date;                  // matrix card lives here now
     case 'amc':    return g+'|'+S.amc.fh+'|'+S.amc.rankDate+'|'+(S.composite.qsel||[]).join('')
                           +'|'+S.league.sortKey+'|'+S.league.sortDir                    // league card lives here now
-                          +'|'+S.xs.metric+'|'+S.xs.sleeve+'|'+S.xs.pct+'|'+S.xs.rows+'|'+S.xs.sort.k+'|'+S.xs.sort.dir;               // …and the cross-section
+                          +'|'+S.xs.metric+'|'+S.xs.sleeve+'|'+S.xs.pct+'|'+S.xs.rows+'|'+S.xs.sort.k+'|'+S.xs.sort.dir+'|'+S.xs.range.on+'|'+S.xs.range.a+'|'+S.xs.range.b;               // …and the cross-section
     case 'scheme': return g+'|'+S.scheme.fh+'|'+S.scheme.cat+'|'+S.scheme.sl+'|'+S.scheme.name+'|'+S.scheme.month+'|'+S.scheme.peerDate;
     default:       return null;                 // mapping (+ its data-quality block): DOM-driven filters, always render
   }
@@ -4045,7 +4053,9 @@ function buildViews(){
           <div class="fg"><label>Invested how</label>
             <div class="seg sm" id="xs-mode"><button data-v="ls" class="active">Lumpsum</button><button data-v="s1">1Y SIP</button><button data-v="s2">2Y SIP</button><button data-v="s3">3Y SIP</button><button data-v="s5">5Y SIP</button></div></div>
           <div class="fg"><label>Over what period</label>
-            <div class="seg sm" id="xs-win"><button data-v="1M">1M</button><button data-v="3M">3M</button><button data-v="6M">6M</button><button data-v="9M">9M</button><button data-v="1Y" class="active">1Y</button><button data-v="2Y">2Y</button><button data-v="3Y">3Y</button><button data-v="5Y">5Y</button></div></div>
+            <div class="seg sm" id="xs-win"><button data-v="1M">1M</button><button data-v="3M">3M</button><button data-v="6M">6M</button><button data-v="9M">9M</button><button data-v="1Y" class="active">1Y</button><button data-v="2Y">2Y</button><button data-v="3Y">3Y</button><button data-v="5Y">5Y</button><button data-v="C">Custom</button></div></div>
+          <div class="fg" id="xs-range"><label>Your own dates</label>
+            <div class="xs-dates"><input type="date" id="xs-d0"><span>to</span><input type="date" id="xs-d1"></div></div>
           <div class="fg"><label>Categories</label><select id="xs-sleeve"></select></div>
           <div class="fg"><label>Per-house block</label>
             <div class="seg sm" id="xs-rows"><button data-v="on" class="active">Show</button><button data-v="off">Hide</button></div></div>
@@ -5096,11 +5106,21 @@ const XS_MLBL = { ret:'Return', alpha:'Alpha vs benchmark', qtl:'Quartile' };
 // changes the window rebuilds from scratch rather than trusting a stale cube.
 let _XS = {key:null, val:null};
 function computeCrossSection(i){
-  const key=_globalSig()+'|'+i;
+  // The reader's own dates are NOT in _globalSig (they are grid-local, and putting them
+  // there would re-render every other tab whenever a date changes), so this key has to
+  // carry them itself. Without that the grid answered a new window with the previous
+  // window's numbers -- and only looked right because loading the NAV block happened to
+  // bump the data epoch on the very first custom render.
+  const key=_globalSig()+'|'+i+'|'+S.xs.range.on+'|'+S.xs.range.a+'|'+S.xs.range.b;
   if(_XS.key===key) return _XS.val;
   const vr=S.universe==='vr';
   const src=(vr?S.data.vr:S.data.allpeer)||[];
   const inScope=new Set(scopeHouses());
+  // The reader's own window, if one is set. Its own failure states are surfaced by the card
+  // rather than silently falling back to the fixed window, which would show a number for a
+  // period nobody asked for.
+  const XC=xscCompute(i);
+  if(XC.state!=='off' && XC.state!=='ok') return {state:'xsc-'+XC.state};
   const seen=new Set();
   const cells=new Map();                                  // "house|cat" -> the house's cell
   const cats=new Map();                                   // cat -> the column
@@ -5109,13 +5129,27 @@ function computeCrossSection(i){
     if(BADCAT(rec.c) || !inScope.has(rec.h)) continue;
     if(vr && isBorrowed(rec)) continue;                   // a borrowed membership is the same fund twice
     if(seen.has(rec.s)) continue; seen.add(rec.s);
-    const al=computeStandingAlpha(rec.s, i);
-    // PANEL-LEVEL states: the whole grid is impossible, so say why once instead of drawing a
-    // thousand dashes. Per-FUND states ('nocat', 'unrated') just leave that fund without a value.
-    if(al.state==='nowindow' || al.state==='absent' || al.state==='winoverbook'){ state=al.state; break; }
-    if(al.state==='loading' || al.state==='nosip' || al.state==='noblock'){ state='loading'; break; }
-    const st=computeStanding(rec.s, i);
-    if(st.state==='stdloading' || st.state==='siploading'){ state='loading'; break; }
+    let al, st;
+    if(XC.state==='ok'){
+      // ★ THE READER'S OWN WINDOW. Shaped like the engine's answer on purpose, so the roll-up,
+      // the benchmark tally and the dropped-column reasons below all keep running on ONE code
+      // path instead of growing a second copy that can drift away from this one.
+      const o = XC.byScheme[rec.s] || null;
+      al = o ? {state:'ok', own:o.ret, ownRaw:o.rawCum, ownW:null, alphaBench:o.alpha,
+                benchName:o.benchName, bench:o.bench, xform:XC.xform, capDate:null,
+                benchWhy:(o.benchName ? (o.bench==null ? 'benchwin' : null) : 'nobench')}
+             : {state:'ok', own:null, ownRaw:null, ownW:null, alphaBench:null,
+                benchName:null, bench:null, xform:XC.xform, capDate:null, benchWhy:'noreturn'};
+      st = {state:'ok', qdigit: o ? o.qtl : null};
+    } else {
+      al=computeStandingAlpha(rec.s, i);
+      // PANEL-LEVEL states: the whole grid is impossible, so say why once instead of drawing a
+      // thousand dashes. Per-FUND states ('nocat', 'unrated') just leave that fund without a value.
+      if(al.state==='nowindow' || al.state==='absent' || al.state==='winoverbook'){ state=al.state; break; }
+      if(al.state==='loading' || al.state==='nosip' || al.state==='noblock'){ state='loading'; break; }
+      st=computeStanding(rec.s, i);
+      if(st.state==='stdloading' || st.state==='siploading'){ state='loading'; break; }
+    }
     anyFund++;
     const cr=(rec.cr && rec.cr[i]!=null && rec.cr[i]>0) ? rec.cr[i] : null;
     // ── the fund's three values. `own` (not ownRaw) is the gate on the return: a fund is only
@@ -5243,6 +5277,9 @@ function renderCrossSection(){
   amcWantReturns(); amcWantStanding();
   xsSyncControls();
   const m=S.xs.metric, X=computeCrossSection(i);
+  // the reader own window, asked for again here -- xscCompute is memoised on the same
+  // signature, so this is a lookup, not a second pass over the universe
+  const XC=xscCompute(i);
   const sub=document.getElementById('xs-sub'), meth=document.getElementById('xs-method');
   const say=(msg)=>{ _XSVIEW=null; host.innerHTML='<div class="sub" style="padding:16px">'+msg+'</div>'; if(meth) meth.innerHTML=''; };
   if(X.state==='nowindow'){ if(sub) sub.textContent='needs one rolling window';
@@ -5252,6 +5289,14 @@ function renderCrossSection(){
   if(X.state==='absent'){ if(sub) sub.textContent='no returns in this build';
     return say('This deck was built without the returns block, so a return, an alpha and a benchmark cannot be shown.'); }
   if(X.state==='loading'){ if(sub) sub.textContent='loading…'; return say('Loading the return and rank data…'); }
+  if(X.state==='xsc-loading'){ if(sub) sub.textContent='loading the daily NAVs…';
+    return say('Loading the daily NAV history this window is measured from. It is about 24 MB and is fetched only when you ask for your own dates, so this happens once per visit.'); }
+  if(X.state==='xsc-nonav'){ if(sub) sub.textContent='no NAV history in this build';
+    return say('This deck was built before the daily NAV history was added, so a window of your own cannot be measured. The fixed periods above still work.'); }
+  if(X.state==='xsc-backwards'){ if(sub) sub.textContent='end is not after the start';
+    return say('The end date needs to be after the start date.'); }
+  if(X.state==='xsc-outside'){ if(sub) sub.textContent='dates outside the history';
+    return say('One of those dates is outside the NAV history this deck carries. Pick dates inside it.'); }
   if(X.state!=='ok'){ if(sub) sub.textContent=''; return say('No scheme in scope on this universe and window.'); }
   const {cells, cats}=X;
   // COLUMNS. Biggest money first, so the categories anyone actually asks about lead and the long
@@ -5501,25 +5546,58 @@ function renderCrossSection(){
   }; });
   _XSVIEW={cols, houses, colInfo, stats, m, i, asof:dates[i], bks};
   const rw=RWOF[S.basis];
+  const winTxt = (XC.state==='ok')
+      ? (fmt.date(XC.from)+' to '+fmt.date(XC.to)+' ('+Math.round(XC.days)+' days'+(XC.ann?', a year or more, so shown per year':'')+')')
+      : (rw+' · '+fmt.date(dates[i]));
   if(sub) sub.innerHTML=XS_MLBL[m]+' · '+houses.length+' house'+(houses.length===1?'':'s')+' × '+cols.length
-        +' categor'+(cols.length===1?'y':'ies')+' · '+universeLabel()+' · '+modeLabel()+' · '+rw+' · '+fmt.date(dates[i]);
-  if(meth) meth.innerHTML=xsMethodNote(cols, houses, colInfo, m, rw, dates[i], dropped);
+        +' categor'+(cols.length===1?'y':'ies')+' · '+universeLabel()+' · '+modeLabel()+' · '+winTxt;
+  if(meth) meth.innerHTML=xsMethodNote(cols, houses, colInfo, m, rw, dates[i], dropped, XC);
 }
 const xsFundVal = (f, m) => m==='ret' ? f.ret : m==='alpha' ? f.alpha : f.qtl;
 
 // Mirror the two SHARED controls (mode, window) from the page state, and reflect this card's own
 // three. Called on every render, so the card can never show a toggle the grid is not on.
+
+// The dates the pickers open on: the last twelve months ENDING AT THE NEWEST DAY THIS DECK HOLDS,
+// never at today. A deck is read weeks after it is built, and defaulting to today would silently
+// measure to a date with no NAV behind it.
+function xscDefaultRange(){
+  const N = navIdxSrc();
+  const last = N ? N.dates[N.dates.length-1]
+                 : ((S.data && S.data.meta && S.data.meta.latest) || null);
+  if(!last) return;
+  const d = new Date(Date.parse(last));
+  const a = new Date(d.getTime()); a.setFullYear(a.getFullYear()-1);
+  const iso = (x)=> x.toISOString().slice(0,10);
+  S.xs.range.b = last;
+  S.xs.range.a = iso(a);
+}
 function xsSyncControls(){
   setSeg('xs-metric', S.xs.metric);
   syncModeButtons('xs-mode');
   setSeg('xs-mode',   S.mode);
-  setSeg('xs-win',    RWOF[S.basis] ? S.basis : '');
+  setSeg('xs-win',    S.xs.range.on ? 'C' : (RWOF[S.basis] ? S.basis : ''));
+  // the date pickers appear only when they are in charge, and are bounded by the history the
+  // deck actually carries so a date with no NAV behind it cannot be picked in the first place
+  const _rg=document.getElementById('xs-range');
+  if(_rg) _rg.style.display = S.xs.range.on ? '' : 'none';
+  const _N=navIdxSrc(), _a=document.getElementById('xs-d0'), _b=document.getElementById('xs-d1');
+  if(_a && _b){
+    _a.value=S.xs.range.a||''; _b.value=S.xs.range.b||'';
+    if(_N){ const lo=_N.dates[0], hi=_N.dates[_N.dates.length-1];
+            _a.min=lo; _a.max=hi; _b.min=lo; _b.max=hi; }
+  }
+  // Custom is offered only when this deck carries the NAV history to honour it.
+  const _cb=document.querySelector('#xs-win button[data-v="C"]');
+  if(_cb){ const okc=!!(S.data && S.data.meta && S.data.meta.has_navidx);
+           _cb.style.display = okc ? '' : 'none'; }
   setSeg('xs-pct',    S.xs.pct?'p':'n');
   setSeg('xs-rows',   S.xs.rows?'on':'off');
   // A window longer than the SIP book ships nothing at all from the engine, so the button is
   // disabled rather than left to produce a grid of dashes with no explanation.
   const bm=modeBookMonths();
   document.querySelectorAll('#xs-win button').forEach(b=>{
+    if(b.dataset.v==='C') return;                      // a free range has no fixed month count
     const w=WINMONTHS[RWOF[b.dataset.v]]||null, bad=!!(bm && w && w>bm);
     b.disabled=bad; b.style.opacity=bad?'0.35':'';
     b.title=bad ? 'The '+b.dataset.v+' window is longer than the '+(bm/12)+'-year SIP book, so there is nothing to measure' : '';
@@ -5542,8 +5620,130 @@ function wireCrossSection(){
   // These two write the PAGE's state (rule 2 in the header note), so the global bar and every
   // other panel move with them — that is the point, not a side effect.
   segWire('xs-mode',   v=>{ setMode(v); });
-  segWire('xs-win',    v=>{ if(S.basis===v) return; S.basis=v; syncGlobalControls(); renderAll(); });
+  segWire('xs-win',    v=>{
+    if(v==='C'){                       // the reader's own window: grid-local, page state untouched
+      S.xs.range.on=true;
+      if(!S.xs.range.a || !S.xs.range.b) xscDefaultRange();
+      fetchNavIdx(); xsSyncControls(); renderCrossSection(); return;
+    }
+    S.xs.range.on=false;
+    if(S.basis===v){ xsSyncControls(); renderCrossSection(); return; }
+    S.basis=v; syncGlobalControls(); renderAll();
+  });
+  const _d0=document.getElementById('xs-d0'), _d1=document.getElementById('xs-d1');
+  const _onDate=()=>{ S.xs.range.a=_d0.value; S.xs.range.b=_d1.value; S.xs.range.on=true;
+                      fetchNavIdx(); xsSyncControls(); renderCrossSection(); };
+  if(_d0) _d0.onchange=_onDate;
+  if(_d1) _d1.onchange=_onDate;
   const x=document.getElementById('xs-exp'); if(x) x.onclick=exportCrossSection;
+}
+
+
+// ── THE DAILY NAV INDEX (Kyser 2026-09-09) ─────────────────────────────────────────────────
+// One series per scheme and per benchmark, forward-filled and rebased to 1 at its own start, on
+// one shared daily axis. Loaded exactly like standing.json / returns.json: single-flight, and
+// GATED on meta.has_navidx so a navidx.json left behind by an earlier publish can never be joined
+// to fresher peer data. ~24 MB, so it is fetched only when somebody actually asks for a custom
+// window -- the fixed buttons never touch it.
+let NAVIDX_PROMISE = null;
+function navIdxSrc(){ return (S.data && S.data.navidx) || null; }
+function fetchNavIdx(){
+  if (NAVIDX_PROMISE || (S.data && S.data.navidx)) return NAVIDX_PROMISE;
+  if (!(S.data && S.data.meta && S.data.meta.has_navidx)) return null;
+  NAVIDX_PROMISE = fetch('navidx.json')
+    .then(r => { if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
+    .then(res => { S.data.navidx = res; dataLanded();
+      try { renderCrossSection(); } catch(e){} })
+    .catch(() => { NAVIDX_PROMISE = null; });
+  return NAVIDX_PROMISE;
+}
+// The last axis date on or before `ds`. ISO dates compare correctly as strings, so this is a
+// plain binary search -- and "on or before" is the right rule: a Sunday start date must use
+// Friday's NAV, not refuse to answer.
+function xscDateIdx(N, ds){
+  const D = N.dates; let lo = 0, hi = D.length - 1, ans = -1;
+  while (lo <= hi){ const m = (lo + hi) >> 1; if (D[m] <= ds){ ans = m; lo = m + 1; } else hi = m - 1; }
+  return ans;
+}
+// A series carries values from its own first observation (`f`) onward. Before that the fund did
+// not exist and after its last value it has stopped reporting -- both are NO ANSWER, never a
+// silently held-flat number.
+function xscNavAt(rec, i){
+  if (!rec) return null;
+  const k = i - (rec.f || 0);
+  return (k >= 0 && k < rec.v.length) ? rec.v[k] : null;
+}
+function xscCum(rec, i0, i1){
+  const a = xscNavAt(rec, i0), b = xscNavAt(rec, i1);
+  if (a == null || b == null || !(a > 0)) return null;
+  return (b / a - 1) * 100;
+}
+// Annualize only past a year, and by ACTUAL days. A 400-day window is not "13 months" and a
+// 366-day one is not a year -- using the real day count is what keeps a custom window comparable
+// with the fixed buttons, where the engine does the same thing.
+function xscAnnualize(cum, days){
+  if (cum == null) return null;
+  return (days >= 365) ? (Math.pow(1 + cum/100, 365/days) - 1) * 100 : cum;
+}
+// ONE pass over the in-scope universe for the reader's window: every fund's raw cumulative, its
+// annualized return, its alpha against its own category benchmark, and a quartile RANKED on
+// these returns (the engine has no quartile for a window it never saw). Memoised per signature,
+// and -- as everywhere on this card -- a transient state is never stored.
+let _XSC = { key:null, val:null };
+function xscCompute(i){
+  const R = S.xs.range;
+  if (!R.on || !R.a || !R.b) return {state:'off'};
+  const key = _globalSig() + '|' + i + '|' + R.a + '|' + R.b;
+  if (_XSC.key === key) return _XSC.val;
+  if (!(S.data && S.data.meta && S.data.meta.has_navidx)) return {state:'nonav'};
+  const N = navIdxSrc();
+  if (!N){ fetchNavIdx(); return {state:'loading'}; }
+  const i0 = xscDateIdx(N, R.a), i1 = xscDateIdx(N, R.b);
+  if (i0 < 0 || i1 < 0) return {state:'outside'};
+  if (i1 <= i0)         return {state:'backwards'};
+  const days = (Date.parse(N.dates[i1]) - Date.parse(N.dates[i0])) / 86400000;
+  const vr = S.universe === 'vr';
+  const src = (vr ? S.data.vr : S.data.allpeer) || [];
+  const inScope = new Set(scopeHouses());
+  const bcache = {};                      // benchmark name -> {cum, ret} for this window
+  const benchOf = (nm) => {
+    if (!nm) return null;
+    if (!(nm in bcache)){
+      const c = xscCum(N.bench[nm], i0, i1);
+      bcache[nm] = (c == null) ? null : {cum:c, ret:xscAnnualize(c, days)};
+    }
+    return bcache[nm];
+  };
+  const byScheme = {}, byCat = {}, seen = new Set();
+  for (const rec of src){
+    if (BADCAT(rec.c) || !inScope.has(rec.h)) continue;
+    if (vr && isBorrowed(rec)) continue;
+    if (seen.has(rec.s)) continue; seen.add(rec.s);
+    const cum = xscCum(N.funds[rec.s], i0, i1);
+    const home = vr ? vrHomeRec(rec.s) : rec;
+    const bcat = (home && !BADCAT(home.c)) ? home.c : null;
+    const bname = bcat ? benchNameFor(bcat) : null;
+    const B = benchOf(bname);
+    const ret = xscAnnualize(cum, days);
+    const o = { rawCum:cum, ret:ret,
+                alpha:(ret != null && B) ? (ret - B.ret) : null,
+                qtl:null, benchName:bname, bench:B ? B.ret : null };
+    byScheme[rec.s] = o;
+    (byCat[rec.c] = byCat[rec.c] || []).push(o);
+  }
+  // THE QUARTILE, ranked on these very returns. 1 is the best quarter of the category, 4 the
+  // worst -- the same reading direction the fixed-window quartile has, computed a different way,
+  // which the method note states outright.
+  Object.keys(byCat).forEach(c => {
+    const have = byCat[c].filter(o => o.ret != null).sort((x,y) => y.ret - x.ret);
+    const n = have.length;
+    if (n < 4) return;                    // fewer than four funds cannot carry four quartiles
+    have.forEach((o, k) => { o.qtl = Math.min(4, Math.floor(k * 4 / n) + 1); });
+  });
+  const val = {state:'ok', byScheme, days, from:N.dates[i0], to:N.dates[i1],
+               ann:(days >= 365), xform:(raw) => xscAnnualize(raw, days)};
+  _XSC = {key, val};
+  return val;
 }
 
 // Plain words for each reason a category has no value on the chosen metric. Written as a
@@ -5588,7 +5788,7 @@ function xsDropNote(dropped, m){
   });
   return '<div class="xs-drop"><b>Not shown under ' + XS_MLBL[m] + '.</b> ' + parts.join('. ') + '.</div>';
 }
-function xsMethodNote(cols, houses, colInfo, m, rw, asof, dropped){
+function xsMethodNote(cols, houses, colInfo, m, rw, asof, dropped, XC){
   const mixed=cols.filter(c=>c.mixed).length;
   const nob=cols.filter(c=>!c.mixed && c.bench==null).length;
   const med=m==='ret' ? cols.filter(c=>!colInfo[c.c].byBench).length : 0;
@@ -5601,6 +5801,19 @@ function xsMethodNote(cols, houses, colInfo, m, rw, asof, dropped){
       ? (S.mode==='ls' ? 'Twelve months and longer are <b>annualized</b> (a CAGR), so a 3Y cell is a rate per year, not the whole three years.'
                        : 'Twelve months and longer are <b>annualized</b> (an XIRR solved on the actual instalment dates).')
       : 'Under twelve months the figure is the window <b>as it happened</b> — a cumulative return, not a rate per year — so "≥ 5%" in the block below means five per cent over the '+rw+', not five per cent a year.';
+  if(XC && XC.state==='ok'){
+    return methodNote(
+      'Every cell is '+what+' measured from <b>'+fmt.date(XC.from)+'</b> to <b>'+fmt.date(XC.to)
+      +'</b> — <b>'+Math.round(XC.days)+' days</b> — on the <b>'+universeLabel()+'</b> universe, lumpsum.'
+      +(XC.ann ? ' The span is a year or more, so it is shown as a rate <b>per year</b>, worked out from the actual number of days rather than a month count.'
+               : ' The span is under a year, so it is the return <b>as it happened</b> over those days, not a rate per year.')
+      +'<br><br><b>Where these numbers come from.</b> Your dates are measured straight off each fund\'s own daily NAV history: the value on the end date divided by the value on the start date. If a date falls on a weekend or a holiday the last published NAV on or before it is used, which is what an investor would actually have transacted at. A fund that had not launched by your start date, or that stopped reporting before your end date, has no answer and is left blank rather than guessed.'
+      +'<br><br><b>The benchmark</b> is the same index the fixed windows use — the one the majority of the money in that category follows — measured over the identical dates, so the alpha is a like-for-like difference.'
+      +'<br><br><b>The quartile is computed here, and it is not the same quartile the fixed windows show.</b> The engine ranks funds on a composite score at its own month-end dates and has no answer for a window it never saw, so for your dates the funds of each category are ranked on this very return: 1 is the best quarter, 4 the worst. A category with fewer than four rated funds is left blank, because four quartiles need four funds.'
+      +'<br><br><b>Where a house runs more than one fund</b> in a category the cell is AUM-weighted, and the return weights the raw growth and converts to a yearly rate ONCE — an average of yearly rates is a number no investor earned.'
+      +'<br><br><b>Scope.</b> Rows are the houses in the current house scope ('+scopeLabel()+') holding a fund in a shown category; a column is dropped when no house in scope has a value in it'
+      +((dropped && dropped.length) ? ' — <b>'+dropped.length+'</b> categor'+(dropped.length===1?'y is':'ies are')+' dropped on this view, named directly under the grid with the reason for each' : '')+'.');
+  }
   return methodNote(
     'Every cell is '+what+' over the <b>'+rw+'</b> ending <b>'+fmt.date(asof)+'</b>, on the <b>'+universeLabel()
     +'</b> universe, '+modeSentenceShortXS()+'. '+unit
