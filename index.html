@@ -1558,6 +1558,8 @@
     <div class="srow"><input type="range" id="gc-w" min="0" max="100" step="5" value="80"><span class="slidval" id="gc-wval">80 / 20</span></div></div>
   <div class="fg" id="gc-rewardwrap" style="display:none"><label>Benchmark reward</label>
     <label class="chk"><input type="checkbox" id="gc-reward" checked> +1 if beats 3Y benchmark</label></div>
+  <div class="fg"><label>Measure shares as</label>
+    <div class="seg" id="gc-wt"><button data-v="aum" class="active">% of AUM</button><button data-v="cnt">% of funds</button></div></div>
   <div class="fg"><label>Investment mode</label>
     <div class="seg" id="gc-mode"><button data-v="ls" class="active">Lumpsum</button><button data-v="s1">1Y SIP</button><button data-v="s2">2Y SIP</button><button data-v="s3">3Y SIP</button><button data-v="s5">5Y SIP</button></div></div>
   <div class="fg" id="gc-xrwrap"><label>Date range &middot; charts</label>
@@ -1689,11 +1691,23 @@ const QORDER = ['% in Q1','% in Q2','% in Q3','% in Q4'];
 const QCOL   = { '% in Q1':C.q1, '% in Q2':C.q2, '% in Q3':C.q3, '% in Q4':C.q4 };
 const SCOREW = { '% in Q1':4, '% in Q2':3, '% in Q3':2, '% in Q4':1 };
 const WEIGHT_QT = '% of AMC AUM';
+// how many funds stand behind a cube cell -- carried beside the bands so a caption can say it
+const COUNT_QT  = '# funds';
+// What the shares on screen are measured in, for the labels. byCnt() is the switch; the rest
+// are the words, in one place, so a caption can never name a basis the numbers are not on.
+const byCnt    = ()=> S.wt==='cnt';
+const wtNoun   = ()=> byCnt() ? 'funds' : 'AUM';
+const wtOfAll  = ()=> byCnt() ? 'of all the house\u2019s ranked funds' : 'of all house AUM';
+const wtShort  = ()=> byCnt() ? '% of funds' : '% of AUM';
 const BADCAT = c => c==null || c==='' || c===0 || c==='0' || c==='Unknown';
 
 const S = {
   data:null, charts:{},
   universe:'all',                                   // 'all' | 'vr'
+  // How EVERY quartile share on the deck is measured (Kyser 2026-09-10). 'aum' = each fund
+  // counts by the money it runs; 'cnt' = one fund, one vote. Global on purpose: the same
+  // house must not read one way on the cards and another on the chart beside them.
+  wt:'aum',                                         // 'aum' | 'cnt'
   scope:'t15',                                      // house scope: 't15' Top-15 | 'all' every AMC
   window:'1 Year',                                  // all-peer rolling window
   basis:'1Y', w:80, reward:true,                    // VR score basis (default 1Y on load — Kyser 2026-09-02; Composite stays one click away)
@@ -1710,11 +1724,9 @@ const S = {
   // that grid runs on the page's own S.mode / S.basis, so it can never contradict the
   // AMC summary directly above it. Only what is genuinely local to the card lives here.
   xs:{ metric:'ret', sleeve:'(all)', pct:true, rows:true, sort:{k:null, dir:-1},
-       // What the per-house block's shares are measured ON. 'f' = one fund one vote;
-       // 'a' = weighted by the money each fund runs, which is how the quartile cards at
-       // the top of this tab are measured. Kyser 2026-09-10: the two blocks read 68% and
-       // 72% for the same house on the same day, and nothing on screen said why.
-       rsw:'a',
+       // The per-house block's basis lives in S.wt with the rest of the deck, NOT here:
+       // Kyser 2026-09-10, the block read 72% while the cards above it read 68% for the same
+       // house on the same day. One basis per screen, chosen in one place.
        // the reader's OWN window. Grid-local on purpose: the fixed buttons write the
        // page's state so every panel moves together, but a free date range has no meaning
        // on the panels that only hold pre-computed windows.
@@ -2447,7 +2459,7 @@ function ensureAllCube(){ const key='all|'+S.w+'|'+S.mode; if(S.allKey!==key){ b
 // AUM into the four bands per house & house|sleeve, Top-15 only — mirrors the 1Y/3Y tables but
 // computed client-side from the per-scheme rows so we don't ship 4 more precomputed tables.
 function buildAllRawCube(basis){
-  const field=allFieldFor(basis), M=S.data.aum_dates.length, house={}, hs={};
+  const field=allFieldFor(basis)||_cubeFieldFor(basis), M=S.data.aum_dates.length, house={}, hs={};
   for(const r of S.data.allpeer){ if(!house[r.h]) house[r.h]=Array.from({length:M},blankCell);
     const k=r.h+'|'+r.sl; if(!hs[k]) hs[k]=Array.from({length:M},blankCell); }
   for(let i=0;i<M;i++){
@@ -2464,6 +2476,9 @@ function buildAllRawCube(basis){
 // raw all-peer quartiles don't depend on weight/reward, so cache once per window basis —
 // but they DO depend on the investment mode (lumpsum vs SIP series), so the mode is part of
 // the cache key. Returns the cube so callers never touch the key shape directly.
+// The per-scheme quartile field behind a basis, INCLUDING the two the engine ships as
+// precomputed %AUM tables. Only the fund-count basis reads these two: it has no table to read.
+function _cubeFieldFor(basis){ return basis==='1Y' ? 'aq1y' : basis==='3Y' ? 'aq3y' : null; }
 function ensureAllRawCube(basis){
   S.allRawCubes=S.allRawCubes||{}; const k=S.mode+'|'+basis;
   if(!S.allRawCubes[k]) S.allRawCubes[k]=buildAllRawCube(basis);
@@ -2471,11 +2486,27 @@ function ensureAllRawCube(basis){
 }
 function cubeSeries(cube, fh, sleeve, dates){
   const cells=(sleeve ? cube.hs[fh+'|'+sleeve] : cube.house[fh]) || [];
-  const byQ={'% in Q1':[],'% in Q2':[],'% in Q3':[],'% in Q4':[],[WEIGHT_QT]:[]};
+  const byQ={'% in Q1':[],'% in Q2':[],'% in Q3':[],'% in Q4':[],[WEIGHT_QT]:[],[COUNT_QT]:[]};
+  // ── THE ONE PLACE THE AUM / FUND-COUNT CHOICE BITES (Kyser 2026-09-10).
+  // Under money each band is the fund's share of the house's AUM and the weight is the house's
+  // rated AUM, exactly as before. Under fund count each band is that many funds OVER the funds
+  // the house has ranked here, and the weight is 1 -- so every consumer that divides a band by
+  // the weight, or prints a band as a percentage, keeps working untouched. The raw count rides
+  // along under COUNT_QT for the captions that want to say "17 of 24 funds".
+  const cnt=(S.wt==='cnt'), hcells=cube.house[fh]||[];
   for(let m=0;m<dates.length;m++){ const c=cells[m];
-    if(!c || c.tCnt===0){ QORDER.forEach(q=>byQ[q].push(null)); byQ[WEIGHT_QT].push(null); continue; }
-    byQ['% in Q1'].push(c.a[1]); byQ['% in Q2'].push(c.a[2]); byQ['% in Q3'].push(c.a[3]); byQ['% in Q4'].push(c.a[4]);
-    byQ[WEIGHT_QT].push(c.tA);
+    if(!c || c.tCnt===0){ QORDER.forEach(q=>byQ[q].push(null)); byQ[WEIGHT_QT].push(null); byQ[COUNT_QT].push(null); continue; }
+    if(cnt){
+      // The denominator is the HOUSE's ranked funds, never the sleeve's -- exactly as the AUM
+      // side divides by the house's money. That keeps all four derived readings honest at once:
+      // the bands sum to the sleeve's weight, the weight is the share of the house's funds this
+      // sleeve holds, and "within sleeve" stays a within-sleeve number because it divides by that
+      // weight. Dividing by the sleeve's own count instead made every sleeve weigh 100% of its house.
+      const hc=hcells[m], den=(hc && hc.tCnt) ? hc.tCnt : c.tCnt;
+      QORDER.forEach((q,k)=>byQ[q].push(c.cnt[k+1]/den)); byQ[WEIGHT_QT].push(c.tCnt/den);
+    }
+    else { QORDER.forEach((q,k)=>byQ[q].push(c.a[k+1])); byQ[WEIGHT_QT].push(c.tA); }
+    byQ[COUNT_QT].push(c.tCnt);
   }
   return {dates, byQ};
 }
@@ -2489,6 +2520,11 @@ function houseSeries(fh, sleeve){
     // allFieldFor is mode-aware: under SIP it also routes 1Y/3Y through the raw cube on the
     // SIP aq1y/aq3y series (the precomputed sleeve/amc_all tables below are lumpsum-only)
     if(allFieldFor(S.basis)){ return cubeSeries(ensureAllRawCube(S.basis), fh, sleeve, S.data.aum_dates); }
+    // 1Y / 3Y BY FUND COUNT: the engine's tables below are %AUM only, so count from the rows.
+    // The two denominators are not identical -- the tables divide by ALL of a house's money,
+    // including funds too young to rank, while the rows can only count funds that ARE ranked --
+    // which is why the Rated line reads 100% on this basis and says so.
+    if(S.wt==='cnt' && _cubeFieldFor(S.basis)){ return cubeSeries(ensureAllRawCube(S.basis), fh, sleeve, S.data.aum_dates); }
     // 1Y / 3Y read the engine's precomputed (exact) all-peer tables
     const rw = S.basis==='3Y' ? '3 Year' : '1 Year', byQ={};
     const recs = sleeve
@@ -3144,7 +3180,8 @@ function basisDesc(){
   // by the global summary tag, the masthead and ~30 method notes, so this one line makes all of
   // them disclose the scope rather than each note having to remember to.
   const md = (S.mode==='ls' ? '' : ' · '+modeLabel())
-           + ((S.scope==='all' && scopeAvailable()) ? ' · all AMCs' : '');
+           + ((S.scope==='all' && scopeAvailable()) ? ' · all AMCs' : '')
+           + (byCnt() ? ' · % of funds' : '');
   if(S.universe==='all'){
     if(S.basis==='Composite') return `All Peers (MFI) · Composite (1Y ${S.w} / 3Y ${100-S.w}, no reward)`+md;
     return `All Peers (MFI) · ${RWOF[S.basis]||S.basis} return quartile`+md;
@@ -3226,6 +3263,7 @@ function syncGlobalControls(){
   if(!modeAvailable(S.mode)) S.mode='ls';
   syncModeButtons('gc-mode');
   setSeg('gc-mode', S.mode);
+  setSeg('gc-wt', S.wt);
   document.getElementById('gc-w').value=S.w;
   document.getElementById('gc-wval').textContent=`${S.w} / ${100-S.w}`;
   document.getElementById('gc-reward').checked=S.reward;
@@ -3244,6 +3282,7 @@ function wireGlobalControls(){
   segWire('gc-window',   v=>{ S.window=v; renderAll(); });
   segWire('gc-basis',    v=>{ S.basis=v; syncGlobalControls(); renderAll(); });
   segWire('gc-mode',     v=>{ setMode(v); });
+  segWire('gc-wt',       v=>{ S.wt=(v==='cnt'?'cnt':'aum'); syncGlobalControls(); renderAll(); });
   document.getElementById('gc-w').oninput=e=>{ S.w=+e.target.value; document.getElementById('gc-wval').textContent=`${S.w} / ${100-S.w}`; syncGlobalControls(); renderAll(); };
   document.getElementById('gc-reward').onchange=e=>{ S.reward=e.target.checked; renderAll(); };
   // Date range. 'change' rather than 'input': a date field fires input on every keystroke while
@@ -3330,7 +3369,7 @@ function dataLanded(){ _DATA_EPOCH++; }
 // chart stayed on the full history, because this signature had not changed and renderIfDirty()
 // short-circuits on an unchanged signature. The crop is a global input to every time-axis
 // chart on every tab, so it goes in the GLOBAL half of the signature, not a per-view one.
-function _globalSig(){ return S.universe+'|'+S.scope+'|'+S.basis+'|'+S.w+'|'+S.reward+'|'+S.mode
+function _globalSig(){ return S.universe+'|'+S.scope+'|'+S.basis+'|'+S.w+'|'+S.reward+'|'+S.mode+'|'+S.wt
                             +'|'+S.xr.from+'|'+S.xr.to+'|'+_DATA_EPOCH; }
 function viewSig(view){
   const g=_globalSig();
@@ -3339,7 +3378,7 @@ function viewSig(view){
                           +'|'+S.matrix.metric+'|'+S.matrix.date;                  // matrix card lives here now
     case 'amc':    return g+'|'+S.amc.fh+'|'+S.amc.rankDate+'|'+(S.composite.qsel||[]).join('')
                           +'|'+S.league.sortKey+'|'+S.league.sortDir                    // league card lives here now
-                          +'|'+S.xs.metric+'|'+S.xs.sleeve+'|'+S.xs.pct+'|'+S.xs.rows+'|'+S.xs.rsw+'|'+S.xs.sort.k+'|'+S.xs.sort.dir+'|'+S.xs.range.on+'|'+S.xs.range.a+'|'+S.xs.range.b;               // …and the cross-section
+                          +'|'+S.xs.metric+'|'+S.xs.sleeve+'|'+S.xs.pct+'|'+S.xs.rows+'|'+S.xs.sort.k+'|'+S.xs.sort.dir+'|'+S.xs.range.on+'|'+S.xs.range.a+'|'+S.xs.range.b;               // …and the cross-section
     case 'scheme': return g+'|'+S.scheme.fh+'|'+S.scheme.cat+'|'+S.scheme.sl+'|'+S.scheme.name+'|'+S.scheme.month+'|'+S.scheme.peerDate;
     default:       return null;                 // mapping (+ its data-quality block): DOM-driven filters, always render
   }
@@ -4231,7 +4270,8 @@ function sleeveAt(byQ, i){
   const rated=(q1||0)+(q2||0)+(q3||0)+(q4||0);
   const wArr=byQ[WEIGHT_QT], wRaw=(wArr && i<wArr.length)?wArr[i]:null;
   const R=rated>0?rated:null, W=(wRaw!=null&&wRaw>0)?wRaw:null;
-  return { q1:q1||0, q2:q2||0, q3:q3||0, q4:q4||0, rated:R, weight:W,
+  const nArr=byQ[COUNT_QT], nRaw=(nArr && i<nArr.length)?nArr[i]:null;
+  return { q1:q1||0, q2:q2||0, q3:q3||0, q4:q4||0, rated:R, weight:W, n:nRaw,
     // rated AUM is a SUBSET of the sleeve by construction, so a ratio above 1 can only be the
     // 4-dp transport drift above — clamp the DISPLAY, never the underlying quantity.
     cov:(R!=null&&W!=null)?Math.min(1,R/W):null,
@@ -4285,9 +4325,9 @@ function renderSleeve(){
     + `border-color:${sleeveTint(br,0.30)}">${br}</span>`;
   document.getElementById('sl-ctx').innerHTML=`${basisDesc()}<br>Snapshot ${fmt.date(dates[li])}`;
   document.getElementById('sl-kpis').innerHTML=`
-    <div class="kpi qc q-q12"><div class="k-lbl">Q1+Q2 within sleeve</div><div class="k-val">${fmt.pct(A.top)}</div><div class="k-sub">of the sleeve's <b>rated</b> AUM</div></div>
-    <div class="kpi mc m-aum"><div class="k-lbl">Sleeve weight in AMC</div><div class="k-val">${fmt.pct(A.weight)}</div><div class="k-sub">of total ${fh} AUM</div></div>
-    <div class="kpi mc m-aum${covWarn?' warn':''}"><div class="k-lbl">Rated</div><div class="k-val">${fmt.pct(A.cov)}</div><div class="k-sub">${covWarn?'of sleeve AUM carries a quartile':'the whole sleeve is scored'}</div></div>
+    <div class="kpi qc q-q12"><div class="k-lbl">Q1+Q2 within sleeve</div><div class="k-val">${fmt.pct(A.top)}</div><div class="k-sub">of the sleeve's <b>ranked</b> ${wtNoun()}</div></div>
+    <div class="kpi mc m-aum"><div class="k-lbl">Sleeve weight in AMC</div><div class="k-val">${fmt.pct(A.weight)}</div><div class="k-sub">of ${fh}'s ${byCnt()?'ranked funds':'total AUM'}</div></div>
+    <div class="kpi mc m-aum${covWarn?' warn':''}"><div class="k-lbl">Rated</div><div class="k-val">${fmt.pct(A.cov)}</div><div class="k-sub">${covWarn?('of sleeve '+wtNoun()+' carries a quartile'):'the whole sleeve is scored'}</div></div>
     <div class="kpi mc m-ret" title="${esc0('AUM-weighted percentile: each rated fund in this sleeve is ranked inside its OWN category on this basis, turned into a percentile by (n − rank + 0.5) ÷ n × 100 — 100 is the top of the peer group, 0 the bottom, 50 the middle whatever the category size — then AUM-weighted across the sleeve. It replaces the old 1–4 quartile score.')}"><div class="k-lbl">AUM-weighted %ile</div><div class="k-val">${slPr.v==null?(slPr.loading?'…':'—'):fmt.num(slPr.v,1)}</div><div class="k-sub">100 = top of peer group · rated AUM only</div></div>
     <div class="kpi qc q-q4"><div class="k-lbl">Q4 within sleeve</div><div class="k-val">${fmt.pct(A.qq4)}</div><div class="k-sub">bottom-quartile AUM</div></div>`;
 
@@ -4307,7 +4347,7 @@ function renderSleeve(){
     options:stackOpts({leftMax:mode==='within'?100:undefined,
       // the left denominator CHANGES with the mode toggle, so the title has to change with it --
       // a fixed label here would be wrong half the time
-      leftLabel: mode==='within' ? "% of the sleeve's rated AUM" : "% of the house's AUM",
+      leftLabel: mode==='within' ? `% of the sleeve's ranked ${wtNoun()}` : `% of the house's ${wtNoun()}`,
       rightLabel:"Sleeve's share of the house", xmin, xmax})});
   document.getElementById('sl-c1-method').innerHTML=methodNote(
     (mode==='within'
@@ -4336,7 +4376,7 @@ function renderSleeveTrend(){
     { label:'AUM-weighted %ile', data:scoreS, borderColor:C.quartile, borderWidth:1.8, tension:0.3, pointRadius:0, yAxisID:'y1', fill:false, spanGaps:true }
   ];
   S.charts.slTrend=new Chart(ctx,{type:'line',data:{datasets:smoothSeries(base, sm)},
-    options:dualOpts({leftSuffix:'%', leftLabel:"% of the sleeve's rated AUM",
+    options:dualOpts({leftSuffix:'%', leftLabel:`% of the sleeve's ranked ${wtNoun()}`,
       rightLabel:'Percentile vs peers (100 = best)', rightMin:0, rightMax:100, xmin, xmax, noGrid:true})});
   const _slsub=document.getElementById('sl-trend-sub');
   if(_slsub) _slsub.textContent='Within sleeve: Q1+Q2 (green) and Q4 (red)'
@@ -4452,7 +4492,9 @@ function renderAMC(){
 
   const fh=S.amc.fh, {dates,byQ}=houseSeries(fh,null);
   renderAMCHouseKPIs();
-  document.getElementById('am-stack-sub').textContent=`All equity & hybrid AUM in ${houseLabel(fh)}; bands sum to the house's covered weight`;
+  document.getElementById('am-stack-sub').textContent = byCnt()
+    ? `Every equity & hybrid fund in ${houseLabel(fh)} that carries a quartile, counted one apiece`
+    : `All equity & hybrid AUM in ${houseLabel(fh)}; bands sum to the house's covered weight`;
 
   const series=QORDER.map(q=>(byQ[q]||[]).map(v=>v==null?null:v*100));
   const {xmin,xmax}=xBounds(dates, ...series);
@@ -4486,7 +4528,7 @@ function renderAMC(){
   const adDates=houseSeries(fh,null).dates;
   const {xmin:rxmin,xmax:rxmax}=xBounds(adDates, aTop, aQ4);
   S.charts.amRank=new Chart(ctx2,{type:'line',data:{datasets:dsets},
-    options:dualOpts({leftSuffix:'%', leftLabel:"% of the house's AUM",
+    options:dualOpts({leftSuffix:'%', leftLabel:`% of the house's ${wtNoun()}`,
       rightLabel:'Percentile vs peers (100 = best)', rightMin:0, rightMax:100, xmin:rxmin, xmax:rxmax})});
   document.getElementById('am-rank-title').textContent=`${houseLabel(fh)} — Q1+Q2 (green) & Q4 (red) over time`;
   // Kyser 2026-09-04: the old subtitle ("<house> only; dashed = quality score (right axis).
@@ -4552,13 +4594,18 @@ function renderAMCHouseKPIs(){
   // `esc` is a LOCAL const in renderAMCSummary, not a global -- calling it from here threw and
   // blanked the tab (caught by _verify/rollup6_probe.js, 2026-09-05). Declare our own.
   const esc=t=> String(t==null?'':t).replace(/"/g,'&quot;');
-  const ratedTip='Rated = the share of this house’s AUM that actually carries a quartile on this basis. '
+  const ratedTip=byCnt()
+    ? 'On the % of funds basis every ranked fund counts once, and the denominator is the funds this house '
+      + 'HAS ranked on this basis — funds too young to rank are outside it, not diluting it, so this reads 100%. '
+      + 'Switch to % of AUM to see how much of the house’s money is actually measured.'
+    : 'Rated = the share of this house’s AUM that actually carries a quartile on this basis. '
     +'The four quartile cards below are shares of ALL house AUM, so they sum to exactly this number, and it is '
     +'the same figure the league table shows as “Scored %”. Unrated money therefore dilutes every card; the '
     +'bracket is the top half measured on RATED AUM only, and the two reconcile as '
     +'Q1+Q2 of house AUM = Rated × top half of rated AUM.';
   document.getElementById('am-ctx').innerHTML=`${basisDesc()}<br>Snapshot ${fmt.date(dates[i])}`
-    + ` · <span title="${esc(ratedTip)}"${covWarn?' style="color:var(--q4)"':''}>Rated ${fmt.pct(A.cov)} of house AUM`
+    + ` · <span title="${esc(ratedTip)}"${covWarn?' style="color:var(--q4)"':''}>`
+    + (byCnt() ? `Ranked ${A.n||''} funds` : `Rated ${fmt.pct(A.cov)} of house AUM`)
     + ` (its top half = ${fmt.pct(A.top)})</span>`;
   const pctTip='AUM-weighted percentile: every rated fund is ranked inside its OWN category on this basis, '
     +'turned into a percentile by (n − rank + 0.5) ÷ n × 100 — so 100 is the top of the peer group, 0 the bottom, '
@@ -4567,12 +4614,12 @@ function renderAMCHouseKPIs(){
     +'It replaces the old 1–4 quartile score (Q1=4…Q4=1), which the Excel export still carries.';
   const pctVal=(pr.v==null) ? (pr.loading?'…':'—') : fmt.num(pr.v,1);
   document.getElementById('am-kpis').innerHTML=`
-    <div class="kpi qc q-q1"><div class="k-lbl">Q1 share</div><div class="k-val">${fmt.pct(q1)}</div><div class="k-sub">top quartile, of all house AUM</div></div>
-    <div class="kpi qc q-q2"><div class="k-lbl">Q2 share</div><div class="k-val">${fmt.pct(q2)}</div><div class="k-sub">of all house AUM</div></div>
-    <div class="kpi qc q-q3"><div class="k-lbl">Q3 share</div><div class="k-val">${fmt.pct(q3)}</div><div class="k-sub">of all house AUM</div></div>
-    <div class="kpi qc q-q4"><div class="k-lbl">Q4 share</div><div class="k-val">${fmt.pct(q4)}</div><div class="k-sub">bottom quartile, of all house AUM</div></div>
-    <div class="kpi qc q-q12"><div class="k-lbl">Q1+Q2 share</div><div class="k-val">${fmt.pct((q1||0)+(q2||0))}</div><div class="k-sub">top half, of <b>all</b> house AUM</div></div>
-    <div class="kpi mc m-ret" title="${esc(pctTip)}"><div class="k-lbl">AUM-weighted %ile</div><div class="k-val">${pctVal}</div><div class="k-sub">100 = top of peer group · rated AUM only</div></div>`;
+    <div class="kpi qc q-q1"><div class="k-lbl">Q1 share</div><div class="k-val">${fmt.pct(q1)}</div><div class="k-sub">top quartile, ${wtOfAll()}</div></div>
+    <div class="kpi qc q-q2"><div class="k-lbl">Q2 share</div><div class="k-val">${fmt.pct(q2)}</div><div class="k-sub">${wtOfAll()}</div></div>
+    <div class="kpi qc q-q3"><div class="k-lbl">Q3 share</div><div class="k-val">${fmt.pct(q3)}</div><div class="k-sub">${wtOfAll()}</div></div>
+    <div class="kpi qc q-q4"><div class="k-lbl">Q4 share</div><div class="k-val">${fmt.pct(q4)}</div><div class="k-sub">bottom quartile, ${wtOfAll()}</div></div>
+    <div class="kpi qc q-q12"><div class="k-lbl">Q1+Q2 share</div><div class="k-val">${fmt.pct((q1||0)+(q2||0))}</div><div class="k-sub">top half, ${wtOfAll()}</div></div>
+    <div class="kpi mc m-ret" title="${esc(pctTip)}"><div class="k-lbl">${byCnt()?'Average %ile':'AUM-weighted %ile'}</div><div class="k-val">${pctVal}</div><div class="k-sub">100 = top of peer group · ranked ${wtNoun()} only</div></div>`;
 }
 // Everything on this tab that depends on the AS-OF DATE, and nothing else. The timeline
 // scrubber / GIF exporter calls this once per frame, so it deliberately leaves the
@@ -5368,7 +5415,11 @@ function renderCrossSection(){
   }));
   // ONE definition of the share, used by the cells, the shading, the best/worst three and the
   // header sort -- so a column can never be ranked on one weighting and coloured on another.
-  const rswAum = (S.xs.rsw==='a');
+  // ★ The block does NOT keep a basis of its own (it did, for one afternoon, and then the deck
+  // could show funds here and AUM on the cards two inches above -- the very confusion this whole
+  // change exists to remove). It reads the page's basis; its control writes it, the same way the
+  // window and mode buttons on this card write the page's state.
+  const rswAum = !byCnt();
   const rsShare = (h,k)=>{ const r=rs[h]; if(!r) return null;
     return rswAum ? (r.cr>0 ? r['cr_'+k]/r.cr : null) : (r.n>0 ? r[k]/r.n : null); };
   // each summary column gets the same treatment a category column gets: shaded by its own value
@@ -5618,7 +5669,7 @@ function xsSyncControls(){
   if(_cb){ const okc=!!(S.data && S.data.meta && S.data.meta.has_navidx);
            _cb.style.display = okc ? '' : 'none'; }
   setSeg('xs-pct',    S.xs.pct?'p':'n');
-  setSeg('xs-rsw',    S.xs.rsw==='a'?'a':'f');
+  setSeg('xs-rsw',    byCnt()?'f':'a');
   // the weighting control belongs to the block; with the block hidden it has nothing to say
   const _rswfg=document.getElementById('xs-rsw-fg'); if(_rswfg) _rswfg.style.display = S.xs.rows?'':'none';
   setSeg('xs-rows',   S.xs.rows?'on':'off');
@@ -5645,7 +5696,7 @@ function wireCrossSection(){
   root.dataset.wired='1';
   segWire('xs-metric', v=>{ S.xs.metric=v; renderCrossSection(); });
   segWire('xs-pct',    v=>{ S.xs.pct=(v==='p'); renderCrossSection(); });
-  segWire('xs-rsw',    v=>{ S.xs.rsw=(v==='a'?'a':'f'); renderCrossSection(); });
+  segWire('xs-rsw',    v=>{ S.wt=(v==='f'?'cnt':'aum'); syncGlobalControls(); renderAll(); });
   segWire('xs-rows',   v=>{ S.xs.rows=(v==='on'); renderCrossSection(); });
   // These two write the PAGE's state (rule 2 in the header note), so the global bar and every
   // other panel move with them — that is the point, not a side effect.
@@ -5918,7 +5969,8 @@ function renderAMCTable(){
   // ★ Kyser 2026-09-05 — the same six items as the KPI row above, in his order: the four
   // quartile bands, then the top half, then the AUM-weighted percentile. Scored % and Covered
   // AUM stay on as CONTEXT columns (they are denominators, not quartile readings).
-  const cols=[['q1','Q1'],['q2','Q2'],['q3','Q3'],['q4','Q4'],['top','Q1+Q2'],['pctile','AUM-wtd %ile'],['cov','Scored %'],['cr','Covered AUM']];
+  const cols=[['q1','Q1'],['q2','Q2'],['q3','Q3'],['q4','Q4'],['top','Q1+Q2'],
+              ['pctile', byCnt()?'Avg %ile':'AUM-wtd %ile'],['cov','Scored %'],['cr','Covered AUM']];
   let html='<table class="rt"><thead><tr><th>#</th><th>Fund House</th>';
   cols.forEach(([key,lbl])=> html+=`<th class="num lg-sort" data-k="${key}" style="cursor:pointer">${lbl}${k===key?(dir<0?' ▾':' ▴'):''}</th>`);
   html+='</tr></thead><tbody>';
@@ -6273,10 +6325,14 @@ function aumPctByHouse(i, sleeve){
     if(sleeve && m.sl!==sleeve) return;                            // sleeve filter (m.sl === sleeve.br)
     const rm=rankMaps.get(m.c); if(!rm||!rm.n) return;
     const rk=rm.ranks.get(m); if(rk==null) return;                 // unrated: excluded both sides
-    const aum=m.cr?m.cr[i]:null; if(aum==null||aum<=0) return;      // no AUM: cannot weight
+    // On the fund-count basis every ranked fund weighs the same, so a fund without an AUM
+    // still belongs in the average -- requiring one there would drop funds for no reason.
+    const byCnt=(S.wt==='cnt');
+    const aum=m.cr?m.cr[i]:null; if(!byCnt && (aum==null||aum<=0)) return;   // no AUM: cannot weight
+    const w=byCnt?1:aum;
     seen.add(m.s);
     const pct=100*(rm.n - rk + 0.5)/rm.n;
-    const a=acc.get(m.h)||{num:0,den:0}; a.num+=pct*aum; a.den+=aum; acc.set(m.h,a); };
+    const a=acc.get(m.h)||{num:0,den:0}; a.num+=pct*w; a.den+=w; acc.set(m.h,a); };
   if(vr){ const homeByName=new Map();
     pool.forEach(m=>{ if(!homeByName.has(m.s)) homeByName.set(m.s, vrHomeRec(m.s)||m); });
     homeByName.forEach(record);
