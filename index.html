@@ -1714,7 +1714,7 @@ const S = {
        // 'a' = weighted by the money each fund runs, which is how the quartile cards at
        // the top of this tab are measured. Kyser 2026-09-10: the two blocks read 68% and
        // 72% for the same house on the same day, and nothing on screen said why.
-       rsw:'f',
+       rsw:'a',
        // the reader's OWN window. Grid-local on purpose: the fixed buttons write the
        // page's state so every panel moves together, but a free date range has no meaning
        // on the panels that only hold pre-computed windows.
@@ -4065,7 +4065,7 @@ function buildViews(){
           <div class="fg"><label>Per-house block</label>
             <div class="seg sm" id="xs-rows"><button data-v="on" class="active">Show</button><button data-v="off">Hide</button></div></div>
           <div class="fg" id="xs-rsw-fg"><label>Block weighted by</label>
-            <div class="seg sm" id="xs-rsw"><button data-v="f" class="active">Fund count</button><button data-v="a">Money</button></div></div>
+            <div class="seg sm" id="xs-rsw"><button data-v="f">% of funds</button><button data-v="a" class="active">% of AUM</button></div></div>
           <div class="fg"><label>Summary rows</label>
             <div class="seg sm" id="xs-pct"><button data-v="n">Count / ₹ cr</button><button data-v="p" class="active">% share</button></div></div>
         </div>
@@ -5433,7 +5433,7 @@ function renderCrossSection(){
     else bands.push({b, n:1}); });
   let html='<table class="rt xs-tbl"><thead>';
   html+='<tr class="xs-bandrow"><th class="xs-lbl"></th>'
-      + (showRS?'<th class="xs-sum xs-sumA xs-sumZ" colspan="'+XS_ROWSUM.length+'" title="'+xsEsc(RSW_TIP)+'">Across the categories shown \u00b7 by '+(rswAum?'money':'fund count')+'</th>':'')
+      + (showRS?'<th class="xs-sum xs-sumA xs-sumZ" colspan="'+XS_ROWSUM.length+'" title="'+xsEsc(RSW_TIP)+'">Across the categories shown \u00b7 by '+(rswAum?'AUM':'number of funds')+'</th>':'')
       + bands.map(g=>{ const c=sleeveColor(g.b)||'#8e8e94';
           return '<th class="num xs-bandh" colspan="'+g.n+'" style="background:'+c+'1f;border-bottom:2px solid '+c+'" title="'+xsEsc(g.b)+'">'+xsEsc(g.b)+'</th>'; }).join('')
       + '</tr>';
