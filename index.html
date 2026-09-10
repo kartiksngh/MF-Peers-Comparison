@@ -1710,6 +1710,11 @@ const S = {
   // that grid runs on the page's own S.mode / S.basis, so it can never contradict the
   // AMC summary directly above it. Only what is genuinely local to the card lives here.
   xs:{ metric:'ret', sleeve:'(all)', pct:true, rows:true, sort:{k:null, dir:-1},
+       // What the per-house block's shares are measured ON. 'f' = one fund one vote;
+       // 'a' = weighted by the money each fund runs, which is how the quartile cards at
+       // the top of this tab are measured. Kyser 2026-09-10: the two blocks read 68% and
+       // 72% for the same house on the same day, and nothing on screen said why.
+       rsw:'f',
        // the reader's OWN window. Grid-local on purpose: the fixed buttons write the
        // page's state so every panel moves together, but a free date range has no meaning
        // on the panels that only hold pre-computed windows.
@@ -3334,7 +3339,7 @@ function viewSig(view){
                           +'|'+S.matrix.metric+'|'+S.matrix.date;                  // matrix card lives here now
     case 'amc':    return g+'|'+S.amc.fh+'|'+S.amc.rankDate+'|'+(S.composite.qsel||[]).join('')
                           +'|'+S.league.sortKey+'|'+S.league.sortDir                    // league card lives here now
-                          +'|'+S.xs.metric+'|'+S.xs.sleeve+'|'+S.xs.pct+'|'+S.xs.rows+'|'+S.xs.sort.k+'|'+S.xs.sort.dir+'|'+S.xs.range.on+'|'+S.xs.range.a+'|'+S.xs.range.b;               // …and the cross-section
+                          +'|'+S.xs.metric+'|'+S.xs.sleeve+'|'+S.xs.pct+'|'+S.xs.rows+'|'+S.xs.rsw+'|'+S.xs.sort.k+'|'+S.xs.sort.dir+'|'+S.xs.range.on+'|'+S.xs.range.a+'|'+S.xs.range.b;               // …and the cross-section
     case 'scheme': return g+'|'+S.scheme.fh+'|'+S.scheme.cat+'|'+S.scheme.sl+'|'+S.scheme.name+'|'+S.scheme.month+'|'+S.scheme.peerDate;
     default:       return null;                 // mapping (+ its data-quality block): DOM-driven filters, always render
   }
@@ -4059,6 +4064,8 @@ function buildViews(){
           <div class="fg"><label>Categories</label><select id="xs-sleeve"></select></div>
           <div class="fg"><label>Per-house block</label>
             <div class="seg sm" id="xs-rows"><button data-v="on" class="active">Show</button><button data-v="off">Hide</button></div></div>
+          <div class="fg" id="xs-rsw-fg"><label>Block weighted by</label>
+            <div class="seg sm" id="xs-rsw"><button data-v="f" class="active">Fund count</button><button data-v="a">Money</button></div></div>
           <div class="fg"><label>Summary rows</label>
             <div class="seg sm" id="xs-pct"><button data-v="n">Count / ₹ cr</button><button data-v="p" class="active">% share</button></div></div>
         </div>
@@ -5099,6 +5106,14 @@ const XS_ROWSUM = [
   { k: "am2",  lbl: "\u2264\u22122pp", tip: "Funds at least 2 percentage points behind their benchmark.", good: -1, f: (x) => x.alpha != null && x.alpha <= -2 },
 ];
 const XS_MLBL = { ret:'Return', alpha:'Alpha vs benchmark', qtl:'Quartile' };
+// The block beside each house can be read two ways, and which one is on changes the number,
+// so it is written on the header rather than left to be inferred.
+const RSW_TIP = 'Each column counts this house\u2019s own funds inside the categories on screen. '
+  + 'By fund count, a small fund and a large one count the same. By money, each fund counts by the AUM it runs, '
+  + 'measured against the money in these categories that carries a value \u2014 the same basis as the bracket beside '
+  + '\u201cRated\u201d above the quartile cards. Those cards divide by ALL of the house\u2019s money, so where a house has funds too '
+  + 'young to be ranked the cards read a little lower than this block, by exactly that unranked slice.';
+const _rsCr = (v)=> Math.round(v||0).toLocaleString('en-IN');
 
 // ── the cross-section itself. One pass over the universe's records, bucketed to (house, cat).
 // Memoised on the page signature + the as-of index: every toggle that can change a number is
@@ -5339,20 +5354,29 @@ function renderCrossSection(){
   });
   // ── the per-house block. Counted over the FUNDS of the shown columns, so a house running two
   // funds in one category contributes two answers here and one cell in the grid.
+  // Both weightings are accumulated in the same pass: the headcount (one fund, one vote) and
+  // the money (each fund carrying its own AUM). Which one is DISPLAYED is a toggle, so the
+  // reader can put this block on the same scale as the quartile cards at the top of the tab.
   const rs = {};
-  houses.forEach(h=>{ rs[h]={n:0}; XS_ROWSUM.forEach(c=>{ if(c.f) rs[h][c.k]=0; }); });
+  houses.forEach(h=>{ rs[h]={n:0, cr:0}; XS_ROWSUM.forEach(c=>{ if(c.f){ rs[h][c.k]=0; rs[h]['cr_'+c.k]=0; } }); });
   cols.forEach(cc=> cc.funds.forEach(f=>{
     const r=rs[f.h]; if(!r) return;
     if(f.ret==null && f.alpha==null && f.qtl==null) return;
-    r.n++;
-    XS_ROWSUM.forEach(c=>{ if(c.f && c.f(f)) r[c.k]++; });
+    const w=(f.cr!=null && f.cr>0) ? f.cr : 0;
+    r.n++; r.cr+=w;
+    XS_ROWSUM.forEach(c=>{ if(c.f && c.f(f)){ r[c.k]++; r['cr_'+c.k]+=w; } });
   }));
+  // ONE definition of the share, used by the cells, the shading, the best/worst three and the
+  // header sort -- so a column can never be ranked on one weighting and coloured on another.
+  const rswAum = (S.xs.rsw==='a');
+  const rsShare = (h,k)=>{ const r=rs[h]; if(!r) return null;
+    return rswAum ? (r.cr>0 ? r['cr_'+k]/r.cr : null) : (r.n>0 ? r[k]/r.n : null); };
   // each summary column gets the same treatment a category column gets: shaded by its own value
   // in its own direction, with the best three and worst three in bold
   const rsInfo = {};
   XS_ROWSUM.forEach(c=>{
     if(!c.f){ rsInfo[c.k]={rank:{}}; return; }
-    const sh={}; houses.forEach(h=>{ sh[h] = rs[h].n>0 ? rs[h][c.k]/rs[h].n : null; });
+    const sh={}; houses.forEach(h=>{ sh[h] = rsShare(h, c.k); });
     const have=houses.filter(h=>sh[h]!=null);
     const spread = have.length ? (Math.max.apply(null,have.map(h=>sh[h])) - Math.min.apply(null,have.map(h=>sh[h]))) : 0;
     const rank={};
@@ -5370,7 +5394,7 @@ function renderCrossSection(){
   if(sk){
     const valOf = (h)=>{
       if(sk==='__name') return null;
-      if(sk.charAt(0)==='#'){ const c=sk.slice(1); return rs[h].n>0 ? rs[h][c]/rs[h].n : null; }
+      if(sk.charAt(0)==='#'){ return rsShare(h, sk.slice(1)); }
       const ci=colInfo[sk]; return ci ? ci.byH[h] : null;
     };
     houses.sort((a,b)=>{
@@ -5390,12 +5414,14 @@ function renderCrossSection(){
   const rsHead = showRS ? XS_ROWSUM.map((c,i)=>'<th class="num xs-sum xs-h'+rsEdge(i)+'" data-sk="#'+c.k+'" title="'+xsEsc(c.tip)+' Click to rank the houses on it.">'+c.lbl+' '+xsArrow('#'+c.k)+'</th>').join('') : '';
   const rsCells = (h)=> !showRS ? '' : XS_ROWSUM.map((c,i)=>{
     const e=rsEdge(i), r=rs[h];
-    if(!c.f) return '<td class="num xs-sum'+e+'">'+(r.n||'\u2014')+'</td>';
+    if(!c.f) return '<td class="num xs-sum'+e+'" title="'+(rswAum?'these funds run '+_rsCr(r.cr)+' cr between them':'funds counted')+'">'+(r.n||'\u2014')+'</td>';
     if(!r.n) return '<td class="num xs-sum'+e+'">\u2014</td>';
-    const share=r[c.k]/r.n;
-    const txt = S.xs.pct ? Math.round(100*share)+'%' : String(r[c.k]);
+    const share=rsShare(h, c.k);
+    if(share==null) return '<td class="num xs-sum'+e+'" title="none of these funds carries an AUM, so a money-weighted share cannot be formed">\u2014</td>';
+    const txt = S.xs.pct ? Math.round(100*share)+'%' : (rswAum ? _rsCr(r['cr_'+c.k]) : String(r[c.k]));
+    const ttl = rswAum ? (_rsCr(r['cr_'+c.k])+' cr of '+_rsCr(r.cr)+' cr') : (r[c.k]+' of '+r.n);
     return '<td class="num xs-sum'+e+' '+(rsInfo[c.k].rank[h]||'')+'" style="'
-      + xsBar(share, c.good)+'" title="'+r[c.k]+' of '+r.n+'">'+txt+'</td>';
+      + xsBar(share, c.good)+'" title="'+ttl+'">'+txt+'</td>';
   }).join('');
 
   // one spanning blank so every footer row stays aligned under the per-house block
@@ -5407,7 +5433,7 @@ function renderCrossSection(){
     else bands.push({b, n:1}); });
   let html='<table class="rt xs-tbl"><thead>';
   html+='<tr class="xs-bandrow"><th class="xs-lbl"></th>'
-      + (showRS?'<th class="xs-sum xs-sumA xs-sumZ" colspan="'+XS_ROWSUM.length+'">Across the categories shown</th>':'')
+      + (showRS?'<th class="xs-sum xs-sumA xs-sumZ" colspan="'+XS_ROWSUM.length+'" title="'+xsEsc(RSW_TIP)+'">Across the categories shown \u00b7 by '+(rswAum?'money':'fund count')+'</th>':'')
       + bands.map(g=>{ const c=sleeveColor(g.b)||'#8e8e94';
           return '<th class="num xs-bandh" colspan="'+g.n+'" style="background:'+c+'1f;border-bottom:2px solid '+c+'" title="'+xsEsc(g.b)+'">'+xsEsc(g.b)+'</th>'; }).join('')
       + '</tr>';
@@ -5592,6 +5618,9 @@ function xsSyncControls(){
   if(_cb){ const okc=!!(S.data && S.data.meta && S.data.meta.has_navidx);
            _cb.style.display = okc ? '' : 'none'; }
   setSeg('xs-pct',    S.xs.pct?'p':'n');
+  setSeg('xs-rsw',    S.xs.rsw==='a'?'a':'f');
+  // the weighting control belongs to the block; with the block hidden it has nothing to say
+  const _rswfg=document.getElementById('xs-rsw-fg'); if(_rswfg) _rswfg.style.display = S.xs.rows?'':'none';
   setSeg('xs-rows',   S.xs.rows?'on':'off');
   // A window longer than the SIP book ships nothing at all from the engine, so the button is
   // disabled rather than left to produce a grid of dashes with no explanation.
@@ -5616,6 +5645,7 @@ function wireCrossSection(){
   root.dataset.wired='1';
   segWire('xs-metric', v=>{ S.xs.metric=v; renderCrossSection(); });
   segWire('xs-pct',    v=>{ S.xs.pct=(v==='p'); renderCrossSection(); });
+  segWire('xs-rsw',    v=>{ S.xs.rsw=(v==='a'?'a':'f'); renderCrossSection(); });
   segWire('xs-rows',   v=>{ S.xs.rows=(v==='on'); renderCrossSection(); });
   // These two write the PAGE's state (rule 2 in the header note), so the global bar and every
   // other panel move with them — that is the point, not a side effect.
@@ -5834,7 +5864,7 @@ function xsMethodNote(cols, houses, colInfo, m, rw, asof, dropped, XC){
     + (m!=='qtl' ? '<br><br><b>The benchmark row</b> is shown only where every fund in the column follows the same index. '
         + (mixed? 'It is blank for <b>'+mixed+'</b> column'+(mixed===1?'':'s')+' whose funds do not — under the MFI all-peer universe a category is not a Value Research category, so its members can carry different indices or none, and there is no one benchmark to print. ' : '')
         + (nob? 'A further <b>'+nob+'</b> column'+(nob===1?'':'s')+' has no benchmark value on this window. ' : '') : '')
-    +(S.xs.rows!==false ? '<br><br><b>The block beside each house</b> summarises that house ACROSS the categories on screen, and unlike the block at the foot it does not follow the toggle: a house is a whole book, and how much of it is top-quartile, how much is bottom-quartile and how much beats its benchmark are the same three questions whatever the cells are showing. Every fund counts once per category it is in, and the denominator is the funds of that house carrying any value at all — the hover on each cell gives the count over that denominator.' : '')
+    +(S.xs.rows!==false ? '<br><br><b>The block beside each house</b> summarises that house ACROSS the categories on screen, and unlike the block at the foot it does not follow the toggle: a house is a whole book, and how much of it is top-quartile, how much is bottom-quartile and how much beats its benchmark are the same three questions whatever the cells are showing. Every fund counts once per category it is in, and only funds carrying a value at all are counted. <b>Block weighted by</b> decides what those shares are measured on. On <b>fund count</b> a small fund and a large one count the same. On <b>money</b> each fund counts by the AUM it runs, and the share is of the money in these categories that carries a value at all — the same basis as the bracket beside “Rated” above the quartile cards, so on money this block and that bracket read the same number. The cards themselves divide by <b>all</b> of the house’s money, so a house with funds too young to be ranked reads a little lower there than here, by exactly that unranked slice. On fund count the block differs from both whenever a house’s big funds rank differently from its small ones. The hover on each cell gives the figure over its denominator either way.' : '')
     +'<br><br><b>Column order.</b> By <b>sleeve</b> first, then by family inside it — the size ladder read large to small, the style cuts, then themes grouped by what they are about, then the wrappers. A rule marks where one sleeve ends and the next begins, and each header names its sleeve on hover. Ordering by money instead put Pharma between Flexi Cap and Arbitrage, which is an order but not a reading order.'
     +'<br><br><b>Scope.</b> Rows are the houses in the current house scope ('+scopeLabel()+') holding a fund in a shown category; a column is dropped when no house in scope has a value in it'+((dropped && dropped.length) ? ' \u2014 <b>'+dropped.length+'</b> categor'+(dropped.length===1?'y is':'ies are')+' dropped on this view for that reason, named directly under the grid with the reason for each, so a category that cannot be measured is never confused with one nobody runs a fund in' : '')+'. Change the peer universe, the investment mode, the period or the house scope and the whole grid re-derives — nothing here is pinned to a window or a book.');
 }
