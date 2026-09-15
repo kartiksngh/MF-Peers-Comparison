@@ -1,0 +1,14 @@
+Some files in this archived folder are not stored as the engine wrote them, because
+GitHub refuses any file over 100 MB.
+
+NOT ARCHIVED (the self-contained offline decks):
+  dashboard.html (151 MB)
+  dashboard_offline.html (151 MB)
+Rebuild them byte-for-byte from inside this folder with:
+    python peer_monitor.py --data Data --out out
+
+STORED GZIPPED (unpack with: python -c "import gzip,shutil,sys; shutil.copyfileobj(gzip.open(sys.argv[1]), open(sys.argv[1][:-3], 'wb'))" <file.gz>):
+  dashboard_data.json (148 MB -> dashboard_data.json.gz 35 MB)
+
+The live site is unaffected: it is served from index.html + the packed JSON files in
+the repo root, which are built from the working refresh folder.

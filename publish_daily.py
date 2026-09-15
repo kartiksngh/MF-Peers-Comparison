@@ -21,6 +21,15 @@ exists so the DAILY cron can update the live deck without growing the repo by a 
 per day. Caller does the git add/commit/push (DAILY_REFRESH.ps1 amends a rolling
 "daily deck" commit so history stays small).
 
+★ ONE WRITER FOR THE LIVE PAGE (2026-09-15). `write_live_page()` below is the only code that
+turns a refresh folder into the hosted page's files; publish_refresh.py (the Monday archive)
+calls it too. Until today the archive script carried its own copy of this logic, and the copy
+had drifted three times without anyone noticing: it still wrote the SIP files retired on
+2026-08-13 (so every Monday shipped 4-byte sip_first/sip_last files and left the real SIP books
+at the previous day's data), it never learned the daily NAV index (so a Monday deck would have
+hidden the reader's custom date window), and it ran its size guard only AFTER writing the live
+files into the working copy. A second copy of a writer is a second place for a rename to be missed.
+
 Usage: python publish_daily.py "<path to refresh folder>"
 """
 import json
@@ -30,10 +39,11 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent
 
 
-def main():
-    if len(sys.argv) < 2:
-        sys.exit('usage: python publish_daily.py "<path to refresh folder>"')
-    src = Path(sys.argv[1]).resolve()
+def write_live_page(src):
+    """Write the hosted page's files into REPO from one refresh folder. Returns the list of what
+    was written (a leading '-' marks a retired file that was deleted). Raises SystemExit with a
+    plain message when the folder has no template or no engine output."""
+    src = Path(src).resolve()
     tpl = src / "dashboard.html"                      # template copy WITH __PEER_DATA__
     dj = src / "out" / "dashboard_data.json"
     if not tpl.exists() or "__PEER_DATA__" not in tpl.read_text(encoding="utf-8", errors="ignore")[:5_000_000]:
@@ -114,6 +124,13 @@ def main():
     html = extract_fonts(html, REPO)          # ~2 MB of base64 fonts -> cached fonts/*.woff2
     (REPO / "index.html").write_text(html, encoding="utf-8")
     print(f"live page refreshed from {src.name}: index.html (fonts split) + " + " + ".join(written) + " (packed)")
+    return written
+
+
+def main():
+    if len(sys.argv) < 2:
+        sys.exit('usage: python publish_daily.py "<path to refresh folder>"')
+    write_live_page(sys.argv[1])
 
 
 if __name__ == "__main__":
