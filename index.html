@@ -5183,6 +5183,25 @@ function computeCrossSection(i){
   // period nobody asked for.
   const XC=xscCompute(i);
   if(XC.state!=='off' && XC.state!=='ok') return {state:'xsc-'+XC.state};
+  // ★ THE PEER UNIVERSE OF EACH COLUMN — every fund the quartile ranks, not only the houses drawn
+  // in the grid. Kyser, 2026-09-23: "in multicap there is only 1 fund in Q1 in a universe of 15
+  // funds?" The grid draws fifteen houses, while the quartile is struck over the whole category —
+  // 32 funds in Multi Cap on 21-Sep-2026, of which 8 are Q1 and 7 of those 8 belong to houses this
+  // grid does not draw. A footer that says only "15" reads as the universe, and 1 of 15 in the top
+  // quarter IS impossible on that reading. So the real universe is counted here, by the SAME read
+  // the cells use — qseries under a fixed window, xscCompute's own ranking under a custom one — and
+  // the two can never disagree.
+  const uniQf = vr ? VRFIELD[S.basis] : (S.basis==='3Y'?'aq3y' : S.basis==='1Y'?'aq1y' : ALLFIELD[S.basis]);
+  const uni={}, seenU=new Set();
+  for(const rec of src){
+    if(BADCAT(rec.c)) continue;
+    if(vr && isBorrowed(rec)) continue;
+    if(seenU.has(rec.s)) continue; seenU.add(rec.s);
+    let q=null;
+    if(XC.state==='ok'){ const o=XC.byScheme[rec.s]; q = o ? o.qtl : null; }
+    else { const qa = uniQf ? qseries(rec, uniQf) : null; q = qa ? qa[i] : null; }
+    if(q!=null) uni[rec.c]=(uni[rec.c]||0)+1;
+  }
   const seen=new Set();
   const cells=new Map();                                  // "house|cat" -> the house's cell
   const cats=new Map();                                   // cat -> the column
@@ -5276,6 +5295,7 @@ function computeCrossSection(i){
     a.n     = a.funds.length;
   });
   cats.forEach(cc=>{
+    cc.uni = uni[cc.c]||0;                 // the whole category, which is what the quartile ranks against
     // the index the most MONEY in this column follows, and how much of the column that is
     let best=null, bestCr=-1;
     Object.keys(cc.bnCr).forEach(n=>{ if(cc.bnCr[n]>bestCr){ bestCr=cc.bnCr[n]; best=n; } });
@@ -5561,8 +5581,15 @@ function renderCrossSection(){
           // it is two different populations. Both numbers, in the place the surprise happens.
           const hs = new Set(); cc.funds.forEach(f=>{ if(xsFundVal(f,m)!=null) hs.add(f.h); });
           const n = stats[cc.c].nAll;
-          return '<td class="num xs-den" title="'+(n||0)+' fund'+(n===1?'':'s')+' with a value on this window, run by '+hs.size+' house'+(hs.size===1?'':'s')+'. The grid above shows one cell per HOUSE; this row counts FUNDS, so a house running several funds in one category contributes several here and one cell there. It is the denominator of every share below.">'
-            + (n||'—') + (hs.size && n>hs.size ? '<span class="xs-tot">/'+hs.size+'</span>' : '') + '</td>';
+          // ★ AND, IN THE QUARTILE VIEW, WHAT THE QUARTILE IS STRUCK OVER. These funds are the ones
+          // on the grid; the quartile ranks each of them against every fund in the category, which is
+          // a wider set. Without this the footer's own number reads as the universe and a column with
+          // one fund in Q1 looks impossible (Kyser, 2026-09-23).
+          const uni = cc.uni||0, uniBit = (m==='qtl' && uni>n) ? ' of '+uni : '';
+          return '<td class="num xs-den" title="'+(n||0)+' fund'+(n===1?'':'s')+' with a value on this window, run by '+hs.size+' house'+(hs.size===1?'':'s')+'. The grid above shows one cell per HOUSE; this row counts FUNDS, so a house running several funds in one category contributes several here and one cell there. It is the denominator of every share below.'
+            + (uniBit ? ' The quartile is a different denominator: it ranks each fund against all '+uni+' funds in this category, most of which are run by houses this grid does not show — so the houses here can hold any number of the top-quarter places, not a quarter of them.' : '')+'">'
+            + (n||'—') + (hs.size && n>hs.size ? '<span class="xs-tot">/'+hs.size+'</span>' : '')
+            + (uniBit ? '<span class="xs-tot">'+uniBit+'</span>' : '') + '</td>';
         }).join('')+'</tr>';
   html+='<tr class="xs-den"><th class="xs-lbl">Rated AUM, ₹ cr</th>'+padRS
       + cols.map(cc=>'<td class="num xs-den" title="AUM behind those funds — the denominator of every AUM share below">'
