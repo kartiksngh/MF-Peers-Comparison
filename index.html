@@ -8,6 +8,11 @@
 <title>Peer Performance Monitor — Quartile &amp; AUM Positioning</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%23591102'/%3E%3Ctext x='8' y='12' font-size='10' fill='%23f3ead8' text-anchor='middle' font-family='monospace'%3EQ%3C/text%3E%3C/svg%3E">
 <style>
+/* 2026-10-18 (Kyser, iPhone): phone browsers may enlarge small text inside a frame; keep the sizes this sheet sets */
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+/* a scheme name that opens the scheme: underlined lightly so it reads as something to tap */
+.pick { cursor: pointer; text-decoration: underline; text-decoration-color: rgba(60,50,40,.28); text-underline-offset: 3px; }
+.pick:hover, .pick:focus-visible { text-decoration-color: currentColor; outline: none; }
 /* Inlined Google Fonts — latin + latin-ext subsets, base64 woff2 */
 /* Fraunces latin-ext */
 @font-face {
@@ -925,6 +930,8 @@
     .tbl-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; max-width: 100%; }
     .tbl-wrap table, .card > table, table.rt { width: max-content; min-width: 100%; }
     table.rt th, table.rt td { white-space: nowrap; }
+    /* 2026-10-18: scheme names run 45-77 characters; in the quartile drill they wrap so the numbers stay on screen */
+    #sc-dd td.lbl { white-space: normal; min-width: 9.5em; max-width: 52vw; }
     .card-h, .shead { flex-wrap: wrap; gap: 8px 14px; }
     .card-h .ctx, .shead .ctx { text-align: left; }
 
@@ -1920,10 +1927,16 @@ Chart.register({
       .filter(i=>{ const m=chart.getDatasetMeta(i); return m.type==='bar' && !m.hidden; });
     if(!idxs.length) return;
     const n = (chart.data.labels||[]).length || (chart.getDatasetMeta(idxs[0]).data||[]).length;
-    const dp = opts.dp==null ? 1 : opts.dp, suffix = opts.suffix||'';
+    // 2026-10-18 (Kyser, phone): when each bar has less than 34 px the labels collide, so they become whole numbers
+    // in a smaller font, and lose the % sign if they still do not fit (the axis already says %)
+    const slot = (chart.chartArea.right - chart.chartArea.left) / Math.max(1, n), tight = slot < 34;
+    const dp = tight ? 0 : (opts.dp==null ? 1 : opts.dp);
+    let suffix = opts.suffix||'';
     const ctx = chart.ctx;
     ctx.save();
-    ctx.font = opts.font || '600 9.5px -apple-system, BlinkMacSystemFont, Inter, sans-serif';
+    ctx.font = opts.font || (tight ? '600 8px -apple-system, BlinkMacSystemFont, Inter, sans-serif'
+                                   : '600 9.5px -apple-system, BlinkMacSystemFont, Inter, sans-serif');
+    if(tight && suffix && ctx.measureText('100'+suffix).width > slot - 1) suffix = '';
     ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
     ctx.fillStyle = opts.color || '#6d685f';
     for(let i=0;i<n;i++){
@@ -4875,7 +4888,7 @@ function renderAMCSummary(){
     const cbT = cb!=null ? (fmt.cr(al.crBeat)+' of '+fmt.cr(al.crBeatUsed)+' rated'+(al.crCover==null?'':' · '+al.crCover.toFixed(0)+'% of the category'))
               : (ok ? (al.cWhy==='allpeer' ? 'a cohort-level figure needs one shared index — switch the universe to Exact Peers (VR)' : bWhy(al)) : why(al));
     html+='<tr>'
-      +'<td class="lbl">'+r.nm+'</td>'
+      +'<td class="lbl">'+pickName(fh, r.nm)+'</td>'
       +'<td class="am-cat">'+r.cat+'</td>'
       +'<td class="num">'+fmt.cr(r.cr)+'</td>'
       +'<td class="num">'+(q?'<span class="qchip" style="background:'+[null,C.q1,C.q2,C.q3,C.q4][q]+'">Q'+q+'</span>':'—')+'</td>'
@@ -6050,6 +6063,26 @@ function _schemeRowsAt(i){
       else if(S.basis==='Composite'){ sc=(y==null||t==null)?null:wf*y+(1-wf)*(t+(S.reward&&b===1?1:0)); } }
     return { s:v.s, h:v.h, sl:v.sl, c:v.c, q:v.__q, qb:v.__qb, borrowed:isBorrowed(v), a:v.a[i], cr:v.cr[i], score:sc }; });
 }
+// 2026-10-18 (Kyser): a scheme name in a table opens that scheme in Scheme Detail, on the web and on a phone.
+function _pickAttr(x){ return String(x==null?'':x).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
+// Only a house in the current house scope can be shown in Scheme Detail (Top-15 unless "all AMCs" is on), so a
+// scheme from any other house stays plain text rather than a tap that silently changes the deck-wide scope.
+function pickName(h, s){ return h && s && scopeHouses().includes(h) ? `<span class="pick" role="link" tabindex="0" data-h="${_pickAttr(h)}" data-s="${_pickAttr(s)}" title="Open in Scheme Detail">${s}</span>` : (s||''); }
+function openScheme(h, s){
+  const pool=(S.universe==='all'?S.data.allpeer:S.data.vr).filter(r=>r.h===h && r.s===s);
+  if(!pool.length || !housesPresent(null).includes(h)) return;
+  S.scheme.fh=h; S.scheme.name=s;
+  // the category and sleeve filters stay when the scheme is inside them, else they open up so it can be listed
+  if(S.scheme.cat!=='(all)' && !pool.some(r=>r.c===S.scheme.cat)) S.scheme.cat='(all)';
+  if(S.scheme.sl!=='(all)' && !pool.some(r=>r.sl===S.scheme.sl)) S.scheme.sl='(all)';
+  if(S.view!=='scheme') activateTab('scheme');
+  renderScheme();
+  const v=document.getElementById('view-scheme'); if(v) v.scrollIntoView({block:'start'});
+}
+document.addEventListener('click', e=>{ const p=e.target.closest && e.target.closest('.pick'); if(!p) return;
+  e.preventDefault(); e.stopPropagation(); openScheme(p.dataset.h, p.dataset.s); });
+document.addEventListener('keydown', e=>{ if(e.key!=='Enter') return; const p=e.target.closest && e.target.closest('.pick');
+  if(p){ e.preventDefault(); openScheme(p.dataset.h, p.dataset.s); } });
 function renderScheme(){
   const fhSel=document.getElementById('sc-fh');
   if(!fhSel.dataset.wired){ fhSel.dataset.wired='1';
@@ -7201,7 +7234,7 @@ function renderSchemeDrill(){
     // Quartile carries the colour here, NOT the own-house highlight: every row in this drill
     // is the selected house, so `.hl` would paint all four groups identically (see the CSS note).
     items.forEach(r=>{ const cls='qc'+q; const ofSleeve=sleeveCr[r.sl]?r.cr/sleeveCr[r.sl]:null;
-      html+=`<tr class="${cls}"><td class="lbl">${r.s}</td><td>${r.sl}</td>${cat==='(all)'?`<td>${BADCAT(r.c)?'—':r.c}</td>`:''}<td class="num">${fmt.pct(r.a)}</td><td class="num">${fmt.pct(ofSleeve)}</td><td class="num">${fmt.cr(r.cr)}</td></tr>`; });
+      html+=`<tr class="${cls}"><td class="lbl">${pickName(fh, r.s)}</td><td>${r.sl}</td>${cat==='(all)'?`<td>${BADCAT(r.c)?'—':r.c}</td>`:''}<td class="num">${fmt.pct(r.a)}</td><td class="num">${fmt.pct(ofSleeve)}</td><td class="num">${fmt.cr(r.cr)}</td></tr>`; });
   });
   html+='</tbody></table>';
   document.getElementById('sc-dd').innerHTML=html;
@@ -7696,7 +7729,7 @@ function pgColSpec(M){
       cell:r=>{ const bits=[];
         if(r.absl && !r.sel) bits.push('<span style="color:var(--absl-2);font-weight:600">ABSL</span>');
         if(r.borrowed) bits.push('borrowed — reported in its home set');
-        return r.nm + (bits.length?`<span class="pg-sub">${bits.join(' · ')}</span>`:''); } },
+        return pickName(r.house, r.nm) + (bits.length?`<span class="pg-sub">${bits.join(' · ')}</span>`:''); } },
     { k:'q', h:'Qtl', cls:'num', blk:null,
       cell:r=> r.q ? `<span class="qchip" style="background:${[null,C.q1,C.q2,C.q3,C.q4][r.q]}">Q${r.q}</span>` : '—' },
     { k:'catAum', h:'Cat AUM%', cls:'num', blk:null,
