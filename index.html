@@ -8,6 +8,20 @@
 <title>Peer Performance Monitor — Quartile &amp; AUM Positioning</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%23591102'/%3E%3Ctext x='8' y='12' font-size='10' fill='%23f3ead8' text-anchor='middle' font-family='monospace'%3EQ%3C/text%3E%3C/svg%3E">
 <style>
+/* Data to know (2026-10-18): the facts list and the quartile move table */
+#dtk { margin-bottom: 8px; }
+.dtk-facts { margin: 0; padding-left: 1.25em; font-size: 13px; line-height: 1.6; color: var(--ink-2); }
+.dtk-facts > li { margin: 0 0 10px; padding-left: 2px; }
+.dtk-facts b { color: var(--ink); font-weight: 600; }
+.dtk-sub { list-style: none; margin: 4px 0 0; padding: 0; font-size: 12px; color: var(--ink-3); }
+.dtk-sub li { margin: 2px 0; }
+.dtk-go { font-size: 12px; color: var(--navy); white-space: nowrap; }
+.dtk-note { margin-top: 6px; font-size: 11px; color: var(--ink-4); }
+.dtk-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.dtk-mx td.num, .dtk-mx th.num { text-align: right; }
+details.dtk-ref > summary { cursor: pointer; font-size: 13px; color: var(--ink-3); margin: 14px 0 8px; }
+@media (max-width: 1180px) { .dtk-grid { grid-template-columns: 1fr; } }
+@media (max-width: 720px) { .dtk-facts { font-size: 12.5px; } .dtk-mx th, .dtk-mx td { padding: 6px 6px; } }
 /* 2026-10-18 (Kyser, iPhone): phone browsers may enlarge small text inside a frame; keep the sizes this sheet sets */
 html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 /* a scheme name that opens the scheme: underlined lightly so it reads as something to tap */
@@ -3355,7 +3369,7 @@ function resetAsOf(){
 //  'quality' inside mapping — three tabs became sections of their host tabs, same functions.)
 const _VIEW_FNS={ sleeve:()=>{ renderSleeve(); renderMatrix(); }, amc:()=>renderAMC(),
                   scheme:()=>renderScheme(),
-                  mapping:()=>{ renderMapping(); renderQuality(); } };
+                  mapping:()=>{ renderDTK(); renderMapping(); renderQuality(); } };
 let _DIRTY=new Set();
 // ── PER-VIEW INPUT SIGNATURE (Addendum 4 P4) ──────────────────────────────
 // renderAll() marks every view dirty and the visible one repaints. That repaint is pure work if
@@ -4216,6 +4230,8 @@ function buildViews(){
       <button class="btn btn-dark" id="pm-exp">${icoDown()} Export CSV</button>
     </div>
     <div class="content">
+      <div id="dtk"></div>
+      <details class="dtk-ref" id="dtk-ref"><summary>Reference tables: peer mapping, data quality and exclusions</summary>
       <div class="shead"><h2>Peer mapping</h2><div class="ctx" id="pm-count"></div></div>
       <div class="card" style="padding-top:20px">
         <div class="scroll-tall"><table class="rt" id="pm-table"><thead><tr>
@@ -8276,6 +8292,129 @@ function drawQuality(){
 }
 
 //──────────────────────────── 06 PEER MAPPING ──────────────────────────────
+//════════════ DATA TO KNOW (Kyser 2026-10-18) ══════════════════════════════════════════
+// The top of the Data tab: facts about Aditya Birla Sun Life's peer standing, written from the data this build
+// loaded and the filters in force (universe, basis, investment mode), with a quartile move table and two charts.
+// Every number comes through the same functions the other views use (houseSeries/sleeveAt, schemeRowsAt,
+// standingAt), so a fact here always equals the view it links to. Design: DATA_TO_KNOW_DESIGN.md.
+const DTK_HOUSE='Aditya';
+function dtkOrd(n){ const s=['th','st','nd','rd'], v=n%100; return n+(s[(v-20)%10]||s[v]||s[0]); }
+function dtkPts(v){ return v==null?'—':(v>0?'+':v<0?'−':'')+Math.abs(100*v).toFixed(1)+' points'; }
+function dtkGo(view, label){ return `<a href="#" class="dtk-go" data-v="${view}">${label}</a>`; }
+// inside a fact the house is already named, so a scheme shows without the house name and the plan suffix; the tap
+// target and the tooltip keep the full name
+function dtkShort(s){ return String(s).replace(/^Aditya Birla Sun Life\s+/i,'').replace(/\s*-\s*Dir(ect)?\s*-\s*Growth\s*$/i,'').replace(/\s*-\s*Growth\s*$/i,''); }
+function dtkPick(s){ return scopeHouses().includes(DTK_HOUSE)
+  ? `<span class="pick" role="link" tabindex="0" data-h="${_pickAttr(DTK_HOUSE)}" data-s="${_pickAttr(s)}" title="${_pickAttr(s)}">${dtkShort(s)}</span>` : dtkShort(s); }
+function dtkYearAgo(dates, L){              // the last reading on or before the same day a year earlier
+  const t=new Date(dates[L]+'T00:00:00'); t.setFullYear(t.getFullYear()-1);
+  const iso=t.toISOString().slice(0,10); let k=-1; dates.forEach((d,i)=>{ if(d<=iso) k=i; }); return k;
+}
+function renderDTK(){
+  const box=document.getElementById('dtk'); if(!box) return;
+  const dates=curDates(), L=dates.length-1, P=L-1, Y=dtkYearAgo(dates, L);
+  if(L<1){ box.innerHTML=''; return; }
+  const dL=fmt.date(dates[L]), dP=fmt.date(dates[P]);
+  const houses=housesPresent(null), HS=new Map();
+  // top-half share exactly as AMC Roll-up draws it (renderCompositeBar's sumSel): (Q1 + Q2) / the house's covered weight
+  const top=(fh,i)=>{ if(i<0) return null; if(!HS.has(fh)) HS.set(fh, houseSeries(fh,null)); const b=HS.get(fh).byQ, w=(b[WEIGHT_QT]&&b[WEIGHT_QT][i])||0;
+    return w ? (((b['% in Q1']&&b['% in Q1'][i])||0)+((b['% in Q2']&&b['% in Q2'][i])||0))/w : null; };
+  const rankAt=i=>houses.map(fh=>[fh, top(fh,i)]).filter(x=>x[1]!=null).sort((a,b)=>b[1]-a[1]);
+  const facts=[];
+  const hl=houseLabel(DTK_HOUSE);
+  // 1 - the house's top-half share, its change and its rank
+  const tL=top(DTK_HOUSE,L), tP=top(DTK_HOUSE,P), tY=top(DTK_HOUSE,Y);
+  if(tL!=null){
+    const rL=rankAt(L), rP=rankAt(P), kL=rL.findIndex(x=>x[0]===DTK_HOUSE)+1, kP=rP.findIndex(x=>x[0]===DTK_HOUSE)+1;
+    let t=`${hl} has <b>${fmt.pct(tL)}</b> of its covered AUM in the top half (Q1 and Q2) on ${dL}.`;
+    if(tP!=null) t+=` That is ${dtkPts(tL-tP)} since ${dP}`+(tY!=null?` and ${dtkPts(tL-tY)} since ${fmt.date(dates[Y])}.`:'.');
+    if(kL) t+=` It is ${dtkOrd(kL)} of ${rL.length} houses`+(kP&&kP!==kL?`; on ${dP} it was ${dtkOrd(kP)}.`:', the same as on '+dP+'.');
+    facts.push(t+' '+dtkGo('amc','See AMC Roll-up'));
+  }
+  // 2 + 3 - schemes that crossed the line, and where the AUM moved between quartiles
+  const rowsL=new Map(schemeRowsAt(L).filter(r=>r.h===DTK_HOUSE && !r.borrowed).map(r=>[r.s, r]));
+  const rowsP=new Map(schemeRowsAt(P).filter(r=>r.h===DTK_HOUSE && !r.borrowed).map(r=>[r.s, r]));
+  const up=[], down=[], mx=[0,1,2,3,4].map(()=>[0,0,0,0,0]);
+  rowsL.forEach((r,s)=>{ const p=rowsP.get(s); if(!p||!r.q||!p.q||r.cr==null) return;
+    mx[p.q][r.q]+=r.cr;
+    if(p.q>=3 && r.q<=2) up.push({s, from:p.q, to:r.q, cr:r.cr});
+    if(p.q<=2 && r.q>=3) down.push({s, from:p.q, to:r.q, cr:r.cr}); });
+  const sum=a=>a.reduce((x,y)=>x+(y.cr||0),0);
+  const lst=a=>'<ul class="dtk-sub">'+a.sort((x,y)=>y.cr-x.cr).slice(0,5).map(x=>`<li>${dtkPick(x.s)}: Q${x.from} to Q${x.to}, ${fmt.cr(x.cr)}</li>`).join('')+(a.length>5?`<li>and ${a.length-5} more</li>`:'')+'</ul>';
+  if(up.length) facts.push(`${up.length} scheme${up.length>1?'s':''} moved into the top half since ${dP}. ${up.length>1?'They hold':'It holds'} <b>${fmt.cr(sum(up))}</b>.`+lst(up));
+  if(down.length) facts.push(`${down.length} scheme${down.length>1?'s':''} fell out of the top half since ${dP}. ${down.length>1?'They hold':'It holds'} <b>${fmt.cr(sum(down))}</b>.`+lst(down));
+  if(!up.length && !down.length && rowsL.size) facts.push(`No ${hl} scheme crossed between the top half and the bottom half since ${dP}.`);
+  // 4 - the longest current runs in Q1 and in Q4
+  const RC=new Map(), rowsAt=i=>{ if(!RC.has(i)) RC.set(i, new Map(schemeRowsAt(i).filter(r=>r.h===DTK_HOUSE && !r.borrowed).map(r=>[r.s,r.q]))); return RC.get(i); };
+  const run=(s,q)=>{ let i=L; while(i>=0 && rowsAt(i).get(s)===q) i--; return i+1; };   // first index of the current run
+  const runs=[];
+  [[1,'Q1'],[4,'Q4']].forEach(([q,lab])=>{
+    let best=null; rowsL.forEach((r,s)=>{ if(r.q!==q) return; const f=run(s,q); if(!best || f<best.f || (f===best.f && (r.cr||0)>(best.cr||0))) best={s,f,cr:r.cr}; });
+    if(best && best.f<L) runs.push(`in ${lab}, ${dtkPick(best.s)}, at every reading since ${fmt.date(dates[best.f])} (${fmt.cr(best.cr)})`);
+  });
+  if(runs.length) facts.push(`Longest current run without a break: `+runs.join('; ')+'.');
+  schemeRowsAt(L);                                      // leave the shared memo on the latest date
+  // 5 - biggest rank moves inside a category over the month (needs the standing ranks)
+  const rw=RWOF[S.basis];
+  if(rw && standingSrc()){
+    const uni=S.universe, keyOf=r=>uni==='vr'?(r.c+'|'+r.s):r.s, size=new Map();
+    schemeRowsAt(L).forEach(r=>{ if(!r.borrowed && standingAt(uni,keyOf(r),rw,L)!=null) size.set(r.c,(size.get(r.c)||0)+1); });
+    const mv=[]; rowsL.forEach((r,s)=>{ const a=standingAt(uni,keyOf(r),rw,P), b=standingAt(uni,keyOf(r),rw,L), n=size.get(r.c);
+      if(a!=null && b!=null && n>1 && a!==b) mv.push({s, c:r.c, a, b, n, d:(a-b)/n}); });
+    mv.sort((x,y)=>y.d-x.d);
+    const u=mv.filter(x=>x.d>0)[0], dn=mv.filter(x=>x.d<0).slice(-1)[0];
+    const one=(x,verb)=>`${dtkPick(x.s)} ${verb} from ${dtkOrd(x.a)} to ${dtkOrd(x.b)} of ${x.n} in ${BADCAT(x.c)?'its category':x.c}`;
+    if(u||dn) facts.push(`Biggest rank changes in a category since ${dP}: `+[u?one(u,'rose'):null, dn?one(dn,'fell'):null].filter(Boolean).join('; ')+'.');
+  } else if(rw && !standingSrc() && typeof fetchStanding==='function'){ fetchStanding(); }
+  // 6 - houses that gained and lost the most top-half share this month
+  const chg=houses.map(fh=>{ const a=top(fh,P), b=top(fh,L); return (a==null||b==null)?null:{fh,d:b-a,b}; }).filter(Boolean).sort((x,y)=>y.d-x.d);
+  if(chg.length>1){ const g=chg[0], l=chg[chg.length-1];
+    facts.push(`Across the ${chg.length} houses, ${houseLabel(g.fh)} gained the most top-half share since ${dP}: ${dtkPts(g.d)}, to ${fmt.pct(g.b)}. ${houseLabel(l.fh)} lost the most: ${dtkPts(l.d)}, to ${fmt.pct(l.b)}. `+dtkGo('amc','See AMC Roll-up')); }
+  // 7 - how concentrated the bottom quartile is
+  const q4=[...rowsL.values()].filter(r=>r.q===4 && r.cr>0).sort((a,b)=>b.cr-a.cr);
+  if(q4.length>3){ const all=sum(q4), t3=sum(q4.slice(0,3));
+    facts.push(`${hl} has ${fmt.cr(all)} in ${q4.length} Q4 schemes. The three largest hold ${fmt.pct(t3/all,0)} of it: `+q4.slice(0,3).map(r=>dtkPick(r.s)).join(', ')+'.'); }
+  else if(q4.length){ facts.push(`${hl} has ${fmt.cr(sum(q4))} in ${q4.length} Q4 scheme${q4.length>1?'s':''}: `+q4.map(r=>`${dtkPick(r.s)} (${fmt.cr(r.cr)})`).join(', ')+'.'); }
+
+  // the quartile move table (Rs crore at the latest date, by quartile then and now)
+  let mxMax=0; for(let a=1;a<=4;a++) for(let b=1;b<=4;b++) mxMax=Math.max(mxMax, mx[a][b]);
+  const cell=(a,b)=>{ const v=mx[a][b], o=mxMax?0.08+0.5*v/mxMax:0, col=a===b?'31,92,61':(b<a?'53,118,207':'192,82,62');
+    return `<td class="num" style="background:rgba(${col},${v?o.toFixed(2):0})">${v?fmt.cr(v):'—'}</td>`; };
+  const mxHtml=`<table class="rt dtk-mx" data-gsort="none"><thead><tr><th>On ${dP} \\ on ${dL}</th>${[1,2,3,4].map(q=>`<th class="num">Q${q}</th>`).join('')}</tr></thead><tbody>`+
+    [1,2,3,4].map(a=>`<tr><td class="lbl">Q${a}</td>${[1,2,3,4].map(b=>cell(a,b)).join('')}</tr>`).join('')+'</tbody></table>';
+
+  box.innerHTML=`<div class="shead"><h2>Data to know</h2><div class="ctx">${basisDesc()} · ${dL}</div></div>
+    <div class="card dtk-card"><ol class="dtk-facts">${facts.map(f=>`<li>${f}</li>`).join('')||'<li>No data for this selection.</li>'}</ol>
+      <div class="dtk-note">Written from this build's data and the filters above. Top-half share is Q1 + Q2 as a share of the house's covered AUM, as on AMC Roll-up. A tap on a scheme opens it in Scheme Detail.</div></div>
+    <div class="dtk-grid">
+      <div class="card"><div class="card-h"><div><h3>Where ${hl} AUM moved</h3><div class="sub">Rupees by quartile on ${dP} (rows) and on ${dL} (columns). Green stayed, blue moved up, red moved down.</div></div></div>${mxHtml}</div>
+      <div class="card"><div class="card-h"><div><h3>${hl} top-half share</h3><div class="sub">Q1 + Q2 share of covered AUM, last 24 readings, with the median house in scope</div></div></div><div class="chartbox short"><canvas id="dtk-line"></canvas></div></div>
+    </div>
+    <div class="card"><div class="card-h"><div><h3>Change in top-half share since ${dP}</h3><div class="sub">Points, every house in scope. ${hl} is outlined.</div></div></div><div class="chartbox"><canvas id="dtk-bars"></canvas></div></div>`;
+
+  box.querySelectorAll('.dtk-go').forEach(a=>a.onclick=e=>{ e.preventDefault(); activateTab(a.dataset.v); window.scrollTo(0,0); });
+  // charts
+  const i0=Math.max(0,L-23), xs=[], me=[], md=[];
+  for(let i=i0;i<=L;i++){ xs.push(fmt.monyr(dates[i])); const v=top(DTK_HOUSE,i); me.push(v==null?null:+(100*v).toFixed(1));
+    const all=houses.map(fh=>top(fh,i)).filter(v=>v!=null).sort((a,b)=>a-b);
+    md.push(all.length?+(100*(all.length%2?all[(all.length-1)/2]:(all[all.length/2-1]+all[all.length/2])/2)).toFixed(1):null); }
+  ['dtkLine','dtkBars'].forEach(k=>{ if(S.charts[k]){ try{S.charts[k].destroy();}catch(e){} delete S.charts[k]; } });
+  const lc=document.getElementById('dtk-line');
+  if(lc) S.charts.dtkLine=new Chart(lc,{type:'line',data:{labels:xs,datasets:[
+      {label:hl,data:me,borderColor:C.absl||'#c8392b',backgroundColor:C.absl||'#c8392b',borderWidth:2,pointRadius:0,tension:0.2},
+      {label:'Median house',data:md,borderColor:C.ink4||'#9c8f7a',backgroundColor:C.ink4||'#9c8f7a',borderWidth:1.5,borderDash:[],pointRadius:0,tension:0.2}]},
+    options:{maintainAspectRatio:false,animation:false,interaction:{mode:'index',intersect:false},
+      plugins:{legend:{position:'bottom',labels:{boxWidth:10}},tooltip:{callbacks:{label:c=>c.dataset.label+': '+(c.parsed.y==null?'—':c.parsed.y.toFixed(1)+'%')}}},
+      scales:{y:{min:0,max:100,ticks:{callback:v=>v+'%'}},x:{ticks:{maxTicksLimit:6,maxRotation:0}}}}});
+  const bc=document.getElementById('dtk-bars');
+  if(bc && chg.length){ const lab=chg.map(x=>houseLabel(x.fh)), val=chg.map(x=>+(100*x.d).toFixed(1));
+    S.charts.dtkBars=new Chart(bc,{type:'bar',data:{labels:lab,datasets:[{data:val,
+      backgroundColor:chg.map(x=>x.d>=0?(C.q2||'#6fa37c'):(C.q4||'#c0523e')),
+      borderColor:chg.map(x=>x.fh===DTK_HOUSE?'#591102':'rgba(0,0,0,0)'),borderWidth:chg.map(x=>x.fh===DTK_HOUSE?2:0)}]},
+      options:{maintainAspectRatio:false,animation:false,plugins:{legend:{display:false},barValues:{suffix:'',dp:1},
+        tooltip:{callbacks:{label:c=>(c.parsed.y>0?'+':'')+c.parsed.y.toFixed(1)+' points'}}},
+        scales:{y:{ticks:{callback:v=>(v>0?'+':'')+v}},x:{ticks:{autoSkip:false,maxRotation:55,minRotation:55}}}}}); }
+}
 function renderMapping(){
   const D=S.data, sEl=document.getElementById('pm-search');
   const draw=f=>{ const s=(f||'').toLowerCase();
@@ -8284,7 +8423,7 @@ function renderMapping(){
       return `<tr class="${cls}"><td class="lbl">${sch}</td><td>${r.Category||r.cat||''}</td><td>${r.Benchmark||''}</td><td>${r['AMFI Code']||r.amfi||''}</td></tr>`; }).join('');
     document.getElementById('pm-count').textContent=`${rows.length} of ${D.peer_map.length} schemes`;
   };
-  if(!sEl.dataset.wired){ sEl.dataset.wired='1'; sEl.oninput=e=>draw(e.target.value);
+  if(!sEl.dataset.wired){ sEl.dataset.wired='1'; sEl.oninput=e=>{ const d=document.getElementById('dtk-ref'); if(d) d.open=true; draw(e.target.value); };
     document.getElementById('pm-exp').onclick=()=>{ let csv='Scheme,Category,Benchmark,AMFI\n'; D.peer_map.forEach(r=>csv+=[`"${r.Scheme||r.scheme||''}"`,`"${r.Category||r.cat||''}"`,`"${r.Benchmark||''}"`,`"${r['AMFI Code']||r.amfi||''}"`].join(',')+'\n'); downloadCSV(csv,'peer_mapping.csv'); };
   }
   draw('');
